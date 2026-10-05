@@ -149,5 +149,7 @@
         btnEnviar.onclick = ejecutarConsulta;
         inputTexto.onkeypress = (e) => { if (e.key === 'Enter') ejecutarConsulta(); };
     </script>
+    {% block extra_js %}
+    {% endblock %}
 </body>
 </html>
