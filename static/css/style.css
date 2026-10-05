@@ -1,0 +1,379 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BROADBROS - SISTEMA DE GESTIÓN CONTABLE (ESTILO ERP INSTITUCIONAL)
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+    --bg-app: #f1f3f6;
+    --surface-card: #ffffff;
+    --border-color: #d1d5db;
+    --border-subtle: #e5e7eb;
+
+    --sidebar-bg: #1f2937;
+    --sidebar-hover: #374151;
+    --sidebar-active: #111827;
+
+    --primary-color: #0f4c81;       /* Azul clásico institucional */
+    --primary-hover: #0a3357;
+    
+    --text-primary: #111827;
+    --text-muted: #4b5563;
+    --text-light: #6b7280;
+
+    --color-debe: #047857;          /* Verde contable */
+    --color-haber: #b91c1c;         /* Rojo contable */
+
+    --radius: 4px;                  /* Bordes rectos tipo ERP */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ─── SIDEBAR FORMAL ─── */
+.sidebar {
+    width: 240px;
+    background-color: var(--sidebar-bg);
+    color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-right: 1px solid #111827;
+}
+
+.sidebar-brand {
+    padding: 16px;
+    border-bottom: 1px solid #374151;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sidebar-brand h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+.brand-badge {
+    background: #374151;
+    color: #93c5fd;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-weight: 600;
+    border: 1px solid #4b5563;
+}
+
+.sidebar-nav {
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.nav-section {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #9ca3af;
+    padding: 12px 10px 4px 10px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    color: #d1d5db;
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+
+.nav-link:hover {
+    background-color: var(--sidebar-hover);
+    color: #ffffff;
+}
+
+.nav-link.active {
+    background-color: var(--sidebar-active);
+    color: #ffffff;
+    font-weight: 600;
+    border-left: 3px solid #60a5fa;
+}
+
+.nav-link.highlight-ocr {
+    background-color: #2e3846;
+    border: 1px solid #4b5563;
+    color: #f3f4f6;
+    font-weight: 600;
+}
+
+/* ─── CONTENIDO PRINCIPAL ─── */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-app);
+}
+
+.page-header {
+    background: #ffffff;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-header h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.header-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+.content-area {
+    padding: 20px 24px;
+    flex: 1;
+}
+
+/* ─── GRILLA DE MÉTRICAS (PANEL PRINCIPAL) ─── */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.stat-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+    background: #f3f4f6;
+    padding: 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-subtle);
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+}
+
+/* ─── GRILLA DE ACCIONES RÁPIDAS ─── */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.action-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.action-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+
+.action-icon {
+    font-size: 1.4rem;
+    padding: 6px;
+    background: #f9fafb;
+    border-radius: var(--radius);
+}
+
+.action-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 2px;
+}
+
+.action-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ─── TARJETAS GENERALES Y TABLAS ─── */
+.card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.card-header {
+    background: #f9fafb;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3, .card-header h4 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.card-body {
+    padding: 16px;
+}
+
+/* Formularios */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-control, input[type="text"], input[type="date"], select {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    color: #111827;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+}
+
+.form-control:focus, input:focus, select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* Tablas Contables Formales */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    font-size: 0.82rem;
+}
+
+th {
+    background: #e5e7eb;
+    color: #374151;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.3px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+td {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    color: #1f2937;
+}
+
+tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+/* Botones */
+.btn, .btn-primary {
+    background-color: var(--primary-color);
+    color: #ffffff;
+    border: 1px solid var(--primary-hover);
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn:hover, .btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+    background: #ffffff;
+    color: #374151;
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.text-debe { color: var(--color-debe); font-weight: 700; font-family: Consolas, monospace; }
+.text-haber { color: var(--color-haber); font-weight: 700; font-family: Consolas, monospace; }
+
+.footer, footer {
+    display: none !important;
+}
