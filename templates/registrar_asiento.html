@@ -91,7 +91,7 @@
                     <td><strong>Asiento #{{ asiento.id }}</strong> - {{ asiento.descripcion|default:"Sin descripción" }}</td>
                     <td>{{ asiento.movimientos.count }} líneas</td>
                     <td class="text-center">
-                        <a href="{% url 'editar_asiento' asiento.id %}" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 0.85rem;">✏️ Editar</a>
+                        <a href="{% url 'libro_diario' %}?editar={{ asiento.id }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 0.85rem;">✏️ Editar</a>
                         <a href="{% url 'eliminar_asiento' asiento.id %}" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 0.85rem;" onclick="return confirm('¿Eliminar este asiento permanentemente?');">🗑️ Eliminar</a>
                     </td>
                 </tr>

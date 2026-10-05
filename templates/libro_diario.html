@@ -246,7 +246,21 @@
             status.textContent = `❌ Diferencia: S/ ${Math.abs(tDebe - tHaber).toFixed(2)}`; status.className = 'balance-status error';
         }
     }
+    // Abrir automáticamente el asiento enviado desde "Registrar Asiento"
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const asientoId = params.get('editar');
 
+        if (asientoId) {
+        const boton = document.querySelector(
+            `button[onclick^="abrirModalEditar(${asientoId},"]`
+            );
+
+        if (boton) {
+            boton.click();
+            }
+        }
+    });
     window.onclick = function(event) { if (event.target == document.getElementById('modalEditar')) cerrarModal(); }
 </script>
 {% endblock %}
