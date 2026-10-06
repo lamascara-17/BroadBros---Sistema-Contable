@@ -32,10 +32,10 @@
                 {% csrf_token %}
 
                 <div class="form-group">
-                    <label>Fotografía o captura del ejercicio</label>
+                    <label for="imagen-caso">Fotografía o captura del ejercicio</label>
                     <div class="upload-zone">
-                        <input type="file" name="imagen_caso" accept="image/*" capture="environment" required>
-                        <div class="helper-text">En un teléfono se puede abrir directamente la cámara posterior.</div>
+                        <input id="imagen-caso" type="file" name="imagen_caso" accept="image/*" required>
+                        <div class="helper-text">Elige una imagen de tu galería o archivos. También puedes tomar una foto si tu teléfono ofrece esa opción.</div>
                     </div>
                 </div>
 
