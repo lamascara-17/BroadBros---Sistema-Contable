@@ -1015,7 +1015,7 @@ def cargar_imagen_diario(request):
     from .ai_diario import interpretar_caso_imagen
     if request.method != 'POST':
         return render(request, 'cargar_imagen_diario.html')
-    imagen = request.FILES.get('imagen_caso')
+    imagen = request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
     if not imagen:
         messages.error(request, 'Adjunte una imagen del caso contable.')
         return redirect('cargar_imagen_diario')

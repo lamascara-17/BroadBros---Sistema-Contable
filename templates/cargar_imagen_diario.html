@@ -32,10 +32,12 @@
                 {% csrf_token %}
 
                 <div class="form-group">
-                    <label for="imagen-caso">Fotografía o captura del ejercicio</label>
                     <div class="upload-zone">
+                        <label for="imagen-caso">Elegir de la galería o archivos</label>
                         <input id="imagen-caso" type="file" name="imagen_caso" accept="image/*" required>
-                        <div class="helper-text">Elige una imagen de tu galería o archivos. También puedes tomar una foto si tu teléfono ofrece esa opción.</div>
+                        <label for="foto-camara" style="margin-top:16px;">Tomar foto</label>
+                        <input id="foto-camara" type="file" name="foto_camara" accept="image/*" capture="environment">
+                        <div class="helper-text">Usa una de las dos opciones. Al elegir otra imagen, se reemplaza la selección anterior.</div>
                     </div>
                 </div>
 
@@ -74,5 +76,13 @@
             correctLevel: QRCode.CorrectLevel.M
         });
     });
+    const galeria = document.getElementById('imagen-caso');
+    const camara = document.getElementById('foto-camara');
+    function seleccionarImagen(origen, otro) {
+        if (origen.files.length) otro.value = '';
+        galeria.required = !(galeria.files.length || camara.files.length);
+    }
+    galeria.addEventListener('change', () => seleccionarImagen(galeria, camara));
+    camara.addEventListener('change', () => seleccionarImagen(camara, galeria));
 </script>
 {% endblock %}

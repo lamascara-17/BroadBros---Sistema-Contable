@@ -98,10 +98,15 @@ class ReglasCicloTests(SimpleTestCase):
 
 
 class ImportacionReportesTests(TestCase):
-    def importar(self):
+    def importar(self, campo='imagen_caso'):
         with patch('core.ai_diario.extraer_operaciones',return_value=caso()):
-            r=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on'})
+            r=self.client.post(reverse('cargar_imagen_diario'),{campo:imagen(),'limpiar':'on'})
         self.assertRedirects(r,reverse('libro_diario'))
+
+    def test_importacion_desde_camara(self):
+        self.importar('foto_camara')
+        self.assertEqual(AsientoContable.objects.count(),14)
+        self.assertEqual(contexto_estados()['gran_total_debe'],Decimal('39135'))
 
     def test_saldos_del_solucionario_y_clasificacion(self):
         self.importar();ctx=contexto_estados()
