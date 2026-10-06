@@ -650,59 +650,458 @@ def reporte_completo(request):
 
 # ─── TUTOR EXPLICATIVO DEL LIBRO DIARIO (GROQ OFICIAL) ─────────────────────────
 
+# ─── TUTOR EXPLICATIVO DEL LIBRO DIARIO (GROQ OFICIAL) ─────────────────────────
+
 def chatbot_api(request):
     """
-    Chatbot Tutor Contable: Explica técnicamente la dinámica del Libro Diario
-    basado en los asientos reales registrados en la base de datos usando Groq.
+    Chatbot Tutor Contable.
+
+    IMPORTANTE:
+    El número de asiento mostrado al usuario NO corresponde al ID
+    interno de la base de datos.
+
+    Ejemplo:
+        Libro Diario:
+            Asiento #1
+            Asiento #2
+            Asiento #3
+
+        Base de datos:
+            ID 42
+            ID 43
+            ID 44
+
+    El chatbot utiliza el número visible del Libro Diario
+    (1, 2, 3...) y no el ID interno.
     """
+
     if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
+        return JsonResponse(
+            {'error': 'Método no permitido'},
+            status=405
+        )
 
     user_message = request.POST.get('message', '').strip()
+
     if not user_message:
-        return JsonResponse({'error': 'Mensaje vacío'}, status=400)
+        return JsonResponse(
+            {'error': 'Mensaje vacío'},
+            status=400
+        )
 
     try:
-        api_key = getattr(settings, 'GROQ_API_KEY', None) or os.environ.get('GROQ_API_KEY') or DEFAULT_GROQ_KEY
+        # ==========================================================
+        # 1. OBTENER API KEY
+        # ==========================================================
 
-        asientos = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')
-        resumen_diario = []
-        for a in asientos:
-            movs = [f"Cuenta {m.cuenta.codigo} - {m.cuenta.nombre} ({m.tipo.upper()}: S/ {m.monto})" for m in a.movimientos.all()]
-            resumen_diario.append(f"Asiento #{a.id} ({a.fecha}) - {a.descripcion}:\n  " + "\n  ".join(movs))
+        api_key = (
+            getattr(settings, 'GROQ_API_KEY', None)
+            or os.environ.get('GROQ_API_KEY')
+            or DEFAULT_GROQ_KEY
+        )
 
-        contexto = "\n\n".join(resumen_diario) if resumen_diario else "No hay asientos registrados aún."
+        if not api_key:
+            return JsonResponse(
+                {
+                    'error': (
+                        'No se encontró GROQ_API_KEY. '
+                        'Verifica tu archivo .env.'
+                    )
+                },
+                status=500
+            )
 
-        client = groq.Groq(api_key=api_key)
-        system_prompt = f"""
-        Eres un profesor y auditor de contabilidad universitaria bajo el Plan Contable General Empresarial (PCGE) del Perú.
-        Tu rol es sustentar y fundamentar técnicamente el LIBRO DIARIO de la empresa ante el docente.
+        # ==========================================================
+        # 2. OBTENER ASIENTOS EN EL MISMO ORDEN DEL LIBRO DIARIO
+        # ==========================================================
 
-        ASIENTOS REGISTRADOS:
-        -----------------------------------
-        {contexto}
-        -----------------------------------
+        asientos = list(
+            AsientoContable.objects
+            .prefetch_related('movimientos__cuenta')
+            .order_by('fecha', 'id')
+        )
 
-        Instrucciones:
-        1. Explica técnicamente por qué una cuenta va al Debe o al Haber usando la teoría del cargo y abono (+Activo al Debe, -Activo al Haber, +Pasivo al Haber, etc.).
-        2. Cita la cuenta contable y su código oficial según el PCGE.
-        3. Sé formal, seguro y conciso (máximo 2 párrafos cortos).
+        if not asientos:
+            return JsonResponse(
+                {
+                    'error': (
+                        'No existen asientos registrados '
+                        'en el Libro Diario.'
+                    )
+                },
+                status=404
+            )
+
+        # ==========================================================
+        # 3. ASIGNAR NÚMERO VISIBLE AL ASIENTO
+        # ==========================================================
+        #
+        # Este número es EXACTAMENTE el que debe corresponder
+        # al {{ forloop.counter }} utilizado en libro_diario.html.
+        #
+        # Ejemplo:
+        #
+        # posición 1 → Asiento #1
+        # posición 2 → Asiento #2
+        # posición 3 → Asiento #3
+        #
+        # NO usamos a.id como número de asiento.
+        # ==========================================================
+
+        asientos_numerados = []
+
+        for numero_asiento, asiento in enumerate(
+            asientos,
+            start=1
+        ):
+            movimientos = []
+
+            for movimiento in asiento.movimientos.all():
+
+                movimientos.append(
+                    {
+                        'codigo': movimiento.cuenta.codigo,
+                        'nombre': movimiento.cuenta.nombre,
+                        'tipo': movimiento.tipo,
+                        'monto': movimiento.monto,
+                    }
+                )
+
+            asientos_numerados.append(
+                {
+                    'numero': numero_asiento,
+                    'id': asiento.id,
+                    'fecha': asiento.fecha,
+                    'descripcion': asiento.descripcion,
+                    'movimientos': movimientos,
+                }
+            )
+
+        # ==========================================================
+        # 4. DETECTAR SI EL USUARIO MENCIONÓ UN ASIENTO
+        # ==========================================================
+        #
+        # Detecta frases como:
+        #
+        # "asiento 3"
+        # "asiento #3"
+        # "asiento número 3"
+        # "asiento nro 3"
+        # "justifica la cuenta 1101 en el asiento 3"
+        #
+        # También acepta mayúsculas/minúsculas.
+        # ==========================================================
+
+        mensaje_normalizado = user_message.lower()
+
+        patron_asiento = re.search(
+            r'\basiento\s*(?:n[úu]mero|nro\.?|n°|#)?\s*(\d+)\b',
+            mensaje_normalizado,
+            re.IGNORECASE
+        )
+
+        asiento_solicitado = None
+        asiento_encontrado = None
+
+        if patron_asiento:
+
+            asiento_solicitado = int(
+                patron_asiento.group(1)
+            )
+
+            # Buscar por número VISIBLE, no por ID.
+            for asiento_info in asientos_numerados:
+
+                if asiento_info['numero'] == asiento_solicitado:
+                    asiento_encontrado = asiento_info
+                    break
+
+        # ==========================================================
+        # 5. SI SOLICITÓ UN ASIENTO QUE NO EXISTE
+        # ==========================================================
+
+        if (
+            asiento_solicitado is not None
+            and asiento_encontrado is None
+        ):
+
+            total_asientos = len(
+                asientos_numerados
+            )
+
+            return JsonResponse(
+                {
+                    'error': (
+                        f'El Asiento #{asiento_solicitado} '
+                        f'no existe en el Libro Diario. '
+                        f'Actualmente existen '
+                        f'{total_asientos} asientos registrados.'
+                    )
+                },
+                status=404
+            )
+
+        # ==========================================================
+        # 6. CONSTRUIR CONTEXTO PARA GROQ
+        # ==========================================================
+
+        if asiento_encontrado:
+
+            # ------------------------------------------------------
+            # CASO A:
+            # El usuario preguntó por un asiento específico.
+            #
+            # Le enviamos SOLAMENTE ese asiento.
+            # ------------------------------------------------------
+
+            asiento = asiento_encontrado
+
+            movimientos_texto = []
+
+            for mov in asiento['movimientos']:
+
+                movimientos_texto.append(
+                    (
+                        f"Cuenta {mov['codigo']} - "
+                        f"{mov['nombre']} "
+                        f"("
+                        f"{mov['tipo'].upper()}: "
+                        f"S/ {mov['monto']}"
+                        f")"
+                    )
+                )
+
+            contexto = (
+                f"ASIENTO VISIBLE #{asiento['numero']}\n"
+                f"ID INTERNO: {asiento['id']}\n"
+                f"Fecha: {asiento['fecha']}\n"
+                f"Descripción: {asiento['descripcion']}\n"
+                f"Movimientos:\n"
+                + "\n".join(
+                    f"  - {mov}"
+                    for mov in movimientos_texto
+                )
+            )
+
+            instruccion_asiento = f"""
+        El usuario está preguntando específicamente por el
+        ASIENTO VISIBLE #{asiento['numero']} del Libro Diario.
+
+        IMPORTANTE:
+        - Este es el asiento que debes analizar.
+        - NO confundas el número visible del asiento con su ID interno.
+        - El número visible es #{asiento['numero']}.
+        - El ID interno {asiento['id']} NO debe mencionarse como número
+          del asiento al usuario.
+        - Basa tu respuesta exclusivamente en los movimientos
+          proporcionados para este asiento.
         """
+
+        else:
+
+            # ------------------------------------------------------
+            # CASO B:
+            # No especificó asiento.
+            #
+            # Le enviamos todo el Libro Diario numerado correctamente.
+            # ------------------------------------------------------
+
+            resumen_diario = []
+
+            for asiento in asientos_numerados:
+
+                movimientos_texto = []
+
+                for mov in asiento['movimientos']:
+
+                    movimientos_texto.append(
+                        (
+                            f"Cuenta {mov['codigo']} - "
+                            f"{mov['nombre']} "
+                            f"("
+                            f"{mov['tipo'].upper()}: "
+                            f"S/ {mov['monto']}"
+                            f")"
+                        )
+                    )
+
+                resumen_diario.append(
+                    f"Asiento #{asiento['numero']} "
+                    f"({asiento['fecha']}) - "
+                    f"{asiento['descripcion']}:\n"
+                    +
+                    "\n".join(
+                        f"  - {mov}"
+                        for mov in movimientos_texto
+                    )
+                )
+
+            contexto = "\n\n".join(
+                resumen_diario
+            )
+
+            instruccion_asiento = """
+        El usuario no especificó un número de asiento concreto.
+
+        Utiliza el Libro Diario proporcionado para responder.
+        Recuerda que "Asiento #1", "Asiento #2", "Asiento #3", etc.
+        corresponden al orden cronológico mostrado al usuario.
+        """
+
+        # ==========================================================
+        # 7. CREAR CLIENTE GROQ
+        # ==========================================================
+
+        client = Groq(
+            api_key=api_key
+        )
+
+        # ==========================================================
+        # 8. PROMPT DEL TUTOR CONTABLE
+        # ==========================================================
+
+        system_prompt = f"""
+Eres un profesor y auditor de contabilidad universitaria
+especializado en el Plan Contable General Empresarial (PCGE)
+del Perú.
+
+Tu función es sustentar y fundamentar técnicamente los asientos
+del LIBRO DIARIO de la empresa ante un docente.
+
+============================================================
+LIBRO DIARIO
+============================================================
+
+{contexto}
+
+============================================================
+REGLA FUNDAMENTAL SOBRE LOS NÚMEROS DE ASIENTO
+============================================================
+
+Los números de asiento que aparecen en este contexto son los
+NÚMEROS VISIBLES del Libro Diario.
+
+Por ejemplo:
+
+Asiento #1
+Asiento #2
+Asiento #3
+Asiento #4
+
+NO debes reemplazarlos por el ID interno de la base de datos.
+
+El ID interno solamente existe para el funcionamiento de Django
+y NO representa el número del asiento mostrado al usuario.
+
+============================================================
+INSTRUCCIÓN PARA ESTA CONSULTA
+============================================================
+
+{instruccion_asiento}
+
+============================================================
+REGLAS DE RESPUESTA
+============================================================
+
+1. Explica técnicamente por qué una cuenta va al Debe o al Haber.
+
+2. Utiliza la teoría del cargo y abono:
+
+   - Aumento de Activo → Debe
+   - Disminución de Activo → Haber
+   - Aumento de Pasivo → Haber
+   - Disminución de Pasivo → Debe
+   - Aumento de Patrimonio → Haber
+   - Disminución de Patrimonio → Debe
+   - Aumento de Gasto → Debe
+   - Aumento de Ingreso → Haber
+
+3. Cita el código y nombre de la cuenta involucrada.
+
+4. Explica la relación entre la operación económica
+   y el registro contable.
+
+5. Si el usuario pregunta por una cuenta específica,
+   analiza esa cuenta dentro del asiento correspondiente.
+
+6. Si el usuario pregunta:
+   "¿Por qué se cargó la cuenta 1101?"
+   identifica la cuenta 1101 dentro del asiento correcto.
+
+7. Si pregunta:
+   "¿Por qué se abonó la cuenta 5101?"
+   identifica la cuenta 5101 dentro del asiento correcto.
+
+8. No inventes movimientos que no aparecen en el contexto.
+
+9. No inventes números de asiento.
+
+10. No confundas el ID interno con el número visible del asiento.
+
+11. Sé formal, claro y conciso.
+
+12. Responde en máximo 2 párrafos cortos,
+    salvo que la pregunta requiera una explicación mayor.
+
+============================================================
+"""
+
+        # ==========================================================
+        # 9. CONSULTAR GROQ
+        # ==========================================================
 
         chat_completion = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
             ],
             temperature=0.2,
         )
 
-        respuesta = chat_completion.choices[0].message.content
-        return JsonResponse({'response': respuesta, 'status': 'success'})
+        respuesta = (
+            chat_completion
+            .choices[0]
+            .message
+            .content
+        )
+
+        # ==========================================================
+        # 10. RESPUESTA AL FRONTEND
+        # ==========================================================
+
+        return JsonResponse(
+            {
+                'response': respuesta,
+                'status': 'success',
+                'asiento_consultado': (
+                    asiento_encontrado['numero']
+                    if asiento_encontrado
+                    else None
+                )
+            }
+        )
+
+    # ==============================================================
+    # 11. MANEJO DE ERRORES
+    # ==============================================================
 
     except Exception as e:
-        return JsonResponse({'error': f'Error en el asistente: {str(e)}'}, status=500)
+
+        return JsonResponse(
+            {
+                'error': (
+                    f'Error en el asistente: {str(e)}'
+                )
+            },
+            status=500
+        )
 
 
 # ─── INGESTA DE CASO POR IMAGEN / FOTO (GROQ VISION) ──────────────────────────
