@@ -4,152 +4,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
     <title>{% block title %}BroadBros — Sistema Contable{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
-    <div class="layout">
-        <!-- ═══ SIDEBAR CORPORATIVO ═══ -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <h1>BroadBros</h1>
-                <span class="brand-badge">FIIS UNI</span>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-head">
+                <a href="{% url 'index' %}" class="brand">
+                    <span class="brand-mark">B</span>
+                    <span class="brand-copy">
+                        <strong>BroadBros</strong>
+                        <small>Sistema contable</small>
+                    </span>
+                </a>
+                <button class="icon-button sidebar-close" id="sidebar-close" type="button" aria-label="Cerrar menú">×</button>
             </div>
-            
-            <nav class="sidebar-nav">
-                <div class="nav-section">Captura de Datos</div>
-                <a href="{% url 'cargar_imagen_diario' %}" class="nav-link highlight-ocr">
-                    <span>📷</span> Ingesta por Imagen
+
+            <nav class="sidebar-nav" aria-label="Navegación principal">
+                <p class="nav-label">General</p>
+                <a href="{% url 'index' %}" class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                    <span class="nav-icon">⌂</span><span>Resumen</span>
                 </a>
 
-                <div class="nav-section">Libros Obligatorios</div>
-                <a href="{% url 'libro_diario' %}" class="nav-link">
-                    <span>📖</span> Libro Diario
+                <p class="nav-label">Operaciones</p>
+                <a href="{% url 'registrar_asiento' %}" class="nav-link {% if request.resolver_match.url_name == 'registrar_asiento' %}active{% endif %}">
+                    <span class="nav-icon">＋</span><span>Registrar asiento</span>
                 </a>
-                <a href="{% url 'libro_mayor' %}" class="nav-link">
-                    <span>📚</span> Libro Mayor
+                <a href="{% url 'cargar_imagen_diario' %}" class="nav-link {% if request.resolver_match.url_name == 'cargar_imagen_diario' %}active{% endif %}">
+                    <span class="nav-icon">▣</span><span>Importar desde imagen</span>
                 </a>
-
-                <div class="nav-section">Balances y Estados</div>
-                <a href="{% url 'balance_comprobacion' %}" class="nav-link">
-                    <span>⚖️</span> Balance Comprobación
-                </a>
-                <a href="{% url 'estado_resultados' %}" class="nav-link">
-                    <span>📈</span> Estado de Resultados
-                </a>
-                <a href="{% url 'balance_general' %}" class="nav-link">
-                    <span>🏦</span> Balance General
+                <a href="{% url 'libro_diario' %}" class="nav-link {% if request.resolver_match.url_name == 'libro_diario' %}active{% endif %}">
+                    <span class="nav-icon">≡</span><span>Libro diario</span>
                 </a>
 
-                <div class="nav-section">Mantenimiento</div>
-                <a href="{% url 'gestionar_cuentas' %}" class="nav-link">
-                    <span>📋</span> Plan de Cuentas
+                <p class="nav-label">Contabilidad</p>
+                <a href="{% url 'gestionar_cuentas' %}" class="nav-link {% if request.resolver_match.url_name == 'gestionar_cuentas' %}active{% endif %}">
+                    <span class="nav-icon">#</span><span>Plan de cuentas</span>
                 </a>
-                <a href="{% url 'registrar_asiento' %}" class="nav-link">
-                    <span>✏️</span> Registro Manual
+                <a href="{% url 'libro_mayor' %}" class="nav-link {% if request.resolver_match.url_name == 'libro_mayor' %}active{% endif %}">
+                    <span class="nav-icon">▤</span><span>Libro mayor</span>
                 </a>
-                <a href="{% url 'reporte_completo' %}" class="nav-link">
-                    <span>📄</span> Exportar Reporte
+
+                <p class="nav-label">Reportes</p>
+                <a href="{% url 'balance_comprobacion' %}" class="nav-link {% if request.resolver_match.url_name == 'balance_comprobacion' %}active{% endif %}">
+                    <span class="nav-icon">✓</span><span>Balance de comprobación</span>
+                </a>
+                <a href="{% url 'estado_resultados' %}" class="nav-link {% if request.resolver_match.url_name == 'estado_resultados' %}active{% endif %}">
+                    <span class="nav-icon">↗</span><span>Estado de resultados</span>
+                </a>
+                <a href="{% url 'balance_general' %}" class="nav-link {% if request.resolver_match.url_name == 'balance_general' %}active{% endif %}">
+                    <span class="nav-icon">□</span><span>Balance general</span>
+                </a>
+                <a href="{% url 'reporte_completo' %}" class="nav-link {% if request.resolver_match.url_name == 'reporte_completo' %}active{% endif %}">
+                    <span class="nav-icon">⇩</span><span>Exportar reporte</span>
                 </a>
             </nav>
+
+            <div class="sidebar-foot">
+                <span class="status-dot"></span>
+                <span>PCGE · FIIS UNI</span>
+            </div>
         </aside>
 
-        <!-- ═══ ÁREA CENTRAL ═══ -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
         <main class="main-content">
-            <header class="page-header">
-                <div>
-                    <h2>{% block page_title %}Sistema de Gestión Contable{% endblock %}</h2>
-                    <div class="header-subtitle">{% block page_subtitle %}Plan Contable General Empresarial (PC2){% endblock %}</div>
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Abrir menú">☰</button>
+                    <div class="page-heading">
+                        <h1>{% block page_title %}Sistema de Gestión Contable{% endblock %}</h1>
+                        <p>{% block page_subtitle %}Plan Contable General Empresarial{% endblock %}</p>
+                    </div>
                 </div>
-                <div>
-                    <!-- Botón sobrio para sustentar asientos -->
-                    <button id="btn-tutor" class="btn btn-secondary" style="font-size: 0.8rem;">
-                        📋 Sustentación Técnica de Asientos
-                    </button>
-                </div>
+                <button id="btn-tutor" aria-controls="assistant-panel" aria-expanded="false" class="assistant-trigger" type="button">
+                    <span class="assistant-dot"></span>
+                    <span>Asistente contable</span>
+                </button>
             </header>
 
-            <div class="content-area">
+            <section class="content-area" id="contenido">
+                <div class="page-actions">{% block page_actions %}{% endblock %}</div>
                 {% if messages %}
-                    {% for message in messages %}
-                        <div style="background: #ffffff; border-left: 4px solid var(--primary-color); padding: 10px 14px; margin-bottom: 16px; border: 1px solid var(--border-color); font-size: 0.85rem;">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
+                    <div class="messages-stack">
+                        {% for message in messages %}
+                            <div class="alert-message {{ message.tags|default:'' }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
                 {% endif %}
-
                 {% block content %}{% endblock %}
-            </div>
+            </section>
         </main>
     </div>
 
-    <!-- ═══ MODAL TÉCNICO DE SUSTENTACIÓN (OCULTO POR DEFECTO) ═══ -->
-    <div id="modal-tutor" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center;">
-        <div style="background: #ffffff; width: 480px; max-width: 90%; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
-            <div style="padding: 12px 16px; background: #f9fafb; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <strong style="font-size: 0.9rem; color: #1f2937;">Fundamentación Técnica de Asientos Contables</strong>
-                <button id="modal-close" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #6b7280;">&times;</button>
+    <button id="assistant-fab" aria-controls="assistant-panel" aria-expanded="false" class="assistant-fab" type="button" aria-label="Abrir asistente contable">?</button>
+
+    <aside id="assistant-panel" class="assistant-panel" aria-hidden="true" inert aria-labelledby="assistant-title">
+        <div class="assistant-header">
+            <div>
+                <span class="eyebrow">Asistente</span>
+                <h2 id="assistant-title">Consulta contable</h2>
+                <p>Fundamentación de asientos y dinámica de cuentas.</p>
             </div>
-            <div id="tutor-historial" style="height: 280px; overflow-y: auto; padding: 14px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px; background: #ffffff;">
-                <div style="background: #f3f4f6; padding: 8px 12px; border-radius: 4px; color: #374151;">
-                    Ingresa el número de asiento o consulta sobre la dinámica patrimonial (por qué se cargó o abonó una cuenta) para fundamentar ante el docente.
+            <button id="assistant-close" class="icon-button" type="button" aria-label="Cerrar asistente">×</button>
+        </div>
+
+        <div id="tutor-historial" class="assistant-history" role="log" aria-live="polite" aria-relevant="additions text">
+            <div class="chat-message bot">
+                <div class="chat-avatar">B</div>
+                <div class="chat-bubble">
+                    Puedo ayudarte a justificar cargos y abonos, revisar la lógica de un asiento o explicar una cuenta del PCGE.
                 </div>
             </div>
-            <div style="padding: 10px 14px; border-top: 1px solid var(--border-color); display: flex; gap: 8px; background: #f9fafb;">
-                <input type="text" id="tutor-texto" placeholder="Ej: Justifica la cuenta 10 en el asiento 1..." style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 3px; font-size: 0.85rem; outline: none;">
-                <button id="tutor-enviar" class="btn btn-primary" style="padding: 6px 12px;">Consultar</button>
+            <div class="assistant-suggestions">
+                <button type="button" data-prompt="¿Cómo justifico un cargo en la cuenta 10?">Cuenta 10</button>
+                <button type="button" data-prompt="Explícame la lógica del debe y haber de un asiento.">Debe y Haber</button>
+                <button type="button" data-prompt="¿Cómo sustento un asiento contable ante el docente?">Sustentar asiento</button>
             </div>
         </div>
-    </div>
+
+        <div class="assistant-composer">
+            <label class="sr-only" for="tutor-texto">Consulta al asistente contable</label>
+            <textarea id="tutor-texto" rows="1" placeholder="Escribe tu consulta..."></textarea>
+            <button id="tutor-enviar" class="btn btn-primary" type="button">Enviar</button>
+        </div>
+    </aside>
 
     <script>
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebarClose = document.getElementById('sidebar-close');
+
+        function setSidebar(open) {
+            sidebar.classList.toggle('open', open);
+            sidebarOverlay.classList.toggle('open', open);
+            menuToggle.setAttribute('aria-expanded', String(open));
+            if (open) sidebarClose.focus();
+            document.body.classList.toggle('no-scroll', open);
+        }
+
+        menuToggle?.addEventListener('click', () => setSidebar(true));
+        sidebarClose?.addEventListener('click', () => setSidebar(false));
+        sidebarOverlay?.addEventListener('click', () => setSidebar(false));
+
         const btnTutor = document.getElementById('btn-tutor');
-        const modalTutor = document.getElementById('modal-tutor');
-        const btnCerrar = document.getElementById('modal-close');
+        const assistantFab = document.getElementById('assistant-fab');
+        const assistantPanel = document.getElementById('assistant-panel');
+        const assistantClose = document.getElementById('assistant-close');
         const btnEnviar = document.getElementById('tutor-enviar');
         const inputTexto = document.getElementById('tutor-texto');
         const historial = document.getElementById('tutor-historial');
 
-        btnTutor.onclick = () => { modalTutor.style.display = 'flex'; };
-        btnCerrar.onclick = () => { modalTutor.style.display = 'none'; };
+        function setAssistant(open) {
+            assistantPanel.classList.toggle('open', open);
+            assistantPanel.setAttribute('aria-hidden', String(!open));
+            assistantPanel.inert = !open;
+            btnTutor.setAttribute('aria-expanded', String(open));
+            assistantFab.setAttribute('aria-expanded', String(open));
+            if (!open) (window.innerWidth <= 900 ? assistantFab : btnTutor).focus();
+            if (open) setTimeout(() => inputTexto.focus(), 120);
+        }
 
-        async function ejecutarConsulta() {
-            const consulta = inputTexto.value.trim();
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                if (assistantPanel.classList.contains('open')) setAssistant(false);
+                if (sidebar.classList.contains('open')) { setSidebar(false); menuToggle.focus(); }
+            }
+        });
+        btnTutor?.addEventListener('click', () => setAssistant(true));
+        assistantFab?.addEventListener('click', () => setAssistant(true));
+        assistantClose?.addEventListener('click', () => setAssistant(false));
+
+        function appendMessage(text, type) {
+            const row = document.createElement('div');
+            row.className = 'chat-message ' + type;
+
+            if (type === 'bot') {
+                const avatar = document.createElement('div');
+                avatar.className = 'chat-avatar';
+                avatar.textContent = 'B';
+                row.appendChild(avatar);
+            }
+
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+            row.appendChild(bubble);
+            historial.appendChild(row);
+            historial.scrollTop = historial.scrollHeight;
+            return bubble;
+        }
+
+        let consultaPendiente = false;
+        async function ejecutarConsulta(prefill) {
+            if (consultaPendiente) return;
+            const consulta = (prefill || inputTexto.value).trim();
             if (!consulta) return;
 
-            const userP = document.createElement('div');
-            userP.style = "background: #e5e7eb; padding: 8px 12px; border-radius: 4px; align-self: flex-end; font-weight: 600;";
-            userP.textContent = consulta;
-            historial.appendChild(userP);
+            consultaPendiente = true;
+            btnEnviar.disabled = true;
+            document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
+            appendMessage(consulta, 'user');
             inputTexto.value = '';
-            historial.scrollTop = historial.scrollHeight;
 
-            const botP = document.createElement('div');
-            botP.style = "background: #f3f4f6; padding: 8px 12px; border-radius: 4px; color: #4b5563; font-style: italic;";
-            botP.textContent = "Buscando fundamento en el PCGE...";
-            historial.appendChild(botP);
-            historial.scrollTop = historial.scrollHeight;
+            const botBubble = appendMessage('Consultando información contable…', 'bot');
+            botBubble.classList.add('loading');
 
             try {
-                const r = await fetch('/chatbot/', {
+                const r = await fetch('{% url 'chatbot_api' %}', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
-                    body: `message=${encodeURIComponent(consulta)}`
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: 'message=' + encodeURIComponent(consulta)
                 });
                 const d = await r.json();
-                botP.style.fontStyle = "normal";
-                botP.style.color = "#111827";
-                botP.textContent = d.response || d.error;
+                if (!r.ok) throw new Error(d.error || 'El asistente no pudo completar la consulta.');
+                botBubble.classList.remove('loading');
+                botBubble.textContent = d.response || d.error || 'No pude obtener una respuesta.';
             } catch (err) {
-                botP.textContent = "Error al obtener respuesta.";
+                botBubble.classList.remove('loading');
+                botBubble.textContent = err.message === 'Failed to fetch' ? 'No se pudo conectar con el asistente. Intenta nuevamente.' : err.message;
+            } finally {
+                consultaPendiente = false;
+                btnEnviar.disabled = false;
+                document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = false);
             }
+
             historial.scrollTop = historial.scrollHeight;
         }
 
-        btnEnviar.onclick = ejecutarConsulta;
-        inputTexto.onkeypress = (e) => { if (e.key === 'Enter') ejecutarConsulta(); };
+        btnEnviar?.addEventListener('click', () => ejecutarConsulta());
+        inputTexto?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                ejecutarConsulta();
+            }
+        });
+
+        document.querySelectorAll('[data-prompt]').forEach(button => {
+            button.addEventListener('click', () => ejecutarConsulta(button.dataset.prompt));
+        });
     </script>
-    {% block extra_js %}
-    {% endblock %}
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

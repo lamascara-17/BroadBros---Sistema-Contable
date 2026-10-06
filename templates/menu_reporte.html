@@ -1,10 +1,12 @@
 {% extends 'base.html' %}
 
 {% block page_title %}Exportación de Reportes Financieros{% endblock %}
-{% block page_subtitle %}Generación directa en PDF, Excel (.xlsx) o envío postal{% endblock %}
+{% block page_subtitle %}Descarga tus libros y balances en PDF o Excel{% endblock %}
+
+{% block page_actions %}<a href="{% url 'balance_general' %}" class="btn btn-secondary btn-sm">Ver balance general</a>{% endblock %}
 
 {% block content %}
-<div style="max-width: 680px; margin: 20px auto;">
+<div class="report-sheet">
     <div class="card">
         <div class="card-header">
             <h3>Centro de Exportación de Libros y Balances</h3>
@@ -13,39 +15,62 @@
             <form method="POST" action="{% url 'reporte_completo' %}">
                 {% csrf_token %}
 
-                <div class="form-group" style="margin-bottom: 18px;">
-                    <label>Nombre de la Razón Social / Empresa:</label>
-                    <input type="text" name="empresa" class="form-control" value="BroadBros S.A.C." required>
+                <div class="form-group">
+                    <label for="empresa">Razón social</label>
+                    <input type="text" id="empresa" name="empresa" class="form-control" value="BroadBros S.A.C." required>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label>Formato de Exportación:</label>
-                    <select name="formato" class="form-control" style="font-weight: 500;">
-                        <option value="pdf">📄 Documento PDF Oficial (Completo con Carátula y Firmas)</option>
-                        <option value="excel">📊 Hoja de Cálculo Excel (.xlsx con Libro Diario y Balances)</option>
+                <div class="form-group">
+                    <label for="formato">Formato</label>
+                    <select id="formato" name="formato" class="form-control">
+                        <option value="pdf">PDF · Informe completo</option>
+                        <option value="excel">Excel · Libros y balances</option>
                     </select>
                 </div>
 
-                <div style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-bottom: 20px;">
-                    <label style="color: var(--text-light); font-size: 0.8rem; display: block; margin-bottom: 6px;">
-                        Opcional: Envío por Correo Electrónico
+                <div>
+                    <label for="correo">
+                        Correo electrónico (opcional, disponible para PDF)
                     </label>
-                    <input type="email" name="correo" class="form-control" placeholder="destinatario@ejemplo.com">
-                    <small style="color: var(--text-light); font-size: 0.75rem; display: block; margin-top: 4px;">
+                    <input type="email" id="correo" name="correo" class="form-control" placeholder="destinatario@ejemplo.com">
+                    <small class="helper-text">
                         * Déjalo vacío si solo deseas descargarlo directamente a tu computadora.
                     </small>
                 </div>
 
-                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                    <button type="submit" name="accion" value="descargar" class="btn btn-primary" style="flex: 1; justify-content: center; padding: 12px;">
-                        📥 Descargar Inmediatamente
+                <div class="form-actions">
+                    <button type="submit" name="accion" value="descargar" class="btn btn-primary">
+                        Descargar reporte
                     </button>
-                    <button type="submit" name="accion" value="enviar_correo" class="btn btn-secondary" style="padding: 12px 18px;">
-                        ✉️ Enviar al Correo
+                    <button type="submit" id="enviar-correo" name="accion" value="enviar_correo" class="btn btn-secondary">
+                        Enviar por correo
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const formato = document.getElementById('formato');
+    const correo = document.getElementById('correo');
+    const enviar = document.getElementById('enviar-correo');
+    function actualizarExportacion() {
+        const pdf = formato.value === 'pdf';
+        correo.disabled = !pdf;
+        enviar.disabled = !pdf;
+    }
+    formato.addEventListener('change', actualizarExportacion);
+    enviar.addEventListener('click', event => {
+        if (!correo.value.trim()) {
+            event.preventDefault();
+            correo.setCustomValidity('Ingrese un correo para enviar el reporte.');
+            correo.reportValidity();
+        }
+    });
+    correo.addEventListener('input', () => correo.setCustomValidity(''));
+    actualizarExportacion();
+</script>
 {% endblock %}

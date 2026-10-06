@@ -2,9 +2,10 @@
 {% load contable_tags %}
 
 {% block title %}Balance General — BroadBros{% endblock %}
-{% block nav_balance_gen %}active{% endblock %}
-{% block page_title %}🏦 Balance General{% endblock %}
+{% block page_title %}Balance General{% endblock %}
 {% block page_subtitle %}Estado de Situacion Financiera{% endblock %}
+
+{% block page_actions %}<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">Imprimir</button> <a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
 
 {% block content %}
 {% if activos or pasivos or patrimonio %}
@@ -14,23 +15,23 @@
     <!-- ═══ COLUMNA IZQUIERDA: ACTIVOS ═══ -->
     <div class="balance-column">
         <div class="card">
-            <div class="card-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); color: white;">
-                <h3 style="color: white;">🏢 ACTIVO</h3>
+            <div class="card-header">
+                <h3>ACTIVO</h3>
             </div>
-            <div class="card-body" style="padding: 0;">
+            <div class="card-body table-container">
                 <table>
                     <tbody>
                         {% for item in activos %}
                         <tr>
                             <td>{{ item.cuenta.nombre }}</td>
-                            <td class="text-right monto" style="width: 140px;">{{ item.saldo|formato_moneda }}</td>
+                            <td class="text-right monto">{{ item.saldo|formato_moneda }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr>
                             <th>TOTAL ACTIVO</th>
-                            <th class="text-right monto" style="font-size: 1.05rem;">{{ total_activos|formato_moneda }}</th>
+                            <th class="text-right monto">{{ total_activos|formato_moneda }}</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -41,21 +42,21 @@
     <!-- ═══ COLUMNA DERECHA: PASIVOS + PATRIMONIO ═══ -->
     <div class="balance-column">
         <!-- PASIVO -->
-        <div class="card" style="margin-bottom: 16px;">
-            <div class="card-header" style="background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); color: white;">
-                <h3 style="color: white;">💳 PASIVO</h3>
+        <div class="card">
+            <div class="card-header">
+                <h3>PASIVO</h3>
             </div>
-            <div class="card-body" style="padding: 0;">
+            <div class="card-body table-container">
                 <table>
                     <tbody>
                         {% for item in pasivos %}
                         <tr>
                             <td>{{ item.cuenta.nombre }}</td>
-                            <td class="text-right monto" style="width: 140px;">{{ item.saldo|formato_moneda }}</td>
+                            <td class="text-right monto">{{ item.saldo|formato_moneda }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="2" class="text-center" style="color: var(--text-muted); padding: 12px;">Sin pasivos registrados</td>
+                            <td colspan="2" class="text-center">Sin pasivos registrados</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -71,22 +72,22 @@
 
         <!-- PATRIMONIO -->
         <div class="card">
-            <div class="card-header" style="background: linear-gradient(135deg, #6b46c1 0%, #553c9a 100%); color: white;">
-                <h3 style="color: white;">🏛️ PATRIMONIO</h3>
+            <div class="card-header">
+                <h3>PATRIMONIO</h3>
             </div>
-            <div class="card-body" style="padding: 0;">
+            <div class="card-body table-container">
                 <table>
                     <tbody>
                         {% for item in patrimonio %}
                         <tr>
                             <td>{{ item.cuenta.nombre }}</td>
-                            <td class="text-right monto" style="width: 140px;">{{ item.saldo|formato_moneda }}</td>
+                            <td class="text-right monto">{{ item.saldo|formato_moneda }}</td>
                         </tr>
                         {% endfor %}
                         <!-- Resultados acumulados = Utilidad Antes de Impuesto -->
-                        <tr style="background: #faf5ff; font-weight: 600;">
+                        <tr class="report-subtotal">
                             <td>Resultados acumulados</td>
-                            <td class="text-right monto" style="width: 140px;">{{ resultados_acumulados|formato_moneda }}</td>
+                            <td class="text-right monto">{{ resultados_acumulados|formato_moneda }}</td>
                         </tr>
                     </tbody>
                     <tfoot>
@@ -100,15 +101,15 @@
         </div>
 
         <!-- TOTAL PASIVO + PATRIMONIO -->
-        <div class="card" style="margin-top: 16px;">
-            <div class="card-body" style="padding: 0;">
+        <div class="card">
+            <div class="card-body table-container">
                 <table>
                     <tfoot>
                         <tr>
-                            <th style="background: var(--primary); color: white; font-size: 0.95rem;">
+                            <th>
                                 TOTAL PASIVO + PATRIMONIO
                             </th>
-                            <th class="text-right monto" style="background: var(--primary); color: white; font-size: 1.05rem; width: 140px;">
+                            <th class="text-right monto">
                                 {{ total_pasivo_patrimonio|formato_moneda }}
                             </th>
                         </tr>
@@ -120,18 +121,18 @@
 </div>
 
 <!-- ═══ RESUMEN DE LA ECUACIÓN CONTABLE ═══ -->
-<div class="card" style="margin-top: 28px;">
-    <div class="card-header" style="background: #fffaf0;">
-        <h3 style="color: #c05621;">📊 RESUMEN DE LA ECUACION CONTABLE</h3>
+<div class="card">
+    <div class="card-header">
+        <h3>RESUMEN DE LA ECUACION CONTABLE</h3>
     </div>
-    <div class="card-body" style="padding: 0;">
+    <div class="card-body">
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th rowspan="2" style="vertical-align: middle;">CONCEPTO</th>
-                        <th colspan="2" class="text-center" style="border-bottom: 1px solid rgba(255,255,255,0.2);">TOTALES</th>
-                        <th colspan="2" class="text-center" style="border-bottom: 1px solid rgba(255,255,255,0.2);">SALDOS FINALES</th>
+                        <th rowspan="2">CONCEPTO</th>
+                        <th colspan="2" class="text-center">TOTALES</th>
+                        <th colspan="2" class="text-center">SALDOS FINALES</th>
                     </tr>
                     <tr>
                         <th class="text-right">DEBE (S/)</th>
@@ -173,45 +174,17 @@
     </div>
 </div>
 
-<!-- ═══ COMPROBACIÓN DE LA ECUACIÓN CONTABLE ═══ -->
-<div class="card" style="margin-top: 20px;">
-    <div class="card-header" style="background: {% if esta_balanceado %}#f0fff4{% else %}#fff5f5{% endif %};">
-        <h3 style="color: {% if esta_balanceado %}#22543d{% else %}#742a2a{% endif %};">
-            {% if esta_balanceado %}✅{% else %}❌{% endif %}
-            COMPROBACION DE LA ECUACION CONTABLE
-        </h3>
-    </div>
-    <div class="card-body">
-        <div style="text-align: center; font-size: 1.05rem; line-height: 2.2;">
-            <div style="font-weight: 700; color: var(--primary); margin-bottom: 8px;">
-                TOTAL ACTIVO = TOTAL PASIVO + TOTAL PATRIMONIO
-            </div>
-            <div style="font-size: 1.15rem; font-weight: 700;">
-                <span class="monto">{{ total_activos|formato_moneda }}</span>
-                <span style="margin: 0 8px; color: var(--text-light);">=</span>
-                <span class="monto">{{ total_pasivos|formato_moneda }}</span>
-                <span style="margin: 0 8px; color: var(--text-light);">+</span>
-                <span class="monto">{{ total_patrimonio_con_resultados|formato_moneda }}</span>
-            </div>
-            <div style="font-size: 1.25rem; font-weight: 800; margin-top: 8px;">
-                <span class="monto" style="color: var(--primary);">{{ total_activos|formato_moneda }}</span>
-                <span style="margin: 0 12px; color: var(--text-light);">=</span>
-                <span class="monto" style="color: var(--primary);">{{ total_pasivo_patrimonio|formato_moneda }}</span>
-                {% if esta_balanceado %}
-                    <span style="margin-left: 16px; color: #22543d; font-size: 1rem;">✅ (SI CUMPLE)</span>
-                {% else %}
-                    <span style="margin-left: 16px; color: #742a2a; font-size: 1rem;">❌ (NO CUMPLE)</span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+<div class="balance-check {% if esta_balanceado %}balanced{% else %}unbalanced{% endif %}">
+    <strong>{% if esta_balanceado %}Ecuación contable verificada{% else %}La ecuación contable presenta una diferencia{% endif %}</strong>
+    <p>Activo = Pasivo + Patrimonio</p>
+    <div class="equation-values">{{ total_activos|formato_moneda }} = {{ total_pasivos|formato_moneda }} + {{ total_patrimonio_con_resultados|formato_moneda }}</div>
 </div>
 
 {% else %}
 <div class="card">
     <div class="card-body">
         <div class="empty-state">
-            <div class="empty-icon">🏦</div>
+            <div class="empty-icon" aria-hidden="true">□</div>
             <h4>Sin datos para el balance general</h4>
             <p>Registre asientos contables para generar el balance general</p>
         </div>
@@ -219,4 +192,3 @@
 </div>
 {% endif %}
 {% endblock %}
-#a

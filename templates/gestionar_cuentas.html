@@ -2,66 +2,65 @@
 {% load contable_tags %}
 
 {% block title %}Plan de Cuentas — BroadBros{% endblock %}
-{% block nav_cuentas %}active{% endblock %}
-{% block page_title %}Plan de Cuentas{% endblock %}
-{% block page_subtitle %}Catálogo de cuentas contables con su clasificación{% endblock %}
+{% block page_title %}Plan de cuentas{% endblock %}
+{% block page_subtitle %}Catálogo y clasificación de cuentas contables{% endblock %}
 
 {% block content %}
-<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
-    <!-- ═══ FORMULARIO NUEVA CUENTA ═══ -->
+<div class="split-layout">
     <div class="card">
         <div class="card-header">
-            <h3>➕ Nueva Cuenta</h3>
+            <h3>Nueva cuenta</h3>
         </div>
         <div class="card-body">
             <form method="post" action="{% url 'gestionar_cuentas' %}">
                 {% csrf_token %}
                 <div class="form-group">
                     <label for="id_codigo">Código</label>
-                    <input type="text" name="codigo" id="id_codigo" class="form-control"
-                           placeholder="Ej: 10, 12, 20..." required>
+                    <input type="text" name="codigo" id="id_codigo" class="form-control" placeholder="Ej. 10, 12, 20" required>
                 </div>
+
                 <div class="form-group">
-                    <label for="id_nombre">Nombre de la Cuenta</label>
-                    <input type="text" name="nombre" id="id_nombre" class="form-control"
-                           placeholder="Ej: Efectivo y Equivalentes" required>
+                    <label for="id_nombre">Nombre de la cuenta</label>
+                    <input type="text" name="nombre" id="id_nombre" class="form-control" placeholder="Ej. Efectivo y equivalentes" required>
                 </div>
+
                 <div class="form-group">
-                    <label for="id_tipo">Tipo de Cuenta</label>
+                    <label for="id_tipo">Tipo de cuenta</label>
                     <select name="tipo" id="id_tipo" class="form-control" required onchange="toggleSubcategoria()">
-                        <option value="">— Seleccionar tipo —</option>
+                        <option value="">Seleccionar tipo</option>
                         {% for valor, etiqueta in tipos %}
                             <option value="{{ valor }}">{{ etiqueta }}</option>
                         {% endfor %}
                     </select>
                 </div>
+
                 <div class="form-group" id="subcategoria_group" style="display: none;">
-                    <label for="id_subcategoria">Subcategoría (EE.RR.)</label>
+                    <label for="id_subcategoria">Subcategoría</label>
                     <select name="subcategoria" id="id_subcategoria" class="form-control">
-                        <option value="">— General —</option>
+                        <option value="">General</option>
                         {% for valor, etiqueta in subcategorias %}
                             {% if valor %}
                             <option value="{{ valor }}">{{ etiqueta }}</option>
                             {% endif %}
                         {% endfor %}
                     </select>
-                    <small style="color: var(--text-light); font-size: 0.75rem; margin-top: 4px; display: block;">
-                        Clasifica la cuenta para el Estado de Resultados
-                    </small>
+                    <small class="helper-text">Se usa para clasificar cuentas en el Estado de Resultados.</small>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">
-                    💾 Crear Cuenta
-                </button>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;">Crear cuenta</button>
             </form>
         </div>
     </div>
 
-    <!-- ═══ LISTA DE CUENTAS ═══ -->
     <div class="card">
         <div class="card-header">
-            <h3>📋 Cuentas Registradas ({{ cuentas|length }})</h3>
+            <div>
+                <h3>Cuentas registradas</h3>
+                <div class="helper-text">{{ cuentas|length }} cuentas disponibles</div>
+            </div>
         </div>
-        <div class="card-body" style="padding: 0;">
+
+        <div class="card-body" style="padding:0;">
             {% if cuentas %}
             <div class="table-container">
                 <table>
@@ -71,7 +70,7 @@
                             <th>Nombre</th>
                             <th>Tipo</th>
                             <th>Subcategoría</th>
-                            <th class="text-center">Acciones</th>
+                            <th class="text-center">Acción</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,26 +78,18 @@
                         <tr>
                             <td><strong>{{ cuenta.codigo }}</strong></td>
                             <td>{{ cuenta.nombre }}</td>
-                            <td>
-                                <span class="badge {{ cuenta.tipo|tipo_badge }}">
-                                    {{ cuenta.get_tipo_display }}
-                                </span>
-                            </td>
+                            <td><span class="badge {{ cuenta.tipo|tipo_badge }}">{{ cuenta.get_tipo_display }}</span></td>
                             <td>
                                 {% if cuenta.subcategoria %}
-                                    <span style="font-size: 0.78rem; color: var(--text-light);">
-                                        {{ cuenta.get_subcategoria_display }}
-                                    </span>
+                                    {{ cuenta.get_subcategoria_display }}
                                 {% else %}
-                                    <span style="font-size: 0.78rem; color: var(--text-muted);">—</span>
+                                    <span class="helper-text">Sin clasificación</span>
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <a href="{% url 'eliminar_cuenta' cuenta.id %}"
-                                   class="btn btn-sm btn-danger btn-icon"
-                                   onclick="return confirm('¿Eliminar la cuenta {{ cuenta }}?');"
-                                   title="Eliminar">
-                                    🗑️
+                                <a href="{% url 'eliminar_cuenta' cuenta.id %}" class="btn btn-sm btn-danger"
+                                   onclick="return confirm('¿Eliminar la cuenta {{ cuenta }}?');">
+                                    Eliminar
                                 </a>
                             </td>
                         </tr>
@@ -108,9 +99,9 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <div class="empty-icon">📋</div>
+                <div class="empty-icon">#</div>
                 <h4>No hay cuentas registradas</h4>
-                <p>Cree cuentas contables usando el formulario de la izquierda</p>
+                <p>Crea la primera cuenta desde el formulario.</p>
             </div>
             {% endif %}
         </div>
@@ -120,10 +111,6 @@
 
 {% block extra_js %}
 <script>
-    /**
-     * Muestra u oculta el campo de subcategoría según el tipo de cuenta seleccionado.
-     * Solo se muestra para cuentas de tipo 'gasto' o 'ingreso'.
-     */
     function toggleSubcategoria() {
         const tipo = document.getElementById('id_tipo').value;
         const grupo = document.getElementById('subcategoria_group');
@@ -131,14 +118,12 @@
 
         if (tipo === 'gasto' || tipo === 'ingreso') {
             grupo.style.display = 'block';
-            // Filtrar opciones según tipo
-            const opciones = select.querySelectorAll('option');
-            opciones.forEach(opt => {
+            select.querySelectorAll('option').forEach(opt => {
                 if (opt.value === '') {
                     opt.style.display = '';
                 } else if (tipo === 'gasto') {
                     opt.style.display = ['costo_ventas', 'gasto_operativo', 'gasto_financiero', 'otro_gasto'].includes(opt.value) ? '' : 'none';
-                } else if (tipo === 'ingreso') {
+                } else {
                     opt.style.display = ['otro_ingreso'].includes(opt.value) ? '' : 'none';
                 }
             });
@@ -149,4 +134,3 @@
     }
 </script>
 {% endblock %}
-#a
