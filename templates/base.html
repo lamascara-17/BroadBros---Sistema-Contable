@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-head">
@@ -57,7 +58,7 @@
                 <a href="{% url 'balance_general' %}" class="nav-link {% if request.resolver_match.url_name == 'balance_general' %}active{% endif %}">
                     <span class="nav-icon">□</span><span>Balance general</span>
                 </a>
-                <a href="{% url 'reporte_completo' %}" class="nav-link">
+                <a href="{% url 'reporte_completo' %}" class="nav-link {% if request.resolver_match.url_name == 'reporte_completo' %}active{% endif %}">
                     <span class="nav-icon">⇩</span><span>Exportar reporte</span>
                 </a>
             </nav>
@@ -79,13 +80,14 @@
                         <p>{% block page_subtitle %}Plan Contable General Empresarial{% endblock %}</p>
                     </div>
                 </div>
-                <button id="btn-tutor" class="assistant-trigger" type="button">
+                <button id="btn-tutor" aria-controls="assistant-panel" aria-expanded="false" class="assistant-trigger" type="button">
                     <span class="assistant-dot"></span>
                     <span>Asistente contable</span>
                 </button>
             </header>
 
-            <section class="content-area">
+            <section class="content-area" id="contenido">
+                <div class="page-actions">{% block page_actions %}{% endblock %}</div>
                 {% if messages %}
                     <div class="messages-stack">
                         {% for message in messages %}
@@ -98,19 +100,19 @@
         </main>
     </div>
 
-    <button id="assistant-fab" class="assistant-fab" type="button" aria-label="Abrir asistente contable">?</button>
+    <button id="assistant-fab" aria-controls="assistant-panel" aria-expanded="false" class="assistant-fab" type="button" aria-label="Abrir asistente contable">?</button>
 
-    <aside id="assistant-panel" class="assistant-panel" aria-hidden="true">
+    <aside id="assistant-panel" class="assistant-panel" aria-hidden="true" inert aria-labelledby="assistant-title">
         <div class="assistant-header">
             <div>
                 <span class="eyebrow">Asistente</span>
-                <h2>Consulta contable</h2>
+                <h2 id="assistant-title">Consulta contable</h2>
                 <p>Fundamentación de asientos y dinámica de cuentas.</p>
             </div>
             <button id="assistant-close" class="icon-button" type="button" aria-label="Cerrar asistente">×</button>
         </div>
 
-        <div id="tutor-historial" class="assistant-history">
+        <div id="tutor-historial" class="assistant-history" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="chat-message bot">
                 <div class="chat-avatar">B</div>
                 <div class="chat-bubble">
@@ -125,6 +127,7 @@
         </div>
 
         <div class="assistant-composer">
+            <label class="sr-only" for="tutor-texto">Consulta al asistente contable</label>
             <textarea id="tutor-texto" rows="1" placeholder="Escribe tu consulta..."></textarea>
             <button id="tutor-enviar" class="btn btn-primary" type="button">Enviar</button>
         </div>
@@ -139,6 +142,8 @@
         function setSidebar(open) {
             sidebar.classList.toggle('open', open);
             sidebarOverlay.classList.toggle('open', open);
+            menuToggle.setAttribute('aria-expanded', String(open));
+            if (open) sidebarClose.focus();
             document.body.classList.toggle('no-scroll', open);
         }
 
@@ -157,9 +162,19 @@
         function setAssistant(open) {
             assistantPanel.classList.toggle('open', open);
             assistantPanel.setAttribute('aria-hidden', String(!open));
+            assistantPanel.inert = !open;
+            btnTutor.setAttribute('aria-expanded', String(open));
+            assistantFab.setAttribute('aria-expanded', String(open));
+            if (!open) (window.innerWidth <= 900 ? assistantFab : btnTutor).focus();
             if (open) setTimeout(() => inputTexto.focus(), 120);
         }
 
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                if (assistantPanel.classList.contains('open')) setAssistant(false);
+                if (sidebar.classList.contains('open')) { setSidebar(false); menuToggle.focus(); }
+            }
+        });
         btnTutor?.addEventListener('click', () => setAssistant(true));
         assistantFab?.addEventListener('click', () => setAssistant(true));
         assistantClose?.addEventListener('click', () => setAssistant(false));
@@ -184,10 +199,15 @@
             return bubble;
         }
 
+        let consultaPendiente = false;
         async function ejecutarConsulta(prefill) {
+            if (consultaPendiente) return;
             const consulta = (prefill || inputTexto.value).trim();
             if (!consulta) return;
 
+            consultaPendiente = true;
+            btnEnviar.disabled = true;
+            document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
             appendMessage(consulta, 'user');
             inputTexto.value = '';
 
@@ -195,7 +215,7 @@
             botBubble.classList.add('loading');
 
             try {
-                const r = await fetch('/chatbot/', {
+                const r = await fetch('{% url 'chatbot_api' %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -204,11 +224,16 @@
                     body: 'message=' + encodeURIComponent(consulta)
                 });
                 const d = await r.json();
+                if (!r.ok) throw new Error(d.error || 'El asistente no pudo completar la consulta.');
                 botBubble.classList.remove('loading');
                 botBubble.textContent = d.response || d.error || 'No pude obtener una respuesta.';
             } catch (err) {
                 botBubble.classList.remove('loading');
-                botBubble.textContent = 'No se pudo conectar con el asistente. Intenta nuevamente.';
+                botBubble.textContent = err.message === 'Failed to fetch' ? 'No se pudo conectar con el asistente. Intenta nuevamente.' : err.message;
+            } finally {
+                consultaPendiente = false;
+                btnEnviar.disabled = false;
+                document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = false);
             }
 
             historial.scrollTop = historial.scrollHeight;

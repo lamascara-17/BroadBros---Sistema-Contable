@@ -2,22 +2,23 @@
 {% load contable_tags %}
 
 {% block title %}Balance de Comprobación — BroadBros{% endblock %}
-{% block nav_balance_comp %}active{% endblock %}
-{% block page_title %}⚖️ Balance de Comprobación{% endblock %}
+{% block page_title %}Balance de Comprobación{% endblock %}
 {% block page_subtitle %}Verificación de cuadre entre totales de Debe y Haber{% endblock %}
+
+{% block page_actions %}<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">Imprimir</button> <a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
 
 {% block content %}
 {% if datos %}
 <div class="card">
-    <div class="card-body" style="padding: 0;">
+    <div class="card-body">
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th rowspan="2" style="vertical-align: middle;">Código</th>
-                        <th rowspan="2" style="vertical-align: middle;">Cuenta</th>
-                        <th colspan="2" class="text-center" style="border-bottom: 1px solid rgba(255,255,255,0.2);">Sumas</th>
-                        <th colspan="2" class="text-center" style="border-bottom: 1px solid rgba(255,255,255,0.2);">Saldos</th>
+                        <th rowspan="2">Código</th>
+                        <th rowspan="2">Cuenta</th>
+                        <th colspan="2" class="text-center">Sumas</th>
+                        <th colspan="2" class="text-center">Saldos</th>
                     </tr>
                     <tr>
                         <th class="text-right">Debe</th>
@@ -66,16 +67,16 @@
 <!-- Indicador de cuadre -->
 <div class="balance-check {% if esta_cuadrado %}balanced{% else %}unbalanced{% endif %}">
     {% if esta_cuadrado %}
-        ✅ <strong>Balance cuadrado:</strong> Los totales de Debe ({{ gran_total_debe|formato_moneda }}) y Haber ({{ gran_total_haber|formato_moneda }}) coinciden correctamente.
+        <strong>Balance cuadrado:</strong> Los totales de Debe ({{ gran_total_debe|formato_moneda }}) y Haber ({{ gran_total_haber|formato_moneda }}) coinciden correctamente.
     {% else %}
-        ❌ <strong>Balance descuadrado:</strong> Los totales de Debe ({{ gran_total_debe|formato_moneda }}) y Haber ({{ gran_total_haber|formato_moneda }}) no coinciden.
+        <strong>Balance descuadrado:</strong> Los totales de Debe ({{ gran_total_debe|formato_moneda }}) y Haber ({{ gran_total_haber|formato_moneda }}) no coinciden.
     {% endif %}
 </div>
 {% else %}
 <div class="card">
     <div class="card-body">
         <div class="empty-state">
-            <div class="empty-icon">⚖️</div>
+            <div class="empty-icon" aria-hidden="true">=</div>
             <h4>Sin datos para el balance</h4>
             <p>Registre asientos contables para generar el balance de comprobación</p>
         </div>
@@ -83,4 +84,3 @@
 </div>
 {% endif %}
 {% endblock %}
-#a

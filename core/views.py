@@ -214,27 +214,43 @@ def registrar_asiento(request):
 
 def editar_asiento(request, asiento_id):
     asiento = get_object_or_404(AsientoContable, id=asiento_id)
-    if request.method == 'POST':
-        asiento.fecha = request.POST.get('fecha')
-        asiento.descripcion = request.POST.get('descripcion')
-        asiento.save()
-        
-        asiento.movimientos.all().delete()
+    if request.method != 'POST':
+        return redirect('libro_diario')
+
+    # Validar todas las líneas antes de reemplazar los movimientos existentes.
+    from datetime import date
+    try:
+        fecha = date.fromisoformat(request.POST.get('fecha', ''))
         num_movs = int(request.POST.get('num_movimientos', 0))
+        if num_movs < 2:
+            raise ValueError('Debe registrar al menos 2 movimientos por asiento.')
+        movimientos = []
         for i in range(num_movs):
-            cuenta_id = request.POST.get(f'cuenta_{i}')
-            tipo = request.POST.get(f'tipo_{i}')
-            monto = request.POST.get(f'monto_{i}')
-            if cuenta_id and monto:
-                Movimiento.objects.create(
-                    asiento=asiento,
-                    cuenta_id=cuenta_id,
-                    tipo=tipo,
-                    monto=monto
-                )
-        
-        ahora = timezone.localtime(timezone.now()).strftime("%d/%m/%Y a las %H:%M")
-        messages.success(request, f"Asiento actualizado exitosamente el {ahora}.")
+            cuenta = CuentaContable.objects.get(pk=int(request.POST.get(f'cuenta_{i}', '')))
+            tipo = request.POST.get(f'tipo_{i}', '')
+            monto = Decimal(request.POST.get(f'monto_{i}', ''))
+            if tipo not in ('debe', 'haber') or not monto.is_finite() or monto <= 0:
+                raise ValueError('Cada movimiento debe tener una cuenta, tipo y monto válidos.')
+            if monto != monto.quantize(Decimal('0.01')) or monto >= Decimal('10000000000'):
+                raise ValueError('Los montos deben tener como máximo dos decimales y 10 dígitos enteros.')
+            movimientos.append({'cuenta': cuenta, 'tipo': tipo, 'monto': monto})
+        debe = sum(m['monto'] for m in movimientos if m['tipo'] == 'debe')
+        haber = sum(m['monto'] for m in movimientos if m['tipo'] == 'haber')
+        if debe != haber:
+            raise ValueError('El asiento no está balanceado. Los totales de Debe y Haber deben coincidir.')
+    except (ValueError, InvalidOperation, CuentaContable.DoesNotExist):
+        messages.error(request, 'No se guardaron los cambios. Revise la fecha, las cuentas y el cuadre del asiento.')
+        return redirect('libro_diario')
+
+    # La cabecera y el detalle se actualizan juntos o se conserva el asiento anterior.
+    with transaction.atomic():
+        asiento.fecha = fecha
+        asiento.descripcion = request.POST.get('descripcion', '').strip()
+        asiento.save()
+        asiento.movimientos.all().delete()
+        Movimiento.objects.bulk_create([Movimiento(asiento=asiento, **m) for m in movimientos])
+    ahora = timezone.localtime(timezone.now()).strftime("%d/%m/%Y a las %H:%M")
+    messages.success(request, f"Asiento actualizado exitosamente el {ahora}.")
     return redirect('libro_diario')
 
 
