@@ -8,9 +8,11 @@
 {% block content %}
 <section class="dashboard-intro">
     <div>
-        <h2>Vista general</h2>
-        <p>Consulta rápidamente la actividad del sistema, accede a las tareas principales y revisa los últimos asientos registrados.</p>
+        <span class="eyebrow">Tu espacio de trabajo</span>
+        <h2>Las cuentas, en orden.</h2>
+        <p>Registra tus operaciones y revisa cómo se reflejan en los libros y estados financieros.</p>
     </div>
+    <a href="{% url 'registrar_asiento' %}" class="btn btn-primary">Nuevo asiento <span aria-hidden="true">＋</span></a>
 </section>
 
 <div class="stats-grid">
@@ -51,57 +53,22 @@
     </article>
 </div>
 
-<div class="section-heading">
-    <div>
-        <h3>Accesos principales</h3>
-        <p>Las tareas más frecuentes, sin duplicar todo el menú lateral.</p>
-    </div>
-</div>
-
-<div class="actions-grid">
-    <a href="{% url 'registrar_asiento' %}" class="action-card">
-        <span class="action-kicker">Operación</span>
-        <h4>Registrar asiento</h4>
-        <p>Crea un asiento manual y valida que el Debe y Haber estén balanceados.</p>
-        <span class="action-arrow">→</span>
-    </a>
-
-    <a href="{% url 'cargar_imagen_diario' %}" class="action-card">
-        <span class="action-kicker">Importación</span>
-        <h4>Cargar desde imagen</h4>
-        <p>Extrae información de un asiento desde una imagen para agilizar el registro.</p>
-        <span class="action-arrow">→</span>
-    </a>
-
-    <a href="{% url 'libro_diario' %}" class="action-card">
-        <span class="action-kicker">Consulta</span>
-        <h4>Libro diario</h4>
-        <p>Revisa los asientos registrados, su detalle y orden cronológico.</p>
-        <span class="action-arrow">→</span>
-    </a>
-
-    <a href="{% url 'libro_mayor' %}" class="action-card">
-        <span class="action-kicker">Análisis</span>
-        <h4>Libro mayor</h4>
-        <p>Consulta movimientos y saldos agrupados por cuenta contable.</p>
-        <span class="action-arrow">→</span>
-    </a>
-
-    <a href="{% url 'balance_comprobacion' %}" class="action-card">
-        <span class="action-kicker">Control</span>
-        <h4>Balance de comprobación</h4>
-        <p>Verifica saldos y detecta diferencias antes de emitir estados financieros.</p>
-        <span class="action-arrow">→</span>
-    </a>
-
-    <a href="{% url 'reporte_completo' %}" class="action-card">
-        <span class="action-kicker">Reporte</span>
-        <h4>Exportar reporte completo</h4>
-        <p>Genera la salida consolidada del sistema para revisión o entrega.</p>
-        <span class="action-arrow">→</span>
-    </a>
-</div>
-
+<div class="dashboard-workspace">
+    <section>
+        <div class="section-heading"><div><h3>Trabajar con tus cuentas</h3><p>Elige cómo quieres continuar.</p></div></div>
+        <div class="task-list">
+            <a href="{% url 'cargar_imagen_diario' %}" class="task-link">
+                <span class="task-number">01</span><div><h4>Importar un ejercicio</h4><p>Procesa una fotografía o captura del caso contable.</p></div><span class="task-arrow" aria-hidden="true">↗</span>
+            </a>
+            <a href="{% url 'gestionar_cuentas' %}" class="task-link">
+                <span class="task-number">02</span><div><h4>Organizar el plan de cuentas</h4><p>Revisa los códigos y la clasificación de tus cuentas.</p></div><span class="task-arrow" aria-hidden="true">↗</span>
+            </a>
+            <a href="{% url 'balance_comprobacion' %}" class="task-link">
+                <span class="task-number">03</span><div><h4>Comprobar los saldos</h4><p>Verifica el cuadre antes de preparar tus reportes.</p></div><span class="task-arrow" aria-hidden="true">↗</span>
+            </a>
+        </div>
+    </section>
+    <section>
 {% if ultimos_asientos %}
 <div class="section-heading">
     <div>
@@ -139,5 +106,10 @@
         </div>
     </div>
 </div>
+{% else %}
+<div class="section-heading"><div><h3>Actividad reciente</h3><p>Tus próximos registros aparecerán aquí.</p></div></div>
+<div class="empty-state"><h4>Comienza con tu primer asiento</h4><p>Crea las cuentas que necesitas y registra una operación balanceada.</p></div>
 {% endif %}
+    </section>
+</div>
 {% endblock %}
