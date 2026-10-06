@@ -1213,3 +1213,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #b79fad; outline-offs
 }
 
 summary:focus-visible { outline: 3px solid var(--pink-orchid); outline-offset: 3px; }
+
+.financial-seccion td { background: var(--surface-soft); color: var(--blue-slate); font-weight: 700; padding-top: 16px; }
+.financial-subtotal td { border-top: 1px solid var(--line-strong); font-weight: 700; }
+.financial-total td { background: var(--blue-slate); color: white; font-weight: 700; padding-top: 16px; padding-bottom: 16px; }

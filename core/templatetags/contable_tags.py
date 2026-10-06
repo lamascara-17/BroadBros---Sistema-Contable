@@ -41,3 +41,10 @@ def abs_value(valor):
     except Exception:
         return valor
 #a
+
+@register.filter
+def formato_importe(valor):
+    """Importe sin símbolo, para tablas cuya cabecera ya indica la moneda."""
+    if valor is None:
+        return ''
+    return f'{Decimal(str(valor)):,.2f}'
