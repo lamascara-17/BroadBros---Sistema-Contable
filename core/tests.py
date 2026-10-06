@@ -21,7 +21,7 @@ class FrontendFlowTests(TestCase):
         data.update(changes)
         return data
 
-    def test_assistant_returns_plain_text_preserving_amounts_and_dates(self):
+    def test_assistant_preserves_bold_without_exposing_format_markers(self):
         from .views import texto_chat_simple
         respuesta = '## Asiento 1\n\nLa cuenta **1101 - Caja** recibe S/ 10 000 el 30/03/2009.\n\n- La cuenta __5101__ aumenta.\\\n`Debe y Haber`.'
         esperado = 'Asiento 1\n\nLa cuenta 1101 - Caja recibe S/ 10 000 el 30/03/2009.\nLa cuenta 5101 aumenta.\nDebe y Haber.'
@@ -32,8 +32,18 @@ class FrontendFlowTests(TestCase):
             response = self.client.post(reverse('chatbot_api'), {'message': 'asiento 1'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['response'], esperado)
+        segmentos = response.json()['segments']
+        self.assertEqual([s['text'] for s in segmentos if s['bold']], ['1101 - Caja', '5101'])
+        self.assertEqual(''.join(s['text'] for s in segmentos), esperado)
         prompt = cliente.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content']
         self.assertIn('únicamente texto simple', prompt)
+        self.assertIn('**negrita**', prompt)
+
+    def test_bold_segments_preserve_spaces_and_treat_html_as_text(self):
+        from .views import formato_chat
+        texto, segmentos = formato_chat('La **Caja** aumenta **S/ 10 000**.\n\n**<img src=x onerror=alert(1)>** y un *asterisco suelto.')
+        self.assertEqual(texto, 'La Caja aumenta S/ 10 000.\n\n<img src=x onerror=alert(1)> y un asterisco suelto.')
+        self.assertEqual([s['text'] for s in segmentos if s['bold']], ['Caja', 'S/ 10 000', '<img src=x onerror=alert(1)>'])
 
     def test_chronological_numbers_ignore_database_ids(self):
         self.asiento.delete()

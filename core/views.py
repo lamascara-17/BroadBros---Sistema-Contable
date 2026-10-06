@@ -48,6 +48,27 @@ def texto_chat_simple(texto):
     return re.sub(r'\n{3,}', '\n\n', texto).strip()
 
 
+def formato_chat(texto):
+    """Conserva solo negritas como segmentos de texto, nunca como HTML."""
+    destacados = []
+
+    def destacar(match):
+        destacados.append(texto_chat_simple(match.group(1) or match.group(2)))
+        return f'\ue000{len(destacados) - 1}\ue001'
+
+    texto = (texto or '').replace('\ue000', '').replace('\ue001', '')
+    texto = re.sub(r'\*\*([^*\n]+)\*\*|__([^_\n]+)__', destacar, texto)
+    partes = re.split(r'(\ue000\d+\ue001)', texto_chat_simple(texto))
+    segmentos = []
+    for parte in partes:
+        if not parte:
+            continue
+        negrita = parte.startswith('\ue000')
+        contenido = destacados[int(parte[1:-1])] if negrita else parte
+        segmentos.append({'text': contenido, 'bold': negrita})
+    return ''.join(s['text'] for s in segmentos), segmentos
+
+
 # ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 
 def index(request):
@@ -872,8 +893,9 @@ REGLAS DE RESPUESTA
     salvo que la pregunta requiera una explicación mayor.
 
 13. Escribe como un chat común, únicamente texto simple en párrafos.
-    No uses Markdown, asteriscos, negritas, guiones de lista, encabezados,
-    tablas, bloques de código, LaTeX ni barras de escape.
+    Puedes resaltar cuentas, importes o conceptos importantes usando **negrita**.
+    Usa ese énfasis con moderación. No uses otros formatos Markdown,
+    guiones de lista, encabezados, tablas, código, LaTeX ni barras de escape.
     Menciona los asientos como "asiento 1", sin símbolos de formato.
     Conserva los importes y fechas tal como corresponde, por ejemplo S/ 10 000.
 
@@ -910,9 +932,11 @@ REGLAS DE RESPUESTA
         # 10. RESPUESTA AL FRONTEND
         # ==========================================================
 
+        respuesta, segmentos = formato_chat(respuesta)
         return JsonResponse(
             {
-                'response': texto_chat_simple(respuesta),
+                'response': respuesta,
+                'segments': segmentos,
                 'status': 'success',
                 'asiento_consultado': (
                     asiento_encontrado['numero']

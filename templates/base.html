@@ -162,6 +162,24 @@
         assistantFab?.addEventListener('click', () => setAssistant(true));
         assistantClose?.addEventListener('click', () => setAssistant(false));
 
+        function mostrarRespuesta(bubble, data) {
+            bubble.replaceChildren();
+            if (!Array.isArray(data.segments)) {
+                bubble.textContent = data.response || data.error || 'No pude obtener una respuesta.';
+                return;
+            }
+            for (const segment of data.segments) {
+                const text = String(segment.text ?? '');
+                if (segment.bold === true) {
+                    const strong = document.createElement('strong');
+                    strong.textContent = text;
+                    bubble.appendChild(strong);
+                } else {
+                    bubble.appendChild(document.createTextNode(text));
+                }
+            }
+        }
+
         function appendMessage(text, type) {
             const row = document.createElement('div');
             row.className = 'chat-message ' + type;
@@ -209,7 +227,7 @@
                 const d = await r.json();
                 if (!r.ok) throw new Error(d.error || 'El asistente no pudo completar la consulta.');
                 botBubble.classList.remove('loading');
-                botBubble.textContent = d.response || d.error || 'No pude obtener una respuesta.';
+                mostrarRespuesta(botBubble, d);
             } catch (err) {
                 botBubble.classList.remove('loading');
                 botBubble.textContent = err.message === 'Failed to fetch' ? 'No se pudo conectar con el asistente. Intenta nuevamente.' : err.message;

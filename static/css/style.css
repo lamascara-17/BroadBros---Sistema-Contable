@@ -663,6 +663,11 @@ select:focus {
     font-style: italic;
 }
 
+.chat-message.bot .chat-bubble strong {
+    color: #000;
+    font-weight: 700;
+}
+
 .assistant-suggestions {
     margin-top: 6px;
     display: flex;
