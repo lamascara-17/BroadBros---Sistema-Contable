@@ -34,6 +34,20 @@ def numeros_asientos():
     return {asiento_id: numero for numero, asiento_id in enumerate(ids, 1)}
 
 
+def texto_chat_simple(texto):
+    """Quita marcas de formato conservando importes, fechas y párrafos."""
+    texto = (texto or '').replace('\r\n', '\n')
+    texto = re.sub(r'(?m)^[ \t]*```[^\n]*$', '', texto)
+    texto = re.sub(r'!?\[([^\]]+)\]\([^\n)]+\)', r'\1', texto)
+    texto = re.sub(r'(?m)^\s*(?:#{1,6}\s+|>\s*|[-+•]\s+|\d+[.)]\s+)', '', texto)
+    texto = re.sub(r'(?m)^\s*[-=_]{3,}\s*$', '', texto)
+    texto = re.sub(r'_{1,2}([^_\n]+)_{1,2}', r'\1', texto)
+    texto = texto.translate(str.maketrans('', '', '*`\\'))
+    texto = re.sub(r'(?m)^[ \t]*\||\|[ \t]*$', '', texto)
+    texto = texto.replace('|', ' ')
+    return re.sub(r'\n{3,}', '\n\n', texto).strip()
+
+
 # ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 
 def index(request):
@@ -857,6 +871,12 @@ REGLAS DE RESPUESTA
 12. Responde en máximo 2 párrafos cortos,
     salvo que la pregunta requiera una explicación mayor.
 
+13. Escribe como un chat común, únicamente texto simple en párrafos.
+    No uses Markdown, asteriscos, negritas, guiones de lista, encabezados,
+    tablas, bloques de código, LaTeX ni barras de escape.
+    Menciona los asientos como "asiento 1", sin símbolos de formato.
+    Conserva los importes y fechas tal como corresponde, por ejemplo S/ 10 000.
+
 ============================================================
 """
 
@@ -892,7 +912,7 @@ REGLAS DE RESPUESTA
 
         return JsonResponse(
             {
-                'response': respuesta,
+                'response': texto_chat_simple(respuesta),
                 'status': 'success',
                 'asiento_consultado': (
                     asiento_encontrado['numero']

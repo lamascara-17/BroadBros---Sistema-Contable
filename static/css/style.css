@@ -646,7 +646,7 @@ select:focus {
     border-radius: 11px;
     background: #fff;
     border: 1px solid var(--line);
-    color: #07393c;
+    color: #000;
     font-size: 12px;
     line-height: 1.5;
     white-space: pre-wrap;
@@ -659,7 +659,7 @@ select:focus {
 }
 
 .chat-bubble.loading {
-    color: #2c666e;
+    color: #000;
     font-style: italic;
 }
 

@@ -1,6 +1,8 @@
 from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
+from types import SimpleNamespace
+from unittest.mock import patch
 from .models import AsientoContable, CuentaContable, Movimiento
 
 
@@ -18,6 +20,20 @@ class FrontendFlowTests(TestCase):
                 'cuenta_1': str(self.capital.pk), 'tipo_1': 'haber', 'monto_1': '150.25'}
         data.update(changes)
         return data
+
+    def test_assistant_returns_plain_text_preserving_amounts_and_dates(self):
+        from .views import texto_chat_simple
+        respuesta = '## Asiento 1\n\nLa cuenta **1101 - Caja** recibe S/ 10 000 el 30/03/2009.\n\n- La cuenta __5101__ aumenta.\\\n`Debe y Haber`.'
+        esperado = 'Asiento 1\n\nLa cuenta 1101 - Caja recibe S/ 10 000 el 30/03/2009.\nLa cuenta 5101 aumenta.\nDebe y Haber.'
+        self.assertEqual(texto_chat_simple(respuesta), esperado)
+        with patch('core.views.Groq') as cliente, patch('core.views.DEFAULT_GROQ_KEY', 'test-key'):
+            cliente.return_value.chat.completions.create.return_value = SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=respuesta))])
+            response = self.client.post(reverse('chatbot_api'), {'message': 'asiento 1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['response'], esperado)
+        prompt = cliente.return_value.chat.completions.create.call_args.kwargs['messages'][0]['content']
+        self.assertIn('únicamente texto simple', prompt)
 
     def test_chronological_numbers_ignore_database_ids(self):
         self.asiento.delete()
