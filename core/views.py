@@ -850,7 +850,7 @@ def chatbot_api(request):
         # ==========================================================
 
         system_prompt = f"""
-Te llamas ÑOÑOBOT, el asistente contable de BROADBROS.
+Te llamas ÑoñoBot, el asistente contable de BROADBROS.
 Actúas como un profesor y auditor de contabilidad universitaria
 especializado en el Plan Contable General Empresarial (PCGE)
 del Perú.
