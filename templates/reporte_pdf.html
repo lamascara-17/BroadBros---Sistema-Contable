@@ -1,25 +1,27 @@
-{% load contable_tags %}
+{% load contable_tags static %}
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><title>{{ empresa }} · Informe contable</title>
 <style>
+@font-face { font-family: FiraMono; src: url("{% static 'fonts/FiraMono-Regular.ttf' %}"); }
+@font-face { font-family: FiraMono; font-weight: bold; src: url("{% static 'fonts/FiraMono-Bold.ttf' %}"); }
 @page { size: A4 landscape; margin: 1.4cm 1.5cm 1.8cm;
     @frame footer { -pdf-frame-content: pie; left: 1.5cm; right: 1.5cm; bottom: .6cm; height: .6cm; }
 }
-body { font-family: Helvetica; font-size: 9pt; color: #263f49; }
-h1 { font-family: Times-Roman; font-size: 22pt; font-weight: normal; color: #2e6171; margin: 0 0 5pt; }
-h2 { font-family: Times-Roman; font-size: 17pt; font-weight: normal; margin: 16pt 0 8pt; color: #2e6171; }
+body { font-family: FiraMono; font-size: 9pt; color: #0a090c; }
+h1 { font-family: FiraMono; font-size: 22pt; font-weight: normal; color: #07393c; margin: 0 0 5pt; }
+h2 { font-family: FiraMono; font-size: 17pt; font-weight: normal; margin: 16pt 0 8pt; color: #07393c; }
 p { margin: 0 0 5pt; }
-.meta { color: #556f7a; font-size: 9pt; }
-.marca { font-weight: bold; font-size: 9pt; letter-spacing: 2pt; color: #2e6171; }
+.meta { color: #2c666e; font-size: 9pt; }
+.marca { font-weight: bold; font-size: 9pt; letter-spacing: 2pt; color: #07393c; }
 table { width: 100%; margin-bottom: 12pt; }
-th, td { padding: 3pt 5pt; margin: 0; line-height: 11pt; border-bottom: .4pt solid #e6dfe4; vertical-align: top; }
-th { background-color: #2e6171; color: white; text-align: left; font-size: 8pt; }
+th, td { padding: 3pt 5pt; margin: 0; line-height: 11pt; border-bottom: .4pt solid #d8e1e3; vertical-align: top; }
+th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; }
 .right { text-align: right; }
-.seccion { font-weight: bold; color: #2e6171; background-color: #f2eaf0; }
-.subtotal { font-weight: bold; border-top: .7pt solid #b79fad; background-color: #faf7f9; }
-.total { font-weight: bold; background-color: #2e6171; color: white; }
+.seccion { font-weight: bold; color: #07393c; background-color: #e9f5f8; }
+.subtotal { font-weight: bold; border-top: .7pt solid #90ddf0; background-color: #f8fafb; }
+.total { font-weight: bold; background-color: #07393c; color: white; }
 .break { page-break-before: always; }
-.nota { color: #556f7a; font-size: 8pt; }
+.nota { color: #2c666e; font-size: 8pt; }
 </style></head><body>
 <div id="pie" class="nota">Preparado por el sistema BROADBROS · Página <pdf:pagenumber /> de <pdf:pagecount /></div>
 <p class="marca">BROADBROS / INFORME CONTABLE</p>

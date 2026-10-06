@@ -50,7 +50,7 @@ def fecha(valor):
 
 def generar_asientos(datos):
     """Genera operaciones y ajustes sin deducir importes mediante un modelo."""
-    if not isinstance(datos, dict) or datos.get('observaciones'):
+    if not isinstance(datos, dict) or datos.get('errores_lectura'):
         raise ValueError('La lectura contiene datos pendientes de aclarar. Use una imagen más nítida.')
     operaciones = datos.get('operaciones')
     if not isinstance(operaciones, list) or not operaciones:

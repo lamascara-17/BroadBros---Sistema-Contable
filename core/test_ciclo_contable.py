@@ -51,6 +51,10 @@ class ReglasCicloTests(SimpleTestCase):
             self.assertEqual(sum(m['monto'] for m in a['movimientos'] if m['tipo_movimiento']=='debe'), sum(m['monto'] for m in a['movimientos'] if m['tipo_movimiento']=='haber'))
         self.assertEqual(sum(m['monto'] for a in asientos for m in a['movimientos'] if m['tipo_movimiento']=='debe'), Decimal('39135'))
 
+    def test_notas_informativas_no_bloquean_un_caso_completo(self):
+        datos=caso();datos['observaciones']=['El cobro no indica monto; se toma el saldo de la factura.']
+        self.assertEqual(len(generar_asientos(datos)),14)
+
     def test_datos_variados_no_son_un_solucionario_fijo(self):
         datos = caso()
         datos['operaciones'][0]['monto'] = '20000'
@@ -69,7 +73,7 @@ class ReglasCicloTests(SimpleTestCase):
         self.assertEqual(len(cobro['movimientos']),2)
 
     def test_datos_ambiguos_no_generan_asientos(self):
-        cambios = [lambda d: d.update(observaciones=['Monto ilegible']),
+        cambios = [lambda d: d.update(errores_lectura=['Monto ilegible']),
                    lambda d: d['operaciones'].pop(),
                    lambda d: d['operaciones'][1].update(monto='NaN'),
                    lambda d: d['operaciones'][3].update(porcentaje_contado=110),

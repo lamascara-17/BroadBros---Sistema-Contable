@@ -6,8 +6,8 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from .reporte_utils import contexto_estados
 
-AZUL = '2E6171'
-LILA = 'F2EAF0'
+AZUL = '07393C'
+LILA = 'E9F5F8'
 NUMERO = '#,##0.00;[Red](#,##0.00);"—"'
 
 
@@ -30,15 +30,15 @@ def exportar_excel_contable(empresa='BroadBros'):
         for fila, valor in [(1, empresa), (2, titulo.upper()), (3, f"Al {ctx['fecha_cierre'].strftime('%d/%m/%Y')}" if ctx['fecha_cierre'] else 'Sin movimientos'), (4, 'Preparado por el sistema BROADBROS · Importes en soles')]:
             ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=len(columnas))
             texto(ws.cell(fila, 1), valor)
-        ws.cell(1, 1).font = Font(name='Georgia', size=20, color=AZUL)
-        ws.cell(2, 1).font = Font(name='Calibri', size=12, bold=True, color=AZUL)
+        ws.cell(1, 1).font = Font(name='Fira Mono', size=20, color=AZUL)
+        ws.cell(2, 1).font = Font(name='Fira Mono', size=12, bold=True, color=AZUL)
         for fila in (3, 4):
-            ws.cell(fila, 1).font = Font(name='Calibri', size=10, color='556F7A')
+            ws.cell(fila, 1).font = Font(name='Fira Mono', size=10, color='2C666E')
         ws.append([])
         for col, label in enumerate(columnas, 1):
             cell = ws.cell(6, col)
             texto(cell, label)
-            cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
+            cell.font = Font(name='Fira Mono', size=10, bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor=AZUL)
             cell.alignment = Alignment(vertical='center', wrap_text=True)
         ws.row_dimensions[6].height = 30
@@ -66,19 +66,19 @@ def exportar_excel_contable(empresa='BroadBros'):
                 texto(cell, valor)
             else:
                 cell.value = valor
-            cell.font = Font(name='Calibri', size=10, color='263F49', bold=tipo != 'detalle')
+            cell.font = Font(name='Fira Mono', size=10, color='0A090C', bold=tipo != 'detalle')
             cell.alignment = Alignment(vertical='top', wrap_text=True, horizontal='right' if isinstance(valor, (int, float)) else 'left')
             if not isinstance(valor, str) and not hasattr(valor, 'year'):
                 cell.number_format = NUMERO
                 cell.alignment = Alignment(horizontal='right', vertical='top')
             if tipo == 'total':
                 cell.fill = PatternFill('solid', fgColor=AZUL)
-                cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
+                cell.font = Font(name='Fira Mono', size=10, bold=True, color='FFFFFF')
             elif tipo in ('seccion', 'subtotal'):
                 cell.fill = PatternFill('solid', fgColor=LILA)
-                cell.border = Border(top=Side(style='thin', color='B79FAD'))
+                cell.border = Border(top=Side(style='thin', color='90DDF0'))
             elif index % 2:
-                cell.fill = PatternFill('solid', fgColor='FAF7F9')
+                cell.fill = PatternFill('solid', fgColor='F0EDEE')
         ws.row_dimensions[index].height = 30
         return index
 
@@ -92,7 +92,7 @@ def exportar_excel_contable(empresa='BroadBros'):
                 for col in (start, start + 1):
                     cell = ws.cell(index, col)
                     cell.fill = PatternFill('solid', fgColor=AZUL if item[2] == 'total' else LILA)
-                    cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF' if item[2] == 'total' else AZUL)
+                    cell.font = Font(name='Fira Mono', size=10, bold=True, color='FFFFFF' if item[2] == 'total' else AZUL)
     fila(ws, ['Activo = Pasivo + Patrimonio', ctx['total_activos'], 'Pasivo + Patrimonio', ctx['total_pasivo_patrimonio']], 'subtotal')
     fila(ws, ['Agrupación por código contable; revise vencimientos especiales.', None, None, None])
 

@@ -16,7 +16,7 @@ No incorpores el texto de pie, título o consignas como una operación.
 Respeta el año del ejercicio (09 significa 2009), no el año actual.
 No agregues IGV, impuestos, pagos, costos o saldos que no aparezcan.
 Usa números JSON sin separadores de miles. Cualquier dato ilegible es null
-acompañado de una explicación en observaciones; nunca una conjetura.
+acompañado de una explicación en errores_lectura; nunca una conjetura.
 
 Devuelve únicamente este objeto JSON:
 {
@@ -24,7 +24,7 @@ Devuelve únicamente este objeto JSON:
  "metodo_inventario": "periodico" si hay inventario físico final,
  "inventario_inicial": importe leído, o null si no se indica,
  "fecha_cierre": "YYYY-MM-DD",
- "numero_operaciones": número de operaciones extraídas, incluidas compras separadas e inventario final,
+ "errores_lectura": [],
  "observaciones": [],
  "operaciones": [{"fecha":"YYYY-MM-DD","tipo":"...","texto":"frase literal leída","monto": importe o null, ...}]
 }
@@ -48,7 +48,11 @@ Tipos y campos:
 - pago_servicios: monto total SOLO si escrito; si no, null.
   detalles = [{"concepto":"alquiler, luz, agua u otro texto", "monto":importe escrito}].
 - inventario_final: monto del inventario físico (puede ser cero), fecha de cierre.
-- no_soportada: cualquier operación diferente; copia su texto y explica en observaciones.
+- no_soportada: cualquier operación diferente; copia su texto y explica en errores_lectura.
+
+errores_lectura contiene SOLO datos ilegibles, contradictorios o imposibles de determinar.
+observaciones contiene notas informativas; separar compras o dejar el nominal de
+una factura sin monto escrito son notas normales, no errores de lectura.
 
 Incluye todas las fechas, importes y porcentajes de las dos partes de la imagen.
 El inventario final es un dato para el ajuste, no una compra. El valor residual
@@ -112,8 +116,8 @@ def extraer_operaciones(imagen_file, api_key=None):
         raise ValueError('La lectura no devolvió una estructura válida. Intente con una imagen más nítida.') from None
     if not isinstance(datos, dict) or not isinstance(datos.get('operaciones'), list):
         raise ValueError('La lectura no contiene una lista de operaciones.')
-    if datos.get('numero_operaciones') != len(datos['operaciones']):
-        raise ValueError('La cantidad de operaciones leídas no coincide. No se guardó el caso.')
+    if not datos['operaciones']:
+        raise ValueError('La lectura no contiene operaciones. No se guardó el caso.')
     return datos
 
 

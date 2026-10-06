@@ -370,6 +370,18 @@ def exportar_excel_contable(empresa="BroadBros"):
     return generar_excel(empresa)
 
 
+def recurso_pdf(uri, rel):
+    # Resolver únicamente recursos estáticos del proyecto, incluidas las fuentes.
+    from pathlib import Path
+    prefijo = '/' + settings.STATIC_URL.lstrip('/')
+    if uri.startswith(prefijo):
+        raiz = Path(settings.BASE_DIR) / 'static'
+        ruta = (raiz / uri[len(prefijo):]).resolve()
+        if ruta.is_relative_to(raiz.resolve()):
+            return str(ruta)
+    return uri
+
+
 def reporte_completo(request):
     """
     Permite descargar directamente el reporte en PDF, en Excel (.xlsx)
@@ -399,7 +411,7 @@ def reporte_completo(request):
         del context
 
         pdf_file = BytesIO()
-        pisa_status = pisa.CreatePDF(BytesIO(html.encode('UTF-8')), dest=pdf_file)
+        pisa_status = pisa.CreatePDF(BytesIO(html.encode('UTF-8')), dest=pdf_file, link_callback=recurso_pdf)
         del html
         gc.collect()
 
