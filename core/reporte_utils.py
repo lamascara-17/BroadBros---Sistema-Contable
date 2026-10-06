@@ -1,117 +1,118 @@
+"""Una misma fuente de saldos para pantalla, PDF y Excel."""
 from decimal import Decimal
-from django.db.models import Sum, Q
+from django.db.models import Sum
+from django.utils import timezone
 from .models import CuentaContable, AsientoContable, Movimiento
 
+CERO = Decimal('0')
+
+
 def get_reporte_context():
-    ctx = {}
-    # Traemos todo ordenado en una sola consulta eficiente
-    ctx['asientos'] = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')
-    
-    cuentas = CuentaContable.objects.all()
-    bal_comp_datos = []
-    
-    # OPTIMIZACIÓN CLAVE: Obtenemos todos los totales de una sola vez
-    totales = Movimiento.objects.values('cuenta_id', 'tipo').annotate(total=Sum('monto'))
-    mapa_totales = {}
-    for t in totales:
-        if t['cuenta_id'] not in mapa_totales: mapa_totales[t['cuenta_id']] = {'debe': Decimal('0'), 'haber': Decimal('0')}
-        mapa_totales[t['cuenta_id']][t['tipo']] = t['total']
-
-    gran_total_debe = gran_total_haber = gran_saldo_deudor = gran_saldo_acreedor = Decimal('0')
-
+    asientos = list(AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id'))
+    cuentas = list(CuentaContable.objects.all())
+    totales = {}
+    for fila in Movimiento.objects.values('cuenta_id', 'tipo').annotate(total=Sum('monto')):
+        totales.setdefault(fila['cuenta_id'], {'debe': CERO, 'haber': CERO})[fila['tipo']] = fila['total']
+    balance, mayor = [], []
+    activo_corriente, activo_no_corriente = [], []
+    pasivo_corriente, pasivo_no_corriente, patrimonio = [], [], []
+    er = {k: [] for k in ('ventas', 'costo_ventas', 'gastos_operativos', 'gastos_financieros', 'otros_ingresos', 'otros_gastos')}
     for cuenta in cuentas:
-        tot = mapa_totales.get(cuenta.id, {'debe': Decimal('0'), 'haber': Decimal('0')})
-        total_debe, total_haber = tot['debe'], tot['haber']
-        
-        if total_debe == 0 and total_haber == 0: continue
-            
-        saldo = total_debe - total_haber
-        saldo_deudor = saldo if saldo > 0 else Decimal('0')
-        saldo_acreedor = abs(saldo) if saldo < 0 else Decimal('0')
-        
-        bal_comp_datos.append({
-            'cuenta': cuenta, 'total_debe': total_debe, 'total_haber': total_haber,
-            'saldo_deudor': saldo_deudor, 'saldo_acreedor': saldo_acreedor
-        })
-        
-        gran_total_debe += total_debe
-        gran_total_haber += total_haber
-        gran_saldo_deudor += saldo_deudor
-        gran_saldo_acreedor += saldo_acreedor
-
-    ctx.update({
-        'bal_comp_datos': bal_comp_datos,
-        'gran_total_debe': gran_total_debe, 'gran_total_haber': gran_total_haber,
-        'gran_saldo_deudor': gran_saldo_deudor, 'gran_saldo_acreedor': gran_saldo_acreedor
-    })
-    
-    # Estado de Resultados simplificado (usando totales ya calculados)
-    def total_por_filtro(tipo_cuenta, subcat=None, exclude_subcat=None):
-        qs = cuentas.filter(tipo=tipo_cuenta)
-        if subcat: qs = qs.filter(subcategoria=subcat)
-        if exclude_subcat: qs = qs.exclude(subcategoria__in=exclude_subcat)
-        suma = Decimal('0')
-        for c in qs:
-            t = mapa_totales.get(c.id, {'debe': Decimal('0'), 'haber': Decimal('0')})
-            suma += (t['debe'] - t['haber']) if tipo_cuenta == 'gasto' else (t['haber'] - t['debe'])
-        return suma
-
-    ctx['er_total_ventas'] = total_por_filtro('ingreso', exclude_subcat=['otro_ingreso'])
-    ctx['er_total_costo_ventas'] = total_por_filtro('gasto', subcat='costo_ventas')
-    ctx['er_utilidad_bruta'] = ctx['er_total_ventas'] - ctx['er_total_costo_ventas']
-    ctx['er_total_gastos_operativos'] = total_por_filtro('gasto', exclude_subcat=['costo_ventas', 'gasto_financiero', 'otro_gasto'])
-    ctx['er_utilidad_operativa'] = ctx['er_utilidad_bruta'] - ctx['er_total_gastos_operativos']
-    ctx['er_total_gastos_financieros'] = total_por_filtro('gasto', subcat='gasto_financiero')
-    ctx['er_utilidad_antes_impuesto'] = ctx['er_utilidad_operativa'] - ctx['er_total_gastos_financieros']
-    ctx['er_impuesto'] = (ctx['er_utilidad_antes_impuesto'] * Decimal('0.30')).quantize(Decimal('0.01')) if ctx['er_utilidad_antes_impuesto'] > 0 else Decimal('0')
-    ctx['er_utilidad_neta'] = ctx['er_utilidad_antes_impuesto'] - ctx['er_impuesto']
-
-    # --- NUEVO: Lógica del Balance General ---
-    bg_activos = []
-    bg_pasivos = []
-    bg_patrimonio = []
-    total_activos = total_pasivos = total_patrimonio = Decimal('0')
-
-    for cuenta in cuentas:
-        t = mapa_totales.get(cuenta.id, {'debe': Decimal('0'), 'haber': Decimal('0')})
-        saldo = t['debe'] - t['haber']
+        t = totales.get(cuenta.pk, {'debe': CERO, 'haber': CERO})
+        d, h = t['debe'], t['haber']
+        if not d and not h:
+            continue
+        diferencia = d - h
+        balance.append({'cuenta': cuenta, 'total_debe': d, 'total_haber': h,
+                        'saldo_deudor': max(diferencia, CERO), 'saldo_acreedor': max(-diferencia, CERO)})
+        saldo = diferencia if cuenta.tipo in ('activo', 'gasto') else -diferencia
+        movs = [mov for asiento in asientos for mov in asiento.movimientos.all() if mov.cuenta_id == cuenta.pk]
+        mayor.append({'cuenta': cuenta, 'movimientos': movs, 'total_debe': d, 'total_haber': h, 'saldo_final': saldo})
+        item = {'cuenta': cuenta, 'saldo': saldo}
+        # Las cuentas correctoras del activo (39) conservan su saldo negativo.
+        try:
+            grupo = int(cuenta.codigo[:2])
+        except ValueError:
+            grupo = 0
         if cuenta.tipo == 'activo':
-            if saldo != 0:
-                bg_activos.append({'cuenta': cuenta, 'saldo': saldo})
-                total_activos += saldo
+            (activo_no_corriente if 30 <= grupo <= 39 else activo_corriente).append(item)
         elif cuenta.tipo == 'pasivo':
-            saldo_acreedor = abs(saldo)
-            if saldo_acreedor != 0:
-                bg_pasivos.append({'cuenta': cuenta, 'saldo': saldo_acreedor})
-                total_pasivos += saldo_acreedor
+            (pasivo_no_corriente if 47 <= grupo <= 49 else pasivo_corriente).append(item)
         elif cuenta.tipo == 'patrimonio':
-            saldo_acreedor = abs(saldo)
-            if saldo_acreedor != 0:
-                bg_patrimonio.append({'cuenta': cuenta, 'saldo': saldo_acreedor})
-                total_patrimonio += saldo_acreedor
+            patrimonio.append(item)
+        else:
+            if cuenta.tipo == 'ingreso':
+                clave = 'otros_ingresos' if cuenta.subcategoria == 'otro_ingreso' or grupo == 75 else 'ventas'
+            else:
+                clave = {'costo_ventas': 'costo_ventas', 'gasto_financiero': 'gastos_financieros', 'otro_gasto': 'otros_gastos'}.get(cuenta.subcategoria)
+                if clave is None:
+                    clave = 'costo_ventas' if grupo == 69 else 'otros_gastos' if grupo == 66 else 'gastos_operativos'
+            er[clave].append(item)
 
-    ctx.update({
-        'bg_activos': bg_activos,
-        'bg_pasivos': bg_pasivos,
-        'bg_patrimonio': bg_patrimonio,
-        'bg_total_activos': total_activos,
-        'bg_total_pasivos': total_pasivos,
-        'bg_resultados_acumulados': ctx['er_utilidad_antes_impuesto'],
-        'bg_total_patrimonio': total_patrimonio + ctx['er_utilidad_antes_impuesto'],
-        'bg_total_pasivo_patrimonio': total_pasivos + total_patrimonio + ctx['er_utilidad_antes_impuesto'],
-    })
+    suma = lambda items: sum((item['saldo'] for item in items), CERO)
+    ctx = {'asientos': asientos, 'bal_comp_datos': balance, 'mayor_datos': mayor,
+           'fecha_inicio': asientos[0].fecha if asientos else None,
+           'fecha_cierre': asientos[-1].fecha if asientos else None, 'generado_el': timezone.localtime(),
+           'activo_corriente': activo_corriente, 'activo_no_corriente': activo_no_corriente,
+           'pasivo_corriente': pasivo_corriente, 'pasivo_no_corriente': pasivo_no_corriente,
+           'patrimonio': patrimonio, **er}
+    for clave in ('total_debe', 'total_haber', 'saldo_deudor', 'saldo_acreedor'):
+        ctx['gran_' + clave] = sum((item[clave] for item in balance), CERO)
+    for clave in er:
+        ctx['total_' + clave] = suma(er[clave])
+    ctx['utilidad_bruta'] = ctx['total_ventas'] - ctx['total_costo_ventas']
+    ctx['utilidad_operativa'] = ctx['utilidad_bruta'] - ctx['total_gastos_operativos']
+    ctx['utilidad_antes_impuesto'] = ctx['utilidad_operativa'] - ctx['total_gastos_financieros'] + ctx['total_otros_ingresos'] - ctx['total_otros_gastos']
+    # No se presume una tasa tributaria ni un gasto que no esté registrado.
+    ctx['resultados_acumulados'] = ctx['utilidad_antes_impuesto']
+    for clave in ('activo_corriente', 'activo_no_corriente', 'pasivo_corriente', 'pasivo_no_corriente', 'patrimonio'):
+        ctx['total_' + clave] = suma(ctx[clave])
+    ctx['activos'] = activo_corriente + activo_no_corriente
+    ctx['pasivos'] = pasivo_corriente + pasivo_no_corriente
+    ctx['total_activos'] = suma(ctx['activos'])
+    ctx['total_pasivos'] = suma(ctx['pasivos'])
+    ctx['total_patrimonio_con_resultados'] = ctx['total_patrimonio'] + ctx['resultados_acumulados']
+    ctx['total_pasivo_patrimonio'] = ctx['total_pasivos'] + ctx['total_patrimonio_con_resultados']
+    ctx['esta_balanceado'] = ctx['total_activos'] == ctx['total_pasivo_patrimonio']
+    return ctx
 
-    # Traer Libro Mayor también
-    mayor_datos = []
-    for cuenta in cuentas:
-        movs = Movimiento.objects.filter(cuenta=cuenta).select_related('asiento').order_by('asiento__fecha')
-        if movs.exists():
-            t = mapa_totales.get(cuenta.id, {'debe': Decimal('0'), 'haber': Decimal('0')})
-            mayor_datos.append({
-                'cuenta': cuenta, 'movimientos': movs,
-                'total_debe': t['debe'], 'total_haber': t['haber'],
-                'saldo_final': t['debe'] - t['haber'] if cuenta.tipo == 'activo' else t['haber'] - t['debe']
-            })
-    ctx['mayor_datos'] = mayor_datos
 
+def filas_situacion(ctx, lado):
+    """Filas del ESF utilizadas también por el libro Excel."""
+    filas = []
+    grupos = [('Activo corriente', 'activo_corriente'), ('Activo no corriente', 'activo_no_corriente')] if lado == 'activo' else [('Pasivo corriente', 'pasivo_corriente'), ('Pasivo no corriente', 'pasivo_no_corriente')]
+    for titulo, clave in grupos:
+        filas.append((titulo, None, 'seccion'))
+        filas.extend((f"{i['cuenta'].codigo} · {i['cuenta'].nombre}", i['saldo'], 'detalle') for i in ctx[clave])
+        filas.append((f'Total {titulo.lower()}', ctx['total_' + clave], 'subtotal'))
+    if lado == 'activo':
+        filas.append(('TOTAL ACTIVO', ctx['total_activos'], 'total'))
+    else:
+        filas += [('TOTAL PASIVO', ctx['total_pasivos'], 'subtotal'), ('Patrimonio', None, 'seccion')]
+        filas.extend((f"{i['cuenta'].codigo} · {i['cuenta'].nombre}", i['saldo'], 'detalle') for i in ctx['patrimonio'])
+        filas += [('Resultado del ejercicio', ctx['resultados_acumulados'], 'detalle'),
+                  ('Total patrimonio', ctx['total_patrimonio_con_resultados'], 'subtotal'),
+                  ('TOTAL PASIVO Y PATRIMONIO', ctx['total_pasivo_patrimonio'], 'total')]
+    return filas
+
+
+def filas_resultados(ctx):
+    return [('Ventas netas', ctx['total_ventas'], 'detalle'),
+            ('Costo de ventas', -ctx['total_costo_ventas'], 'detalle'),
+            ('Utilidad bruta', ctx['utilidad_bruta'], 'subtotal'),
+            ('Gastos operativos', -ctx['total_gastos_operativos'], 'detalle'),
+            ('Utilidad operativa', ctx['utilidad_operativa'], 'subtotal'),
+            ('Gastos financieros', -ctx['total_gastos_financieros'], 'detalle'),
+            ('Otros ingresos', ctx['total_otros_ingresos'], 'detalle'),
+            ('Otros gastos', -ctx['total_otros_gastos'], 'detalle'),
+            ('RESULTADO ANTES DE IMPUESTOS', ctx['utilidad_antes_impuesto'], 'total')]
+
+
+def contexto_estados():
+    ctx = get_reporte_context()
+    from itertools import zip_longest
+    ctx['filas_activo'] = filas_situacion(ctx, 'activo')
+    ctx['filas_pasivo'] = filas_situacion(ctx, 'pasivo')
+    ctx['filas_esf'] = list(zip_longest(ctx['filas_activo'], ctx['filas_pasivo']))
+    ctx['filas_er'] = filas_resultados(ctx)
     return ctx

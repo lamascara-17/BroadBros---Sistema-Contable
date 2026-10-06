@@ -17,16 +17,16 @@
                     <span class="brand-mark">B.</span>
                     <span class="brand-copy"><strong>BroadBros</strong><small>Contabilidad empresarial</small></span>
                 </a>
-                <span class="workspace-label">PCGE <span aria-hidden="true">/</span> FIIS · UNI</span>
+                <span class="workspace-label">PCGE <span aria-hidden="true">/</span> Gestión financiera</span>
                 <div class="masthead-actions">
                     <button id="btn-tutor" aria-controls="assistant-panel" aria-expanded="false" class="assistant-trigger" type="button">Asistente contable <span aria-hidden="true">↗</span></button>
                     <button class="icon-button navigation-toggle" id="navigation-toggle" type="button" aria-controls="workspace-nav" aria-expanded="false" aria-label="Abrir navegación">☰</button>
                 </div>
             </div>
             <nav class="workspace-nav" id="workspace-nav" aria-label="Navegación principal">
-                <a href="{% url 'index' %}" class="workspace-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" {% if request.resolver_match.url_name == 'index' %}aria-current="page"{% endif %}>Inicio</a>
+                <a href="{% url 'index' %}" class="workspace-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" {% if request.resolver_match.url_name == 'index' %}aria-current="page"{% endif %}><img class="source-icon" src="{% static 'icons/inicio.png' %}" alt="">Inicio</a>
                 <details class="nav-group {% if request.resolver_match.url_name == 'registrar_asiento' or request.resolver_match.url_name == 'cargar_imagen_diario' or request.resolver_match.url_name == 'gestionar_cuentas' %}active{% endif %}">
-                    <summary>Operaciones<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
+                    <summary><img class="source-icon" src="{% static 'icons/operaciones.png' %}" alt="">Operaciones<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
                     <div class="nav-dropdown">
                         <a href="{% url 'registrar_asiento' %}" {% if request.resolver_match.url_name == 'registrar_asiento' %}aria-current="page"{% endif %}><strong>Registrar asiento</strong><small>Registro manual de movimientos</small></a>
                         <a href="{% url 'cargar_imagen_diario' %}" {% if request.resolver_match.url_name == 'cargar_imagen_diario' %}aria-current="page"{% endif %}><strong>Importar imagen</strong><small>Captura de un ejercicio contable</small></a>
@@ -34,18 +34,18 @@
                     </div>
                 </details>
                 <details class="nav-group {% if request.resolver_match.url_name == 'libro_diario' or request.resolver_match.url_name == 'libro_mayor' %}active{% endif %}">
-                    <summary>Libros<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
+                    <summary><img class="source-icon" src="{% static 'icons/libros.png' %}" alt="">Libros<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
                     <div class="nav-dropdown">
                         <a href="{% url 'libro_diario' %}" {% if request.resolver_match.url_name == 'libro_diario' %}aria-current="page"{% endif %}><strong>Libro diario</strong><small>Asientos en orden cronológico</small></a>
                         <a href="{% url 'libro_mayor' %}" {% if request.resolver_match.url_name == 'libro_mayor' %}aria-current="page"{% endif %}><strong>Libro mayor</strong><small>Movimientos por cuenta</small></a>
                     </div>
                 </details>
                 <details class="nav-group {% if request.resolver_match.url_name == 'balance_comprobacion' or request.resolver_match.url_name == 'estado_resultados' or request.resolver_match.url_name == 'balance_general' %}active{% endif %}">
-                    <summary>Estados financieros<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
+                    <summary><img class="source-icon" src="{% static 'icons/reportes.png' %}" alt="">Estados financieros<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
                     <div class="nav-dropdown">
                         <a href="{% url 'balance_comprobacion' %}" {% if request.resolver_match.url_name == 'balance_comprobacion' %}aria-current="page"{% endif %}><strong>Balance de comprobación</strong><small>Revisión de sumas y saldos</small></a>
                         <a href="{% url 'estado_resultados' %}" {% if request.resolver_match.url_name == 'estado_resultados' %}aria-current="page"{% endif %}><strong>Estado de resultados</strong><small>Ingresos, gastos y utilidad</small></a>
-                        <a href="{% url 'balance_general' %}" {% if request.resolver_match.url_name == 'balance_general' %}aria-current="page"{% endif %}><strong>Balance general</strong><small>Activo, pasivo y patrimonio</small></a>
+                        <a href="{% url 'balance_general' %}" {% if request.resolver_match.url_name == 'balance_general' %}aria-current="page"{% endif %}><strong>Situación financiera</strong><small>Activo, pasivo y patrimonio</small></a>
                     </div>
                 </details>
                 <a href="{% url 'reporte_completo' %}" class="workspace-link export-link {% if request.resolver_match.url_name == 'reporte_completo' %}active{% endif %}" {% if request.resolver_match.url_name == 'reporte_completo' %}aria-current="page"{% endif %}>Exportar <span aria-hidden="true">↓</span></a>
@@ -69,6 +69,7 @@
                     </div>
                 {% endif %}
                 {% block content %}{% endblock %}
+                <div class="site-credits"><span>BROADBROS · Sistema contable</span><a href="https://www.magnific.com/es/autor/magnific/iconos/basic-rounded-lineal_4" target="_blank" rel="noopener noreferrer">Iconos Basic Rounded Lineal de Magnific (Freepik)</a></div>
             </section>
         </main>
     </div>

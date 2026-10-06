@@ -1,0 +1,17 @@
+{% load contable_tags %}
+<div class="balance-grid">
+    <div class="card"><div class="card-header"><h3>Activo</h3></div><div class="table-container">
+        <table><thead><tr><th>Concepto</th><th class="text-right">Importe (S/)</th></tr></thead><tbody>
+        {% for nombre, saldo, tipo in filas_activo %}
+            <tr class="financial-{{ tipo }}"><td>{{ nombre }}</td><td class="text-right monto">{% if saldo != None %}{{ saldo|formato_moneda }}{% endif %}</td></tr>
+        {% endfor %}
+        </tbody></table>
+    </div></div>
+    <div class="card"><div class="card-header"><h3>Pasivo y patrimonio</h3></div><div class="table-container">
+        <table><thead><tr><th>Concepto</th><th class="text-right">Importe (S/)</th></tr></thead><tbody>
+        {% for nombre, saldo, tipo in filas_pasivo %}
+            <tr class="financial-{{ tipo }}"><td>{{ nombre }}</td><td class="text-right monto">{% if saldo != None %}{{ saldo|formato_moneda }}{% endif %}</td></tr>
+        {% endfor %}
+        </tbody></table>
+    </div></div>
+</div>
