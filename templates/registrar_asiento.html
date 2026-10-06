@@ -89,7 +89,7 @@
                 {% for asiento in asientos_registrados %}
                 <tr>
                     <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
-                    <td><strong>Asiento #{{ asiento.id }}</strong> - {{ asiento.descripcion|default:"Sin descripción" }}</td>
+                    <td><strong>Asiento #{{ forloop.counter }}</strong> - {{ asiento.descripcion|default:"Sin descripción" }}</td>
                     <td>{{ asiento.movimientos.count }} líneas</td>
                     <td class="text-center">
                         <a href="{% url 'libro_diario' %}?editar={{ asiento.id }}" class="btn btn-secondary btn-sm">Editar</a>

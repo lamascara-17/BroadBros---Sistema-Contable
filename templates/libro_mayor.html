@@ -37,7 +37,7 @@
                         <tr>
                             {% if mov.tipo == 'debe' %}
                                 <td class="tcuenta-fecha text-center">{{ mov.asiento.fecha|date:"d/m/y" }}</td>
-                                <td class="tcuenta-num text-center">#{{ mov.asiento.id }}</td>
+                                <td class="tcuenta-num text-center">#{{ mov.asiento.numero }}</td>
                                 <td class="tcuenta-monto text-right">{{ mov.monto|formato_moneda }}</td>
                                 <td class="tcuenta-fecha"></td>
                                 <td class="tcuenta-num"></td>
@@ -47,7 +47,7 @@
                                 <td class="tcuenta-num"></td>
                                 <td class="tcuenta-monto text-right"></td>
                                 <td class="tcuenta-fecha text-center">{{ mov.asiento.fecha|date:"d/m/y" }}</td>
-                                <td class="tcuenta-num text-center">#{{ mov.asiento.id }}</td>
+                                <td class="tcuenta-num text-center">#{{ mov.asiento.numero }}</td>
                                 <td class="tcuenta-monto text-right">{{ mov.monto|formato_moneda }}</td>
                             {% endif %}
                         </tr>

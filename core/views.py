@@ -28,6 +28,12 @@ from .reporte_utils import contexto_estados
 DEFAULT_GROQ_KEY = os.getenv("GROQ_API_KEY")
 
 
+def numeros_asientos():
+    """Numeración del libro por fecha; el ID se conserva para editar/eliminar."""
+    ids = AsientoContable.objects.order_by('fecha', 'id').values_list('id', flat=True)
+    return {asiento_id: numero for numero, asiento_id in enumerate(ids, 1)}
+
+
 # ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 
 def index(request):
@@ -47,6 +53,9 @@ def index(request):
     ultimos_asientos = AsientoContable.objects.prefetch_related(
         'movimientos__cuenta'
     ).order_by('-created_at')[:5]
+    numeros = numeros_asientos()
+    for asiento in ultimos_asientos:
+        asiento.numero = numeros[asiento.id]
 
     context = {
         'total_asientos': total_asientos,
@@ -201,7 +210,7 @@ def registrar_asiento(request):
             messages.success(request, f'Asiento registrado exitosamente el {hora_real}.')
             return redirect('libro_diario')
 
-    asientos_registrados = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('-created_at')
+    asientos_registrados = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')
 
     context = {
         'cuentas': cuentas,
@@ -254,7 +263,7 @@ def editar_asiento(request, asiento_id):
 
 def eliminar_asiento(request, asiento_id):
     asiento = get_object_or_404(AsientoContable, id=asiento_id)
-    asiento_num = asiento.id 
+    asiento_num = numeros_asientos()[asiento.id]
     asiento.delete()
     messages.success(request, f'El Asiento #{asiento_num} fue eliminado correctamente.')
     return redirect('libro_diario')
@@ -277,6 +286,7 @@ def libro_diario(request):
 def libro_mayor(request):
     cuentas = CuentaContable.objects.all()
     datos_cuentas = []
+    numeros = numeros_asientos()
     for cuenta in cuentas:
         movimientos = cuenta.movimientos.select_related('asiento').order_by('asiento__fecha', 'asiento__id')
         if not movimientos.exists():
@@ -291,6 +301,10 @@ def libro_mayor(request):
             saldo = total_debe - total_haber
         else:
             saldo = total_haber - total_debe
+
+        movimientos = list(movimientos)
+        for movimiento in movimientos:
+            movimiento.asiento.numero = numeros[movimiento.asiento_id]
 
         datos_cuentas.append({
             'cuenta': cuenta,

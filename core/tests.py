@@ -19,6 +19,35 @@ class FrontendFlowTests(TestCase):
         data.update(changes)
         return data
 
+    def test_chronological_numbers_ignore_database_ids(self):
+        self.asiento.delete()
+        ultimo = AsientoContable.objects.create(id=55, fecha='2009-09-30', descripcion='Cierre')
+        primero = AsientoContable.objects.create(id=56, fecha='2009-03-30', descripcion='Apertura')
+        segundo = AsientoContable.objects.create(id=60, fecha='2009-03-30', descripcion='Compra')
+        Movimiento.objects.create(asiento=ultimo, cuenta=self.caja, tipo='debe', monto=100)
+        Movimiento.objects.create(asiento=primero, cuenta=self.caja, tipo='haber', monto=100)
+
+        registro = self.client.get(reverse('registrar_asiento'))
+        self.assertEqual(list(registro.context['asientos_registrados']), [primero, segundo, ultimo])
+        self.assertContains(registro, 'Asiento #1</strong> - Apertura')
+        self.assertContains(registro, 'Asiento #3</strong> - Cierre')
+        self.assertContains(registro, reverse('eliminar_asiento', args=[55]))
+        self.assertNotContains(registro, 'Asiento #55</strong>')
+
+        diario = self.client.get(reverse('libro_diario'))
+        self.assertEqual(list(diario.context['asientos']), [primero, segundo, ultimo])
+        inicio = self.client.get(reverse('index'))
+        self.assertEqual({a.id: a.numero for a in inicio.context['ultimos_asientos']}, {55: 3, 56: 1, 60: 2})
+        mayor = self.client.get(reverse('libro_mayor'))
+        movimientos = mayor.context['datos_cuentas'][0]['movimientos']
+        self.assertEqual([m.asiento.numero for m in movimientos], [1, 3])
+
+        eliminado = self.client.get(reverse('eliminar_asiento', args=[56]), follow=True)
+        self.assertContains(eliminado, 'El Asiento #1 fue eliminado correctamente.')
+        registro = self.client.get(reverse('registrar_asiento'))
+        self.assertContains(registro, 'Asiento #1</strong> - Compra')
+        self.assertContains(registro, 'Asiento #2</strong> - Cierre')
+
     def test_all_screens_render_with_and_without_movements(self):
         for empty in (False, True):
             if empty:

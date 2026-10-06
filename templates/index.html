@@ -94,7 +94,7 @@
                 <tbody>
                     {% for asiento in ultimos_asientos %}
                     <tr>
-                        <td><strong>#{{ asiento.id }}</strong></td>
+                        <td><strong>#{{ asiento.numero }}</strong></td>
                         <td>{{ asiento.fecha|date:"d/m/Y" }}</td>
                         <td>{{ asiento.descripcion|truncatewords:12 }}</td>
                         <td class="text-right monto text-debe">{{ asiento.total_debe|formato_moneda }}</td>
