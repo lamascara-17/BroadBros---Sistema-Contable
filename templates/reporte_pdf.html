@@ -46,13 +46,6 @@ th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; 
 {% for nombre, saldo, tipo in filas_er %}<tr class="{{ tipo }}"><td>{{ nombre }}</td><td class="right">{{ saldo|formato_importe }}</td></tr>{% endfor %}
 </tbody></table><p class="nota">Los gastos se presentan con signo negativo. El resultado no incluye un impuesto calculado con una tasa supuesta.</p></div>
 
-<div class="break"><p class="marca">BROADBROS / PATRIMONIO</p><h1>{{ empresa }}</h1><h2>Estado de Cambios en el Patrimonio</h2>
-<table repeat="1"><thead><tr><th style="width:40%;">Componente</th><th class="right">Apertura</th><th class="right">Movimientos</th><th class="right">Resultado</th><th class="right">Saldo final</th></tr></thead><tbody>
-{% for r in filas_patrimonio %}<tr><td>{{ r.nombre }}</td><td class="right">{{ r.inicial|formato_importe }}</td><td class="right">{{ r.variacion|formato_importe }}</td><td class="right">{{ r.resultado|formato_importe }}</td><td class="right">{{ r.final|formato_importe }}</td></tr>{% endfor %}
-<tr class="total"><td>TOTAL PATRIMONIO</td><td class="right">{{ totales_patrimonio.inicial|formato_importe }}</td><td class="right">{{ totales_patrimonio.variacion|formato_importe }}</td><td class="right">{{ totales_patrimonio.resultado|formato_importe }}</td><td class="right">{{ totales_patrimonio.final|formato_importe }}</td></tr></tbody></table><p class="nota">{{ nota_patrimonio }}</p>{% if nota_resultado %}<p class="nota">{{ nota_resultado }}</p>{% endif %}</div>
-<div class="break"><p class="marca">BROADBROS / EFECTIVO</p><h1>{{ empresa }}</h1><h2>Estado de Flujos de Efectivo</h2>
-<table repeat="1"><thead><tr><th style="width:75%;">Concepto</th><th class="right">Importe</th></tr></thead><tbody>{% for nombre,saldo,tipo in filas_flujos %}<tr class="{{ tipo }}"><td>{{ nombre }}</td><td class="right">{{ saldo|formato_importe }}</td></tr>{% endfor %}</tbody></table>
-<p class="nota">{{ nota_flujos }}</p>{% for pendiente in pendientes_flujo %}<p class="nota">Clasificación pendiente: {{ pendiente }}</p>{% endfor %}</div>
 <div class="break"><p class="marca">BROADBROS / LIBROS CONTABLES</p><h1>{{ empresa }}</h1><h2>Libro Diario</h2>
 <table repeat="1"><thead><tr><th style="width: 13%;">Fecha</th><th style="width: 59%;">Cuenta / Glosa</th><th style="width: 14%;" class="right">Debe</th><th style="width: 14%;" class="right">Haber</th></tr></thead><tbody>
 {% for asiento in asientos %}

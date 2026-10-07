@@ -396,13 +396,6 @@ def balance_general(request):
     return render(request, 'balance_general.html', contexto_estados())
 
 
-def cambios_patrimonio(request):
-    return render(request,'cambios_patrimonio.html',contexto_estados())
-
-
-def flujos_efectivo(request):
-    return render(request,'flujos_efectivo.html',contexto_estados())
-
 
 # ─── EXPORTACIÓN EN EXCEL Y REPORTE COMPLETO ──────────────────────────────────
 

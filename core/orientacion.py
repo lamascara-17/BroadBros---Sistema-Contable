@@ -30,6 +30,4 @@ def orientar_revision(datos,borrador,error=''):
         if pendientes:sugerencias.extend(pendientes)
         elif borrador['asientos']:
             sugerencias.append('Hay una propuesta con cuentas e importes revisables. Compara cada operación con el enunciado, incluidos los pagos y cobros parciales, antes de guardar.')
-        if any(a.get('flujo_efectivo','pendiente')=='pendiente' for a in borrador['asientos']):
-            sugerencias.append('Clasifica el origen de los cobros y pagos como operación, inversión o financiación para completar el estado de flujos de efectivo.')
     return pendientes,list(dict.fromkeys(sugerencias))

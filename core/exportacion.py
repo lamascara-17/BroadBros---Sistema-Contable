@@ -116,17 +116,6 @@ def exportar_excel_contable(empresa='BroadBros'):
         fila(ws, [concepto, saldo], tipo)
     fila(ws, ['Solo se descuenta el impuesto a las ganancias registrado; no se presume una tasa tributaria.', None])
 
-    ws=hoja('Cambios en Patrimonio',['Componente','Apertura','Movimientos','Resultado','Saldo final'],[60,22,22,22,22])
-    for r in ctx['filas_patrimonio']:
-        fila(ws,[r['nombre'],r['inicial'],r['variacion'],r['resultado'],r['final']])
-    t=ctx['totales_patrimonio'];fila(ws,['TOTAL PATRIMONIO',t['inicial'],t['variacion'],t['resultado'],t['final']],'total')
-    nota(ws,ctx['nota_patrimonio'])
-    if ctx['nota_resultado']:nota(ws,ctx['nota_resultado'])
-    ws=hoja('Flujos de Efectivo',['Concepto','Importe (S/)'],[95,24])
-    for nombre,saldo,tipo in ctx['filas_flujos']:fila(ws,[nombre,saldo],tipo)
-    nota(ws,ctx['nota_flujos'])
-    for pendiente in ctx['pendientes_flujo']:nota(ws,'Clasificación pendiente: '+pendiente)
-
     ws = hoja('Libro Diario', ['Fecha', 'Asiento', 'Código', 'Cuenta', 'Glosa', 'Debe', 'Haber'], [14, 12, 10, 43, 66, 19, 19])
     for numero, asiento in enumerate(ctx['asientos'], 1):
         for mov in asiento.movimientos.all():

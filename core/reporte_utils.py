@@ -172,7 +172,7 @@ def filas_situacion(ctx, lado):
 
 
 def filas_resultados(ctx):
-    return [('Ventas netas', ctx['total_ventas'], 'detalle'),
+    filas = [('Ventas netas', ctx['total_ventas'], 'detalle'),
             ('Costo de ventas', -ctx['total_costo_ventas'], 'detalle'),
             ('Utilidad bruta', ctx['utilidad_bruta'], 'subtotal'),
             ('Gastos operativos', -ctx['total_gastos_operativos'], 'detalle'),
@@ -180,9 +180,12 @@ def filas_resultados(ctx):
             ('Gastos financieros', -ctx['total_gastos_financieros'], 'detalle'),
             ('Otros ingresos', ctx['total_otros_ingresos'], 'detalle'),
             ('Otros gastos', -ctx['total_otros_gastos'], 'detalle'),
-            ('Resultado antes de impuestos', ctx['utilidad_antes_impuesto'], 'subtotal'),
-            ('Impuesto a las ganancias registrado',-ctx['total_impuesto_ganancias'],'detalle'),
-            ('RESULTADO NETO DEL PERÍODO',ctx['resultado_neto'],'total')]
+            ('RESULTADO ANTES DE IMPUESTOS', ctx['utilidad_antes_impuesto'], 'total')]
+    if ctx['total_impuesto_ganancias']:
+        filas[-1] = ('Resultado antes de impuestos', ctx['utilidad_antes_impuesto'], 'subtotal')
+        filas.extend([('Impuesto a las ganancias registrado', -ctx['total_impuesto_ganancias'], 'detalle'),
+                      ('RESULTADO NETO DEL PERÍODO', ctx['resultado_neto'], 'total')])
+    return filas
 
 
 def contexto_estados():

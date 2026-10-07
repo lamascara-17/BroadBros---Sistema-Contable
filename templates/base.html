@@ -46,8 +46,6 @@
                         <a href="{% url 'balance_comprobacion' %}" {% if request.resolver_match.url_name == 'balance_comprobacion' %}aria-current="page"{% endif %}><strong>Balance de comprobación</strong><small>Revisión de sumas y saldos</small></a>
                         <a href="{% url 'estado_resultados' %}" {% if request.resolver_match.url_name == 'estado_resultados' %}aria-current="page"{% endif %}><strong>Estado de resultados</strong><small>Ingresos, gastos y utilidad</small></a>
                         <a href="{% url 'balance_general' %}" {% if request.resolver_match.url_name == 'balance_general' %}aria-current="page"{% endif %}><strong>Situación financiera</strong><small>Activo, pasivo y patrimonio</small></a>
-                        <a href="{% url 'cambios_patrimonio' %}"><strong>Cambios en el patrimonio</strong><small>Apertura, movimientos y resultado</small></a>
-                        <a href="{% url 'flujos_efectivo' %}"><strong>Flujos de efectivo</strong><small>Cobros, pagos y saldo final</small></a>
                     </div>
                 </details>
                 <a href="{% url 'reporte_completo' %}" class="workspace-link export-link {% if request.resolver_match.url_name == 'reporte_completo' %}active{% endif %}" {% if request.resolver_match.url_name == 'reporte_completo' %}aria-current="page"{% endif %}>Exportar <span aria-hidden="true">↓</span></a>

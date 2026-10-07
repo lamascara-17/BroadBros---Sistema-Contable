@@ -61,7 +61,7 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(ctx['gran_total_debe'],68000)
         self.assertEqual(ctx['gran_total_haber'],68000)
         self.assertTrue(ctx['esta_balanceado'])
-        for ruta in ('libro_diario','libro_mayor','balance_comprobacion','estado_resultados','balance_general','cambios_patrimonio','flujos_efectivo'):
+        for ruta in ('libro_diario','libro_mayor','balance_comprobacion','estado_resultados','balance_general'):
             self.assertEqual(self.client.get(reverse(ruta)).status_code,200)
 
     def test_cierre_no_borra_utilidad_ni_duplica_patrimonio(self):
@@ -107,9 +107,12 @@ class EstadosFinancierosTests(TestCase):
         guardar_importacion(novatech(),False)
         r=self.client.post(reverse('reporte_completo'),{'empresa':'NovaTech','formato':'excel','accion':'descargar'})
         wb=load_workbook(BytesIO(r.content),data_only=True)
-        self.assertEqual(len(wb.sheetnames),7)
-        self.assertEqual(wb['Cambios en Patrimonio']['E9'].value,41000)
-        self.assertEqual(wb['Flujos de Efectivo']['B12'].value,29000)
+        self.assertEqual(wb.sheetnames, ['Situación Financiera', 'Estado de Resultados', 'Libro Diario', 'Libro Mayor', 'Balance Comprobación'])
+        for path in ('/reportes/cambios-patrimonio/', '/reportes/flujos-efectivo/'):
+            self.assertEqual(self.client.get(path).status_code, 404)
+        pagina = self.client.get(reverse('balance_general')).content.decode()
+        self.assertNotIn('Cambios en el patrimonio', pagina)
+        self.assertNotIn('Flujos de efectivo', pagina)
 
     def test_nono_bot_detecta_omision_y_da_preguntas_del_analisis(self):
         borrador=normalizar_borrador({'asientos':novatech()[:1],'pendientes':['Falta la vida útil para calcular depreciación.']})
