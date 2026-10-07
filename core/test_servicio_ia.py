@@ -36,6 +36,17 @@ class ServicioIATests(SimpleTestCase):
         client.chat.completions.create.side_effect = fallo(400, 'request_too_large')
         with self.assertRaises(ValueError): solicitar_json(client, model='vision')
 
+    def test_solicitud_demasiado_grande_no_sugiere_esperar(self):
+        client = Mock()
+        error = fallo(429, 'rate_limit_exceeded')
+        error.body={'error':{'code':'rate_limit_exceeded','message':'Request too large for model on output tokens per minute (OTPM): Limit 1000, Requested 1469. org_privada'}}
+        client.chat.completions.create.side_effect=error
+        with self.assertRaises(ValueError) as resultado:
+            solicitar_json(client,model='vision')
+        self.assertIn('Límite: 1000; solicitud: 1469 tokens',str(resultado.exception))
+        self.assertIn('Esperar no reduce',str(resultado.exception))
+        self.assertNotIn('org_privada',str(resultado.exception))
+
     def test_conexion_y_timeout(self):
         request = httpx.Request('POST', 'https://api.groq.com')
         for fallo_api in [APIConnectionError(request=request), APITimeoutError(request=request)]:

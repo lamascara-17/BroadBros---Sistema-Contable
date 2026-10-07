@@ -64,7 +64,7 @@ class ValidadorGeneralTests(SimpleTestCase):
         from .ai_diario import extraer_operaciones
         datos={'operaciones':[],'saldos_apertura':[{'concepto':'capital','monto':1000}],'texto_leido':'Capital 1000 y caja 1000.'}
         with patch('core.ai_diario.Groq') as groq:
-            groq.return_value.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(datos)))])
+            groq.return_value.chat.completions.create.side_effect=[SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=datos['texto_leido']))]),SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(datos)))])]
             self.assertEqual(extraer_operaciones(imagen()),datos)
 
 
