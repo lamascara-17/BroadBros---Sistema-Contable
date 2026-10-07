@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Cambios en el patrimonio — BroadBros{% endblock %}
+{% block page_title %}Estado de Cambios en el Patrimonio{% endblock %}
+{% block page_subtitle %}Del {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles{% endblock %}
+{% block page_actions %}<a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
+{% block content %}{% if nota_resultado %}<p class="helper-text">{{ nota_resultado }}</p>{% endif %}<div class="card report-sheet">{% include 'includes/patrimonio.html' %}</div>{% endblock %}

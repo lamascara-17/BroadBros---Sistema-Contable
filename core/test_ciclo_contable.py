@@ -155,7 +155,7 @@ class ImportacionReportesTests(TestCase):
         self.assertIn('3065',texto.replace(',','').replace('.',''))
         r=self.client.post(reverse('reporte_completo'),{'empresa':'=1+1','formato':'excel','accion':'descargar'})
         wb=load_workbook(BytesIO(r.content),data_only=False)
-        self.assertEqual(len(wb.sheetnames),5)
+        self.assertEqual(len(wb.sheetnames),7)
         self.assertEqual(wb.properties.creator,'BROADBROS')
         self.assertEqual(wb['Estado de Resultados']['B15'].value,3065)
         self.assertEqual(wb['Estado de Resultados']['A1'].data_type,'s')

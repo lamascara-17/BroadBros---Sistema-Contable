@@ -1,0 +1,5 @@
+{% load contable_tags %}
+<div class="table-container"><table><thead><tr><th>Componente</th><th class="text-right">Apertura</th><th class="text-right">Movimientos</th><th class="text-right">Resultado</th><th class="text-right">Saldo final</th></tr></thead><tbody>
+{% for fila in filas_patrimonio %}<tr><td>{{ fila.nombre }}</td><td class="text-right monto">{{ fila.inicial|formato_moneda }}</td><td class="text-right monto">{{ fila.variacion|formato_moneda }}</td><td class="text-right monto">{{ fila.resultado|formato_moneda }}</td><td class="text-right monto">{{ fila.final|formato_moneda }}</td></tr>{% endfor %}
+<tr class="financial-total"><td>TOTAL PATRIMONIO</td><td class="text-right">{{ totales_patrimonio.inicial|formato_moneda }}</td><td class="text-right">{{ totales_patrimonio.variacion|formato_moneda }}</td><td class="text-right">{{ totales_patrimonio.resultado|formato_moneda }}</td><td class="text-right">{{ totales_patrimonio.final|formato_moneda }}</td></tr>
+</tbody></table></div><p class="helper-text">{{ nota_patrimonio }}</p>

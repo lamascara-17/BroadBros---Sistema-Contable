@@ -4,6 +4,7 @@
 {% block page_subtitle %}Completa lo que falta y guarda únicamente los asientos que hayas revisado.{% endblock %}
 {% block content %}
 {% if error_revision %}<div class="message message-error" role="alert">{{ error_revision }}</div>{% endif %}
+{% if sugerencias_bot %}<section class="card" style="margin-bottom:20px;"><div class="card-header"><h3>ÑoñoBot te orienta</h3></div><div class="card-body"><ul>{% for sugerencia in sugerencias_bot %}<li>{{ sugerencia }}</li>{% endfor %}</ul><p class="helper-text">Puedes escribir los datos que faltan o pedir que se complete una operación en el formulario de aclaraciones.</p></div></section>{% endif %}
 {% if error_propuesta %}<div class="message message-error" role="alert">{{ error_propuesta }}</div>
 {% if not lectura_incompleta %}<form method="post" action="{% url 'revisar_importacion' %}" style="margin-bottom:20px;">{% csrf_token %}
 <input type="hidden" name="revision_token" value="{{ revision_token }}"><input type="hidden" name="accion" value="reintentar">
@@ -33,6 +34,8 @@
 <div class="card-header"><h3>Asiento propuesto {{ forloop.counter }}</h3>
 <label style="display:flex;gap:8px;align-items:center;"><input data-incluir type="checkbox" {% if not asiento.error_validacion %}checked{% endif %} style="width:auto;min-height:0;">Guardar este asiento</label></div>
 <div class="card-body">
+<div class="form-row"><label>Clase del asiento<select data-clase>{% for valor,nombre in clases_asiento %}<option value="{{ valor }}" {% if valor == asiento.clase %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></label>
+<label>Actividad del efectivo<select data-flujo>{% for valor,nombre in clases_flujo %}<option value="{{ valor }}" {% if valor == asiento.flujo_efectivo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></label></div>
 {% if asiento.error_validacion %}<p class="helper-text" role="status">{{ asiento.error_validacion }} Corrígelo y marca el asiento para guardarlo.</p>{% endif %}
 {% if asiento.fuente %}<p class="helper-text">Fuente: {{ asiento.fuente }}</p>{% endif %}
 <div class="form-row"><div class="form-group"><label>Fecha<input data-fecha type="date" value="{{ asiento.fecha }}"></label></div><div class="form-group"><label>Descripción<input data-descripcion type="text" maxlength="2000" value="{{ asiento.descripcion }}"></label></div></div>
@@ -86,7 +89,7 @@ revisionForm?.addEventListener('submit', event => {
     const selected = [...revisionForm.querySelectorAll('.revision-asiento')].filter(card => card.querySelector('[data-incluir]').checked);
     if (!selected.length) { event.preventDefault(); alert('Marca al menos un asiento para guardar.'); return; }
     const value = (node, field) => node.querySelector(`[data-${field}]`).value.trim();
-    const asientos = selected.map(card => ({fecha:value(card,'fecha'),descripcion:value(card,'descripcion'),
+    const asientos = selected.map(card => ({fecha:value(card,'fecha'),descripcion:value(card,'descripcion'),clase:value(card,'clase'),flujo_efectivo:value(card,'flujo'),
         movimientos:[...card.querySelectorAll('.revision-lineas tr')].map(row => ({
             codigo:value(row,'codigo'),nombre:value(row,'nombre'),tipo_cuenta:value(row,'tipo'),
             subcategoria:value(row,'subcategoria'),tipo_movimiento:value(row,'lado'),monto:value(row,'monto')

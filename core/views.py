@@ -214,6 +214,8 @@ def registrar_asiento(request):
         num_movimientos = int(request.POST.get('num_movimientos', 0))
 
         errors = []
+        clase=request.POST.get('clase','operacion');flujo=request.POST.get('flujo_efectivo','pendiente')
+        if clase not in dict(AsientoContable.CLASE_CHOICES) or flujo not in dict(AsientoContable.FLUJO_CHOICES):errors.append('Revise la clase del asiento y el flujo de efectivo.')
         if not fecha:
             errors.append('La fecha es obligatoria.')
 
@@ -267,6 +269,9 @@ def registrar_asiento(request):
         elif not errors:
             errors.append('Debe registrar al menos 2 movimientos válidos.')
 
+        if clase=='cierre' and any(m['cuenta'].tipo in ('activo','pasivo') for m in movimientos_data):
+            errors.append('Un cierre de resultados no debe mover activos ni pasivos.')
+
         if errors:
             for error in errors:
                 messages.error(request, error)
@@ -274,6 +279,7 @@ def registrar_asiento(request):
             asiento = AsientoContable.objects.create(
                 fecha=fecha,
                 descripcion=descripcion,
+                clase=clase,flujo_efectivo=flujo,
             )
             for m in movimientos_data:
                 Movimiento.objects.create(
@@ -305,6 +311,8 @@ def editar_asiento(request, asiento_id):
     from datetime import date
     try:
         fecha = date.fromisoformat(request.POST.get('fecha', ''))
+        clase=request.POST.get('clase',asiento.clase);flujo=request.POST.get('flujo_efectivo',asiento.flujo_efectivo)
+        if clase not in dict(AsientoContable.CLASE_CHOICES) or flujo not in dict(AsientoContable.FLUJO_CHOICES):raise ValueError('Clasificación inválida.')
         num_movs = int(request.POST.get('num_movimientos', 0))
         if num_movs < 2:
             raise ValueError('Debe registrar al menos 2 movimientos por asiento.')
@@ -322,6 +330,8 @@ def editar_asiento(request, asiento_id):
         haber = sum(m['monto'] for m in movimientos if m['tipo'] == 'haber')
         if debe != haber:
             raise ValueError('El asiento no está balanceado. Los totales de Debe y Haber deben coincidir.')
+        if clase=='cierre' and any(m['cuenta'].tipo in ('activo','pasivo') for m in movimientos):
+            raise ValueError('Un cierre de resultados no debe mover activos ni pasivos.')
     except (ValueError, InvalidOperation, CuentaContable.DoesNotExist):
         messages.error(request, 'No se guardaron los cambios. Revise la fecha, las cuentas y el cuadre del asiento.')
         return redirect('libro_diario')
@@ -329,6 +339,7 @@ def editar_asiento(request, asiento_id):
     # La cabecera y el detalle se actualizan juntos o se conserva el asiento anterior.
     with transaction.atomic():
         asiento.fecha = fecha
+        asiento.clase=clase;asiento.flujo_efectivo=flujo
         asiento.descripcion = request.POST.get('descripcion', '').strip()
         asiento.save()
         asiento.movimientos.all().delete()
@@ -361,87 +372,18 @@ def libro_diario(request):
 # ─── LIBRO MAYOR ───────────────────────────────────────────────────────────────
 
 def libro_mayor(request):
-    cuentas = CuentaContable.objects.all()
-    datos_cuentas = []
-    numeros = numeros_asientos()
-    for cuenta in cuentas:
-        movimientos = cuenta.movimientos.select_related('asiento').order_by('asiento__fecha', 'asiento__id')
-        if not movimientos.exists():
-            continue
-
-        total_debe = movimientos.filter(tipo='debe').aggregate(
-            total=Sum('monto'))['total'] or Decimal('0')
-        total_haber = movimientos.filter(tipo='haber').aggregate(
-            total=Sum('monto'))['total'] or Decimal('0')
-
-        if cuenta.naturaleza_deudora:
-            saldo = total_debe - total_haber
-        else:
-            saldo = total_haber - total_debe
-
-        movimientos = list(movimientos)
-        for movimiento in movimientos:
-            movimiento.asiento.numero = numeros[movimiento.asiento_id]
-
-        datos_cuentas.append({
-            'cuenta': cuenta,
-            'movimientos': movimientos,
-            'total_debe': total_debe,
-            'total_haber': total_haber,
-            'saldo': saldo,
-        })
-
-    context = {
-        'datos_cuentas': datos_cuentas,
-    }
-    return render(request, 'libro_mayor.html', context)
+    ctx=contexto_estados()
+    return render(request,'libro_mayor.html',{'datos_cuentas':ctx['mayor_datos']})
 
 
 # ─── BALANCE DE COMPROBACIÓN ───────────────────────────────────────────────────
 
 def balance_comprobacion(request):
-    cuentas = CuentaContable.objects.all()
-    datos = []
-    gran_total_debe = Decimal('0')
-    gran_total_haber = Decimal('0')
-    gran_saldo_deudor = Decimal('0')
-    gran_saldo_acreedor = Decimal('0')
-
-    for cuenta in cuentas:
-        total_debe = cuenta.movimientos.filter(tipo='debe').aggregate(
-            total=Sum('monto'))['total'] or Decimal('0')
-        total_haber = cuenta.movimientos.filter(tipo='haber').aggregate(
-            total=Sum('monto'))['total'] or Decimal('0')
-
-        if total_debe == 0 and total_haber == 0:
-            continue
-
-        saldo = total_debe - total_haber
-        saldo_deudor = saldo if saldo > 0 else Decimal('0')
-        saldo_acreedor = abs(saldo) if saldo < 0 else Decimal('0')
-
-        datos.append({
-            'cuenta': cuenta,
-            'total_debe': total_debe,
-            'total_haber': total_haber,
-            'saldo_deudor': saldo_deudor,
-            'saldo_acreedor': saldo_acreedor,
-        })
-
-        gran_total_debe += total_debe
-        gran_total_haber += total_haber
-        gran_saldo_deudor += saldo_deudor
-        gran_saldo_acreedor += saldo_acreedor
-
-    context = {
-        'datos': datos,
-        'gran_total_debe': gran_total_debe,
-        'gran_total_haber': gran_total_haber,
-        'gran_saldo_deudor': gran_saldo_deudor,
-        'gran_saldo_acreedor': gran_saldo_acreedor,
-        'esta_cuadrado': gran_total_debe == gran_total_haber,
-    }
-    return render(request, 'balance_comprobacion.html', context)
+    ctx=contexto_estados()
+    return render(request,'balance_comprobacion.html',{'datos':ctx['bal_comp_datos'],
+        'gran_total_debe':ctx['gran_total_debe'],'gran_total_haber':ctx['gran_total_haber'],
+        'gran_saldo_deudor':ctx['gran_saldo_deudor'],'gran_saldo_acreedor':ctx['gran_saldo_acreedor'],
+        'esta_cuadrado':ctx['gran_total_debe']==ctx['gran_total_haber'] and ctx['gran_saldo_deudor']==ctx['gran_saldo_acreedor']})
 
 
 # ─── ESTADO DE RESULTADOS ──────────────────────────────────────────────────────
@@ -452,6 +394,14 @@ def estado_resultados(request):
 
 def balance_general(request):
     return render(request, 'balance_general.html', contexto_estados())
+
+
+def cambios_patrimonio(request):
+    return render(request,'cambios_patrimonio.html',contexto_estados())
+
+
+def flujos_efectivo(request):
+    return render(request,'flujos_efectivo.html',contexto_estados())
 
 
 # ─── EXPORTACIÓN EN EXCEL Y REPORTE COMPLETO ──────────────────────────────────
@@ -1031,6 +981,7 @@ def guardar_importacion(asientos, limpiar, pendientes=''):
         if limpiar: AsientoContable.objects.all().delete()
         for numero,item in enumerate(asientos):
             asiento=AsientoContable.objects.create(fecha=item['fecha'],descripcion=item['descripcion'],
+                clase=item['clase'],flujo_efectivo=item['flujo_efectivo'],
                 observaciones_importacion=pendientes if numero==len(asientos)-1 else '')
             Movimiento.objects.bulk_create([Movimiento(asiento=asiento,cuenta=cuentas[m['codigo']],
                 tipo=m['tipo_movimiento'],monto=m['monto']) for m in item['movimientos']])
@@ -1043,6 +994,8 @@ def mostrar_revision(request, payload, error=''):
     borrador=normalizar_borrador(payload['borrador'])
     if payload.get('error_propuesta') and not payload['borrador'].get('pendientes'):
         borrador['pendientes']=[]
+    from .orientacion import orientar_revision
+    borrador['pendientes'],sugerencias=orientar_revision(payload['datos'],borrador,payload.get('error_propuesta',''))
     payload['borrador']=borrador
     return render(request,'revisar_importacion.html',{
         **borrador,'revision_token':signing.dumps(payload,salt='revision-contable',compress=True),
@@ -1051,6 +1004,8 @@ def mostrar_revision(request, payload, error=''):
         'limpiar':payload['limpiar'],'error_revision':error,
         'error_propuesta':payload.get('error_propuesta',''),
         'lectura_incompleta':payload['datos'].get('lectura_incompleta',False),
+        'clases_asiento':AsientoContable.CLASE_CHOICES,'clases_flujo':AsientoContable.FLUJO_CHOICES,
+        'sugerencias_bot':[texto_chat_simple(s) for s in sugerencias],
     })
 
 

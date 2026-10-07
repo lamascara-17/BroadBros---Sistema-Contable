@@ -20,7 +20,7 @@
             </div>
 
             <div class="row-actions">
-                <button type="button" class="btn-edit" data-edit-id="{{ asiento.id }}" data-edit-url="{% url 'editar_asiento' asiento.id %}" onclick="abrirModalEditar({{ asiento.id }}, {{ forloop.counter }}, '{{ asiento.fecha|date:'Y-m-d' }}', '{{ asiento.descripcion|escapejs }}')">
+                <button type="button" class="btn-edit" data-clase="{{ asiento.clase }}" data-flujo="{{ asiento.flujo_efectivo }}" data-edit-id="{{ asiento.id }}" data-edit-url="{% url 'editar_asiento' asiento.id %}" onclick="abrirModalEditar({{ asiento.id }}, {{ forloop.counter }}, '{{ asiento.fecha|date:'Y-m-d' }}', '{{ asiento.descripcion|escapejs }}')">
                     Editar
                 </button>
                 <a href="{% url 'eliminar_asiento' asiento.id %}"
@@ -106,6 +106,8 @@
                     <div class="form-group">
                         <label for="edit_descripcion">Descripción</label>
                         <input type="text" name="descripcion" id="edit_descripcion" class="form-control">
+                        <label for="edit_clase">Clase del asiento</label><select name="clase" id="edit_clase"><option value="operacion">Operación o ajuste</option><option value="apertura">Saldo de apertura</option><option value="cierre">Cierre de resultados</option></select>
+                        <label for="edit_flujo">Actividad del efectivo</label><select name="flujo_efectivo" id="edit_flujo"><option value="pendiente">Pendiente de clasificar</option><option value="operacion">Operación</option><option value="inversion">Inversión</option><option value="financiacion">Financiación</option></select>
                     </div>
                 </div>
 

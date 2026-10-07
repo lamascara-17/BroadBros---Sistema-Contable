@@ -6,7 +6,7 @@ from decimal import Decimal
 from groq import Groq
 from django.conf import settings
 from .ciclo_contable import moneda
-from .models import CuentaContable
+from .models import CuentaContable, AsientoContable
 from .servicio_ia import solicitar_json, leer_json
 
 PROMPT_GENERAL = '''Eres un auxiliar contable de BROADBROS para ejercicios en PCGE.
@@ -27,17 +27,37 @@ Si no hay costo de ventas o datos para calcularlo, déjalo pendiente, no lo calc
 como toda la compra ni fabriques inventario final. La ausencia de un inventario
 final no invalida los asientos de operaciones que sí se conocen.
 Identifica cada dato pendiente y pregunta concretamente cómo completarlo.
+En cada pendiente explica brevemente qué operación o reporte afecta y qué dato
+exacto debe aportar el usuario. Si el dato ya está escrito, úsalo, no lo pidas otra vez.
+Revisa cada operación del enunciado antes de responder. Incluye pagos iniciales
+de compras mixtas, cobros y pagos parciales. No omitas una operación conocida.
+Una prestación de servicios no necesita inventario final de mercaderías.
+La falta de vida útil o valor residual no impide registrar la adquisición de un
+equipo; solo deja pendiente su depreciación cuando el ejercicio pida ese ajuste.
+No generes asientos de cierre salvo que el caso lo solicite expresamente.
+clase = apertura para saldos iniciales, cierre para cancelar resultados y
+transferirlos al patrimonio, operacion para las demás operaciones y ajustes.
+flujo_efectivo = operacion, inversion o financiacion según el origen del cobro
+o pago; pendiente si el caso no permite clasificarlo. Un pago de deuda por equipos
+es inversión; un aporte o préstamo recibido es financiación. No confundir el
+reconocimiento de un ingreso con el efectivo realmente cobrado.
+El impuesto a las ganancias registrado es gasto con subcategoria impuesto_ganancias;
+el IGV/IVA por pagar o crédito fiscal no es ese gasto. No calcules renta sin base.
+La depreciación acumulada es una cuenta correctora del activo, no un pasivo.
+Los ingresos financieros y ganancias por medición van en otros ingresos, no en ventas.
+No dupliques gastos por naturaleza y por destino. No generes asientos analíticos
+9/79 ni saldos intermediarios 80-89 salvo que el ejercicio los solicite.
 Si las letras no tienen importes individuales, la convención declarada es cuotas
 iguales, con ajuste de céntimos en la última; informa ese supuesto.
 Una apertura sin fecha explícita puede usar la primera fecha escrita de las
 operaciones, como convención declarada. Si no hay ninguna fecha, déjala pendiente.
 No crees asientos para contenidos ajenos a contabilidad.
 Devuelve SOLO JSON con esta estructura:
-{"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa",
+{"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa", "clase":"operacion|apertura|cierre", "flujo_efectivo":"operacion|inversion|financiacion|pendiente",
 "fuente":"operación del ejercicio que sustenta el asiento",
 "movimientos":[{"codigo":"código PCGE", "nombre":"nombre de cuenta",
 "tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto",
-"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto",
+"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias",
 "tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
 No inventes números de documento ni terceros. Los importes deben tener como
@@ -70,7 +90,7 @@ def validar_asientos(asientos):
                 raise ValueError(f'Revise el código y nombre de cuenta del asiento {numero}.')
             if tipo not in dict(CuentaContable.TIPO_CHOICES) or sub not in dict(CuentaContable.SUBCATEGORIA_CHOICES):
                 raise ValueError('La clasificación de una cuenta no es válida.')
-            if (sub in ('costo_ventas','gasto_operativo','gasto_financiero','otro_gasto') and tipo != 'gasto') or (sub == 'otro_ingreso' and tipo != 'ingreso'):
+            if (sub in ('costo_ventas','gasto_operativo','gasto_financiero','otro_gasto','impuesto_ganancias') and tipo != 'gasto') or (sub == 'otro_ingreso' and tipo != 'ingreso'):
                 raise ValueError('La subcategoría no corresponde al tipo de cuenta.')
             if lado not in ('debe','haber'): raise ValueError('Indique Debe o Haber en cada línea.')
             firma = (nombre, tipo, sub)
@@ -82,7 +102,12 @@ def validar_asientos(asientos):
         debe = sum(m['monto'] for m in movimientos if m['tipo_movimiento']=='debe')
         haber = sum(m['monto'] for m in movimientos if m['tipo_movimiento']=='haber')
         if debe != haber: raise ValueError(f'El asiento {numero} no cuadra: Debe {debe:.2f}, Haber {haber:.2f}.')
-        resultado.append({'fecha':dia,'descripcion':descripcion,'movimientos':movimientos})
+        clase=item.get('clase','operacion');flujo=item.get('flujo_efectivo','pendiente')
+        if clase not in dict(AsientoContable.CLASE_CHOICES) or flujo not in dict(AsientoContable.FLUJO_CHOICES):
+            raise ValueError('Revise la clase y el flujo de efectivo del asiento.')
+        if clase=='cierre' and any(m['tipo_cuenta'] in ('activo','pasivo') for m in movimientos):
+            raise ValueError('Un cierre de resultados no debe mover activos ni pasivos.')
+        resultado.append({'fecha':dia,'descripcion':descripcion,'movimientos':movimientos,'clase':clase,'flujo_efectivo':flujo})
     return resultado
 
 
@@ -98,6 +123,7 @@ def normalizar_borrador(datos):
         if not isinstance(item, dict) or not isinstance(item.get('movimientos'), list) or len(item['movimientos']) > 40:
             raise ValueError('La propuesta contiene movimientos inválidos.')
         a = {k:str(item.get(k) or '')[:2000] for k in ('fecha','descripcion','fuente')}
+        a.update(clase=item.get('clase','operacion'),flujo_efectivo=item.get('flujo_efectivo','pendiente'))
         a['movimientos'] = []
         for m in item['movimientos']:
             if not isinstance(m, dict): raise ValueError('Movimiento inválido en el borrador.')
@@ -119,14 +145,17 @@ def normalizar_borrador(datos):
 def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     key = getattr(settings,'GROQ_API_KEY','')
     if not key: raise ValueError('Configure GROQ_API_KEY para preparar la revisión general.')
-    contenido = json.dumps({'ejercicio':datos,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
+    ejercicio={'texto_leido':datos['texto_leido']} if datos.get('texto_leido') else datos
+    contenido = json.dumps({'ejercicio':ejercicio,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str)
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)
+    modelo=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b')
+    opciones={'reasoning_effort':'low'} if modelo.startswith('openai/gpt-oss') else {}
     respuesta = solicitar_json(client,
-        model=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b'),
+        model=modelo,
         messages=[{'role':'system','content':PROMPT_GENERAL},{'role':'user','content':contenido}],
-        temperature=0,response_format={'type':'json_object'},max_completion_tokens=16384)
+        temperature=0,response_format={'type':'json_object'},max_completion_tokens=16384,**opciones)
     choice=respuesta.choices[0]
     if choice.finish_reason != 'stop': raise ValueError('La propuesta quedó incompleta; no se guardó ningún asiento.')
     try: propuesta=leer_json(choice.message.content)

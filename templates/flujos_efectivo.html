@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% load contable_tags %}
+{% block title %}Flujos de efectivo — BroadBros{% endblock %}
+{% block page_title %}Estado de Flujos de Efectivo{% endblock %}
+{% block page_subtitle %}Del {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles{% endblock %}
+{% block page_actions %}<a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
+{% block content %}
+{% if nota_resultado %}<p class="helper-text">{{ nota_resultado }}</p>{% endif %}
+<div class="card report-sheet"><div class="table-container"><table><thead><tr><th>Concepto</th><th class="text-right">Importe (S/)</th></tr></thead><tbody>
+{% for nombre,saldo,tipo in filas_flujos %}<tr class="financial-{{ tipo }}"><td>{{ nombre }}</td><td class="text-right monto">{{ saldo|formato_moneda }}</td></tr>{% endfor %}</tbody></table></div></div>
+<p class="helper-text">{{ nota_flujos }}</p>
+{% if pendientes_flujo %}<div class="message message-warning"><strong>Clasificación pendiente</strong><ul>{% for nota in pendientes_flujo %}<li>{{ nota }}</li>{% endfor %}</ul><p>Revisa el origen del pago o cobro y edita su actividad en el libro diario.</p></div>{% endif %}
+{% endblock %}

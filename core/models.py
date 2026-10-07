@@ -32,6 +32,7 @@ class CuentaContable(models.Model):
         ('gasto_financiero', 'Gasto Financiero'),
         ('otro_ingreso', 'Otro Ingreso'),
         ('otro_gasto', 'Otro Gasto'),
+        ('impuesto_ganancias', 'Impuesto a las ganancias'),
     ]
 
     codigo = models.CharField(max_length=20, unique=True, verbose_name='Código')
@@ -65,6 +66,10 @@ class AsientoContable(models.Model):
     Agrupa uno o más movimientos que deben estar balanceados (Debe == Haber).
     """
     fecha = models.DateField(verbose_name='Fecha')
+    CLASE_CHOICES=[('operacion','Operación o ajuste'),('apertura','Saldo de apertura'),('cierre','Cierre de resultados')]
+    FLUJO_CHOICES=[('pendiente','Pendiente de clasificar'),('operacion','Operación'),('inversion','Inversión'),('financiacion','Financiación')]
+    clase=models.CharField(max_length=12,choices=CLASE_CHOICES,default='operacion')
+    flujo_efectivo=models.CharField(max_length=12,choices=FLUJO_CHOICES,default='pendiente')
     descripcion = models.TextField(blank=True, default='', verbose_name='Descripción')
     observaciones_importacion = models.TextField(blank=True, default='', verbose_name='Datos pendientes de la importación')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -80,12 +85,16 @@ class AsientoContable(models.Model):
     @property
     def total_debe(self):
         """Suma total de movimientos al Debe."""
+        if 'movimientos' in getattr(self,'_prefetched_objects_cache',{}):
+            return sum((m.monto for m in self.movimientos.all() if m.tipo=='debe'),Decimal('0'))
         return self.movimientos.filter(tipo='debe').aggregate(
             total=models.Sum('monto'))['total'] or Decimal('0')
 
     @property
     def total_haber(self):
         """Suma total de movimientos al Haber."""
+        if 'movimientos' in getattr(self,'_prefetched_objects_cache',{}):
+            return sum((m.monto for m in self.movimientos.all() if m.tipo=='haber'),Decimal('0'))
         return self.movimientos.filter(tipo='haber').aggregate(
             total=models.Sum('monto'))['total'] or Decimal('0')
 

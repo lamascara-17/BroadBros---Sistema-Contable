@@ -91,6 +91,7 @@ if (get('modalEditar')) {
         get('formEditarAsiento').action = button.dataset.editUrl;
         get('modal-asiento-num').textContent = number;
         get('edit_fecha').value = date; get('edit_descripcion').value = description;
+        get('edit_clase').value=button.dataset.clase;get('edit_flujo').value=button.dataset.flujo;
         editor.container.replaceChildren();
         JSON.parse(get(`data-movs-${id}`).textContent).forEach(m => editor.add(m.cuenta_id, m.tipo, m.monto));
         while (editor.container.children.length < 2) editor.add();
