@@ -1055,19 +1055,40 @@ def cargar_imagen_diario(request):
     from .ciclo_contable import generar_asientos, decimal
     from .importacion_general import proponer_caso_general, normalizar_borrador, serializar_asientos
     if request.method!='POST':return render(request,'cargar_imagen_diario.html')
-    imagen=request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
-    if not imagen:
-        messages.error(request,'Adjunte una imagen del caso contable.')
-        return redirect('cargar_imagen_diario')
-    if imagen.size>20*1024*1024:
-        messages.error(request,'La imagen supera los 20 MB.')
-        return redirect('cargar_imagen_diario')
-    try:
-        tasa=str(decimal(request.POST.get('tasa_impuesto','18'),'tasa de impuesto'))
-        if Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
-        datos=extraer_operaciones(imagen)
-        datos['tasa_impuesto_configurada']=tasa
+    from django.core import signing
+    from .importacion_impuestos import necesita_tasa
+    lectura_token=request.POST.get('lectura_token','')
+    if lectura_token:
+        try:
+            lectura=signing.loads(lectura_token,salt='lectura-impuesto',max_age=3600)
+            datos=lectura['datos'];limpiar=lectura['limpiar'];revisar=lectura['revisar']
+        except (signing.BadSignature,ValueError,TypeError,KeyError):
+            messages.error(request,'La lectura caducó o no es válida. Vuelva a subir la imagen.')
+            return redirect('cargar_imagen_diario')
+    else:
+        imagen=request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
+        if not imagen:
+            messages.error(request,'Adjunte una imagen del caso contable.')
+            return redirect('cargar_imagen_diario')
+        if imagen.size>20*1024*1024:
+            messages.error(request,'La imagen supera los 20 MB.')
+            return redirect('cargar_imagen_diario')
+        datos=None
         limpiar=request.POST.get('limpiar')=='on'
+        revisar=request.POST.get('revisar')=='on'
+    try:
+        if datos is None:datos=extraer_operaciones(imagen)
+        if necesita_tasa(datos) and not request.POST.get('tasa_impuesto','').strip():
+            token=lectura_token or signing.dumps({'datos':datos,'limpiar':limpiar,'revisar':revisar},salt='lectura-impuesto',compress=True)
+            return render(request,'cargar_imagen_diario.html',{'lectura_token':token})
+        try:
+            tasa=str(decimal(request.POST['tasa_impuesto'],'tasa de impuesto')) if request.POST.get('tasa_impuesto','').strip() else None
+            if tasa is not None and Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
+        except ValueError as exc:
+            if lectura_token:
+                return render(request,'cargar_imagen_diario.html',{'lectura_token':lectura_token,'error_tasa':str(exc),'tasa_ingresada':request.POST.get('tasa_impuesto','')})
+            raise
+        datos['tasa_impuesto_configurada']=tasa
         try:
             asientos=generar_asientos(datos)
             borrador=normalizar_borrador({'asientos':serializar_asientos(asientos),
@@ -1082,7 +1103,7 @@ def cargar_imagen_diario(request):
             except Exception:
                 borrador={'asientos':[],'pendientes':[str(exc),'No se pudo preparar la propuesta general. Complete los datos y vuelva a intentarlo.'],'supuestos':[]}
             return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
-        if request.POST.get('revisar')=='on':
+        if revisar:
             return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
         cantidad=guardar_importacion(asientos,limpiar)
         messages.success(request,f'Se registraron {cantidad} asientos con cuadre exacto.')
@@ -1129,7 +1150,9 @@ def revisar_importacion(request):
         borrador=normalizar_borrador({'asientos':asientos,'pendientes':pendientes,
                                      'supuestos':payload['borrador'].get('supuestos',[])})
         payload['borrador']=borrador
-        cantidad=guardar_importacion(asientos,payload['limpiar'],'; '.join(map(str,pendientes)))
+        limpiar=request.POST.get('limpiar')=='on' if request.POST.get('elegir_limpieza')=='1' else payload['limpiar']
+        payload['limpiar']=limpiar
+        cantidad=guardar_importacion(asientos,limpiar,'; '.join(map(str,pendientes)))
         messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))
         return redirect('libro_diario')
     except ValueError as exc:return mostrar_revision(request,payload,str(exc))

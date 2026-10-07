@@ -119,7 +119,7 @@ def normalizar_borrador(datos):
 def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     key = getattr(settings,'GROQ_API_KEY','')
     if not key: raise ValueError('Configure GROQ_API_KEY para preparar la revisión general.')
-    contenido = json.dumps({'ejercicio':datos,'tasa_configurada':str(tasa_impuesto),
+    contenido = json.dumps({'ejercicio':datos,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str)
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)

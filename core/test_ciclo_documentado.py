@@ -110,7 +110,7 @@ class ImportacionDocumentadaTests(TestCase):
         self.importar();ids=list(AsientoContable.objects.values_list('pk',flat=True))
         datos=caso_letras();datos['saldos_apertura'][-1]['monto']=1
         with patch('core.ai_diario.extraer_operaciones',return_value=datos):
-            response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on'})
+            response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','tasa_impuesto':'18'})
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'Revisar ejercicio')
         self.assertEqual(list(AsientoContable.objects.values_list('pk',flat=True)),ids)

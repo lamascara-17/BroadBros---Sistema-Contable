@@ -107,7 +107,7 @@ class RevisionGeneralTests(TestCase):
 
     def test_caso_foto_letras_revisado_guarda_siete_asientos(self):
         with patch('core.ai_diario.extraer_operaciones',return_value=caso_letras()):
-            response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','revisar':'on'})
+            response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','revisar':'on','tasa_impuesto':'18'})
         payload=signing.loads(response.context['revision_token'],salt='revision-contable')
         self.assertEqual(len(payload['borrador']['asientos']),7)
         self.assertRedirects(self.guardar(response.context['revision_token'],asientos_json=json.dumps(payload['borrador']['asientos'])),reverse('libro_diario'))

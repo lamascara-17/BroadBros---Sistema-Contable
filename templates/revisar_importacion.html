@@ -42,7 +42,8 @@
 </section>{% endfor %}
 {% if asientos %}
 <div class="card"><div class="card-body">
-<p>{% if limpiar %}Al confirmar, estos asientos reemplazarán los registros anteriores.{% else %}Los asientos seleccionados se añadirán a los registros anteriores.{% endif %}</p>
+<input type="hidden" name="elegir_limpieza" value="1"><label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input type="checkbox" name="limpiar" {% if limpiar %}checked{% endif %} style="width:auto;min-height:0;">Reemplazar los asientos anteriores al guardar este ejercicio.</label>
+<p class="helper-text">Si marcas esta opción, los asientos seleccionados reemplazan los anteriores; en caso contrario, se añaden.</p>
 <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="revisado" type="checkbox" required style="width:auto;min-height:0;">He revisado las fechas, cuentas, importes y el cuadre de los asientos seleccionados.</label>
 <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="aceptar_parcial" type="checkbox" {% if pendientes %}required{% endif %} style="width:auto;min-height:0;">Si hay datos pendientes o excluyo asientos, acepto guardar un registro parcial. Los reportes lo indicarán.</label>
 <button class="btn btn-primary" type="submit">Guardar asientos revisados</button>
