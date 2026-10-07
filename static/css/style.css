@@ -716,10 +716,17 @@ select:focus {
 }
 
 .assistant-composer textarea {
+    flex: 1;
+    min-width: 0;
     min-height: 40px;
     max-height: 110px;
     resize: none;
 }
+
+.voice-button { flex: 0 0 42px; min-width: 42px; padding: 9px; }
+.voice-button svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.voice-button.listening { background: #07393c; color: #90ddf0; border-color: #07393c; }
+.voice-status { margin: 0; padding: 0 12px 12px; color: #07393c; background: white; font-size: 11px; line-height: 1.5; }
 
 .footer, footer { display: none !important; }
 

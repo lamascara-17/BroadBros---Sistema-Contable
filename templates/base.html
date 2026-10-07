@@ -107,8 +107,12 @@
         <div class="assistant-composer">
             <label class="sr-only" for="tutor-texto">Consulta a ÑoñoBot</label>
             <textarea id="tutor-texto" rows="1" placeholder="Escribe tu consulta..."></textarea>
+            <button id="tutor-microfono" class="btn btn-secondary voice-button" type="button" aria-label="Dictar consulta" title="Dictar consulta" aria-pressed="false" aria-describedby="tutor-voz-estado">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
+            </button>
             <button id="tutor-enviar" class="btn btn-primary" type="button">Enviar</button>
         </div>
+        <p id="tutor-voz-estado" class="voice-status" role="status" aria-live="polite">Pulsa el micrófono para dictar tu consulta.</p>
     </aside>
 
     <script>
@@ -147,6 +151,7 @@
         const historial = document.getElementById('tutor-historial');
 
         function setAssistant(open) {
+            if (!open) window.NonobotVoice?.cancel();
             assistantPanel.classList.toggle('open', open);
             assistantPanel.setAttribute('aria-hidden', String(!open));
             assistantPanel.inert = !open;
@@ -209,11 +214,13 @@
         let consultaPendiente = false;
         async function ejecutarConsulta(prefill) {
             if (consultaPendiente) return;
+            if (window.NonobotVoice?.listening) return;
             const consulta = (prefill || inputTexto.value).trim();
             if (!consulta) return;
 
             consultaPendiente = true;
             btnEnviar.disabled = true;
+            window.NonobotVoice?.setBusy(true);
             document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
             appendMessage(consulta, 'user');
             inputTexto.value = '';
@@ -240,6 +247,7 @@
             } finally {
                 consultaPendiente = false;
                 btnEnviar.disabled = false;
+                window.NonobotVoice?.setBusy(false);
                 document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = false);
             }
 
@@ -258,6 +266,7 @@
             button.addEventListener('click', () => ejecutarConsulta(button.dataset.prompt));
         });
     </script>
+    <script src="{% static 'js/nonobot-voz.js' %}" defer></script>
 
     {% block extra_js %}{% endblock %}
 </body>
