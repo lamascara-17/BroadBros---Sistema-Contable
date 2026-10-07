@@ -26,7 +26,7 @@ def datos_generales():
             'operaciones':[{'tipo':'no_soportada','fecha':'2023-06-15','texto':'Se recibe un préstamo bancario por 1000.','monto':1000}]}
 
 
-class ValidadorGeneralTests(SimpleTestCase):
+class ValidadorGeneralTests(TestCase):
     def test_cuadre_exacto_y_clasificacion_consistente(self):
         self.assertEqual(len(validar_asientos(propuesta()['asientos'])),1)
         cambios=[lambda a:a[0]['movimientos'][0].update(monto='1000.01'),
@@ -50,11 +50,14 @@ class ValidadorGeneralTests(SimpleTestCase):
 
     @override_settings(GROQ_API_KEY='test-key')
     def test_propuesta_usa_texto_extraido_y_aclaraciones(self):
+        from .models import CuentaContable
+        CuentaContable.objects.create(codigo='1101', nombre='Caja', tipo='activo')
         with patch('core.importacion_general.Groq') as groq:
             groq.return_value.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(propuesta())))])
             borrador=proponer_caso_general(datos_generales(),'18','El retiro fue de 100.')
             parametros=groq.return_value.chat.completions.create.call_args.kwargs
             self.assertIn('El retiro fue de 100.',parametros['messages'][1]['content'])
+            self.assertEqual(json.loads(parametros['messages'][1]['content'])['plan_cuentas'][0]['codigo'], '1101')
             self.assertEqual(borrador['pendientes'],propuesta()['pendientes'])
             groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')

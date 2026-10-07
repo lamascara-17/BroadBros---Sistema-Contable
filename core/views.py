@@ -971,7 +971,8 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 def guardar_importacion(asientos, limpiar, pendientes='', fecha_cierre=None):
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
-    asientos = validar_asientos(serializar_asientos(asientos))
+    from .plan_importacion import reutilizar_plan
+    asientos = validar_asientos(reutilizar_plan(serializar_asientos(asientos)))
     if fecha_cierre and fecha_cierre < max(a['fecha'] for a in asientos):
         raise ValueError('La fecha de cierre es anterior a una operación del ejercicio.')
     with transaction.atomic():
