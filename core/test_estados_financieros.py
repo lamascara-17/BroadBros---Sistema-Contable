@@ -48,10 +48,23 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(AsientoContable.objects.count(), 7)
         self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
         AsientoContable.objects.all().delete()
+        # Submit the hidden fields rendered by the real upload form as a browser
+        # would: a forced review flag here used to defeat automatic processing.
+        from html.parser import HTMLParser
+        class CamposOcultos(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.campos = {}
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'input' and attrs.get('type') == 'hidden' and attrs.get('name'):
+                    self.campos[attrs['name']] = attrs.get('value', '')
+        formulario = CamposOcultos()
+        formulario.feed(self.client.get(reverse('cargar_imagen_diario')).content.decode())
         with patch('core.ai_diario.extraer_operaciones', return_value={'texto_leido': texto}), \
              patch('core.ciclo_contable.generar_asientos', side_effect=ValueError('Usar análisis general')), \
              patch('core.importacion_general.proponer_caso_general', return_value=borrador):
-            response = self.client.post(reverse('cargar_imagen_diario'), {'imagen_caso': imagen()})
+            response = self.client.post(reverse('cargar_imagen_diario'), {**formulario.campos, 'imagen_caso': imagen()})
         self.assertRedirects(response, reverse('libro_diario'))
         self.assertEqual(AsientoContable.objects.count(), 7)
         self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
