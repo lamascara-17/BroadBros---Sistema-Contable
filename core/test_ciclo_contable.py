@@ -136,7 +136,8 @@ class ImportacionReportesTests(TestCase):
         conteo=Movimiento.objects.count()
         with patch('core.ai_diario.extraer_operaciones',return_value=caso()), patch('core.views.Movimiento.objects.bulk_create',side_effect=RuntimeError('Fallo de escritura')):
             r=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on'})
-        self.assertRedirects(r,reverse('cargar_imagen_diario'))
+        self.assertContains(r,'Revisar ejercicio')
+        self.assertContains(r,'No se pudo guardar el ejercicio')
         self.assertEqual(list(AsientoContable.objects.values_list('pk',flat=True)),ids)
         self.assertEqual(Movimiento.objects.count(),conteo)
 

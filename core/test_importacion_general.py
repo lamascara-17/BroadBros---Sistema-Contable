@@ -128,10 +128,9 @@ class RevisionGeneralTests(TestCase):
         nuevo=propuesta();nuevo['pendientes']=[]
         with patch('core.importacion_general.proponer_caso_general',return_value=nuevo) as proponer:
             response=self.client.post(reverse('revisar_importacion'),{'revision_token':token,'accion':'completar','datos_adicionales':'El retiro fue de 100.'})
-        self.assertEqual(response.status_code,200)
-        self.assertEqual(response.context['pendientes'],[])
+        self.assertRedirects(response,reverse('libro_diario'))
         self.assertEqual(proponer.call_args.args[2],'El retiro fue de 100.')
-        self.assertEqual(AsientoContable.objects.count(),0)
+        self.assertEqual(AsientoContable.objects.count(),1)
 
     def test_excluir_asientos_exige_guardado_parcial(self):
         p=propuesta();p['pendientes']=[];p['asientos'].append(deepcopy(p['asientos'][0]))

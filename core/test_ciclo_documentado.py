@@ -72,9 +72,20 @@ class CicloDocumentadoTests(SimpleTestCase):
 
 
 class ImportacionDocumentadaTests(TestCase):
+    def confirmar_parcial(self, response):
+        import json
+        self.assertContains(response, 'Revisar ejercicio')
+        self.assertTrue(response.context['pendientes'])
+        return self.client.post(reverse('revisar_importacion'), {
+            'revision_token': response.context['revision_token'],
+            'asientos_json': json.dumps(response.context['asientos']),
+            'revisado': 'on', 'aceptar_parcial': 'on'})
+
     def importar(self):
         with patch('core.ai_diario.extraer_operaciones',return_value=caso_letras()):
             response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','tasa_impuesto':'18'})
+        self.assertEqual(AsientoContable.objects.count(),0)
+        response=self.confirmar_parcial(response)
         self.assertRedirects(response,reverse('libro_diario'))
         self.assertEqual(AsientoContable.objects.count(),7)
 
@@ -86,11 +97,12 @@ class ImportacionDocumentadaTests(TestCase):
         self.assertEqual(ctx['total_pasivos'],Decimal('1100000'))
         self.assertEqual(ctx['total_patrimonio_con_resultados'],Decimal('6100000'))
         self.assertTrue(ctx['esta_balanceado'])
-        self.assertIn('Resultado provisional',ctx['nota_resultado'])
-        self.assertContains(self.client.get(reverse('estado_resultados')),'Resultado provisional')
+        self.assertIn('resultado es provisional',ctx['nota_resultado'])
+        self.assertContains(self.client.get(reverse('estado_resultados')),'resultado es provisional')
         datos=caso_letras();datos['operaciones'][0]['monto']=100000
         with patch('core.ai_diario.extraer_operaciones',return_value=datos):
-            self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','tasa_impuesto':'18'})
+            response=self.client.post(reverse('cargar_imagen_diario'),{'imagen_caso':imagen(),'limpiar':'on','tasa_impuesto':'18'})
+        self.assertRedirects(self.confirmar_parcial(response),reverse('libro_diario'))
         nuevo=contexto_estados()
         self.assertEqual(nuevo['total_pasivos'],Decimal('526745.76'))
         self.assertNotIn('4011',{i['cuenta'].codigo for i in nuevo['activo_corriente']})
@@ -100,11 +112,11 @@ class ImportacionDocumentadaTests(TestCase):
         response=self.client.post(reverse('reporte_completo'),{'formato':'excel','accion':'descargar','empresa':'Caso letras'})
         wb=load_workbook(BytesIO(response.content))
         textos=[str(c.value) for row in wb['Estado de Resultados'] for c in row if c.value is not None]
-        self.assertTrue(any('Resultado provisional' in t for t in textos))
+        self.assertTrue(any('resultado es provisional' in t for t in textos))
         response=self.client.post(reverse('reporte_completo'),{'formato':'pdf','accion':'descargar','empresa':'Caso letras'})
         self.assertEqual(response.status_code,200)
         texto=' '.join(p.extract_text() for p in PdfReader(BytesIO(response.content)).pages)
-        self.assertIn('Resultado provisional',texto)
+        self.assertIn('resultado es provisional',texto)
 
     def test_apertura_invalida_conserva_datos_previos(self):
         self.importar();ids=list(AsientoContable.objects.values_list('pk',flat=True))

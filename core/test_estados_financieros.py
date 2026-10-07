@@ -38,6 +38,42 @@ def novatech():
 
 
 class EstadosFinancierosTests(TestCase):
+    def test_novatech_completo_se_guarda_directamente_desde_texto_e_imagen(self):
+        from .test_ciclo_contable import imagen
+        texto = "\n".join(f"El {a['fecha'][8:10]}/10/2025: {a['descripcion']}" for a in novatech())
+        borrador = normalizar_borrador({'asientos': novatech(), 'pendientes': [], 'supuestos': []})
+        with patch('core.importacion_general.proponer_caso_general', return_value=borrador):
+            response = self.client.post(reverse('cargar_texto_diario'), {'texto_caso': texto})
+        self.assertRedirects(response, reverse('libro_diario'))
+        self.assertEqual(AsientoContable.objects.count(), 7)
+        self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
+        AsientoContable.objects.all().delete()
+        with patch('core.ai_diario.extraer_operaciones', return_value={'texto_leido': texto}), \
+             patch('core.ciclo_contable.generar_asientos', side_effect=ValueError('Usar análisis general')), \
+             patch('core.importacion_general.proponer_caso_general', return_value=borrador):
+            response = self.client.post(reverse('cargar_imagen_diario'), {'imagen_caso': imagen()})
+        self.assertRedirects(response, reverse('libro_diario'))
+        self.assertEqual(AsientoContable.objects.count(), 7)
+        self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
+
+    def test_no_omite_revision_por_supuestos_errores_o_conflictos(self):
+        from copy import deepcopy
+        completo = {'asientos': novatech(), 'pendientes': [], 'supuestos': []}
+        for clase in ('supuesto', 'descuadre', 'conflicto'):
+            with self.subTest(clase=clase):
+                AsientoContable.objects.all().delete()
+                borrador = deepcopy(completo)
+                if clase == 'supuesto': borrador['supuestos'] = ['Fecha asumida.']
+                if clase == 'descuadre': borrador['asientos'][0]['movimientos'][0]['monto'] = '30001'
+                if clase == 'conflicto':
+                    guardar_importacion(novatech(), False)
+                    borrador['asientos'][0]['movimientos'][0]['tipo_cuenta'] = 'pasivo'
+                previos = list(AsientoContable.objects.values_list('id', flat=True))
+                with patch('core.importacion_general.proponer_caso_general', return_value=borrador):
+                    response = self.client.post(reverse('cargar_texto_diario'), {'texto_caso': 'Caso contable'})
+                self.assertContains(response, 'Revisar ejercicio')
+                self.assertEqual(list(AsientoContable.objects.values_list('id', flat=True)), previos)
+
     def test_destino_no_duplica_gasto_y_intereses_no_son_ventas(self):
         guardar_importacion(novatech()+[asiento(30,'Destino de gastos',[('94','debe',4000),('79','haber',4000)]),
                                       asiento(30,'Intereses cobrados',[('101','debe',100),('77','haber',100)],flujo='operacion')],False)

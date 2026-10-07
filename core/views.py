@@ -1002,6 +1002,32 @@ def mostrar_revision(request, payload, error=''):
     })
 
 
+def finalizar_propuesta(request, payload, revisar=False):
+    from .importacion_general import normalizar_borrador, validar_asientos
+    from .orientacion import orientar_revision
+    borrador = normalizar_borrador(payload['borrador'])
+    if payload.get('error_propuesta') and not payload['borrador'].get('pendientes'):
+        borrador['pendientes'] = []
+    borrador['pendientes'], _ = orientar_revision(payload['datos'], borrador, payload.get('error_propuesta', ''))
+    payload['borrador'] = borrador
+    requiere_revision = (revisar or payload.get('error_propuesta') or
+                         payload['datos'].get('lectura_incompleta') or
+                         payload['datos'].get('errores_lectura') or
+                         borrador['pendientes'] or borrador['supuestos'] or
+                         any(a.get('error_validacion') for a in borrador['asientos']))
+    if requiere_revision:
+        return mostrar_revision(request, payload)
+    try:
+        asientos = validar_asientos(borrador['asientos'])
+        cantidad = guardar_importacion(asientos, payload['limpiar'])
+    except ValueError as exc:
+        return mostrar_revision(request, payload, str(exc))
+    except Exception:
+        return mostrar_revision(request, payload, 'No se pudo guardar el ejercicio. Sus datos anteriores se conservaron; vuelva a intentarlo.')
+    messages.success(request, f'Se registraron {cantidad} asientos con cuadre exacto.')
+    return redirect('libro_diario')
+
+
 def cargar_texto_diario(request):
     from django.core import signing
     from .ciclo_contable import decimal
@@ -1036,7 +1062,7 @@ def cargar_texto_diario(request):
         else:tasa=None
         datos={'texto_leido':texto}
         borrador=proponer_caso_general(datos,tasa)
-        return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':False,'borrador':borrador})
+        return finalizar_propuesta(request,{'datos':datos,'tasa':tasa,'limpiar':False,'borrador':borrador})
     except signing.BadSignature:
         messages.error(request,'La lectura caducó. Vuelva a procesar el texto conservado.')
     except ValueError as exc:messages.error(request,str(exc))
@@ -1103,14 +1129,8 @@ def cargar_imagen_diario(request):
             except Exception:
                 borrador={'asientos':[],'pendientes':[],'supuestos':[]}
                 error_generacion='No se pudo preparar la propuesta. La lectura se conservó para reintentar.'
-            return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador,'error_propuesta':error_generacion})
-        if revisar:
-            return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
-        cantidad=guardar_importacion(asientos,limpiar)
-        messages.success(request,f'Se registraron {cantidad} asientos con cuadre exacto.')
-        if datos.get('saldos_apertura'):
-            messages.info(request,'Caso con apertura y letras registrado. No se calculó costo de ventas: falta el inventario final o el costo indicado.')
-        return redirect('libro_diario')
+            return finalizar_propuesta(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador,'error_propuesta':error_generacion}, revisar)
+        return finalizar_propuesta(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador}, revisar)
     except ValueError as exc:messages.error(request,f'No se importó el caso: {exc}')
     except Exception:messages.error(request,'No se pudo completar la lectura. Revise la conexión y la configuración del servicio; sus datos se conservaron.')
     return redirect('cargar_imagen_diario')
@@ -1131,7 +1151,7 @@ def revisar_importacion(request):
                 raise ValueError('Complete la lectura antes de generar asientos.')
             payload['borrador']=proponer_caso_general(payload['datos'],payload['tasa'],payload.get('aclaraciones',''))
             payload.pop('error_propuesta',None)
-            return mostrar_revision(request,payload)
+            return finalizar_propuesta(request,payload)
         if request.POST.get('accion')=='completar':
             if payload['datos'].get('lectura_incompleta'):
                 raise ValueError('Edite y complete el texto conservado antes de procesarlo.')
@@ -1142,7 +1162,7 @@ def revisar_importacion(request):
             payload['aclaraciones']=aclaraciones
             payload['borrador']=proponer_caso_general(payload['datos'],payload['tasa'],aclaraciones)
             payload.pop('error_propuesta',None)
-            return mostrar_revision(request,payload)
+            return finalizar_propuesta(request,payload)
         if payload['datos'].get('lectura_incompleta'):
             raise ValueError('No se pueden guardar asientos desde una lectura incompleta. Complete el texto primero.')
         if request.POST.get('revisado')!='on':raise ValueError('Confirme que revisó las cuentas y los importes antes de guardar.')

@@ -9,7 +9,7 @@
 <textarea id="texto-caso" name="texto_caso" rows="12" maxlength="20000" placeholder="Escribe o pega las operaciones, fechas, importes y condiciones del caso." style="width:100%;box-sizing:border-box;">{{ texto_caso }}</textarea>
 <div class="form-group" style="margin-top:20px;"><label for="archivo-texto">O subir un archivo .txt</label><input id="archivo-texto" name="archivo_texto" type="file" accept=".txt,text/plain"><p class="helper-text">Hasta 100 KB y 20 000 caracteres.</p></div>
 <button type="submit" class="btn btn-primary" style="width:100%;">Procesar texto</button>
-<p class="helper-text" style="margin-top:14px;">Revisa las cuentas y los importes antes de guardar. Si faltan datos, podrás completarlos.</p>
+<p class="helper-text" style="margin-top:14px;">Si el ejercicio está completo y pasa las validaciones, se guarda directamente. Si faltan datos o hay errores, podrás revisarlo y completarlo.</p>
 </form>
 <a href="{% url 'cargar_imagen_diario' %}">Prefiero subir una imagen</a>
 </div></div>
