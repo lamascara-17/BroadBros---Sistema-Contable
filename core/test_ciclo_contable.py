@@ -86,12 +86,12 @@ class ReglasCicloTests(SimpleTestCase):
 
     @override_settings(GROQ_API_KEY='test-key')
     @patch('core.ai_diario.Groq')
-    def test_vision_recibe_imagen_completa_y_dos_ampliaciones(self, groq):
+    def test_vision_recibe_imagen_completa_sin_triplicar_tokens(self, groq):
         from .ai_diario import extraer_operaciones
         groq.return_value.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(caso())))])
         self.assertEqual(extraer_operaciones(imagen()), caso())
         params=groq.return_value.chat.completions.create.call_args.kwargs
-        self.assertEqual(len(params['messages'][0]['content']),4)
+        self.assertEqual(len(params['messages'][0]['content']),2)
         self.assertEqual(params['max_completion_tokens'],8192)
         groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
         with self.assertRaises(ValueError):extraer_operaciones(imagen())

@@ -1077,6 +1077,8 @@ def cargar_imagen_diario(request):
                 borrador['supuestos']=['Letras sin importes individuales: cuotas iguales y residuo en la última. Apertura sin fecha: primera fecha del ejercicio.']
         except ValueError as exc:
             try:borrador=proponer_caso_general(datos,tasa)
+            except ValueError as error_propuesta:
+                borrador={'asientos':[],'pendientes':[str(exc),str(error_propuesta)],'supuestos':[]}
             except Exception:
                 borrador={'asientos':[],'pendientes':[str(exc),'No se pudo preparar la propuesta general. Complete los datos y vuelva a intentarlo.'],'supuestos':[]}
             return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})

@@ -1,15 +1,14 @@
 """Lectura de imágenes separada de las reglas y de la persistencia contable."""
 import base64
-import json
 from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
 from groq import Groq
 from django.conf import settings
 from .ciclo_contable import generar_asientos
+from .servicio_ia import solicitar_json, leer_json
 
 PROMPT_LECTURA = """
-Transcribe todas las operaciones del ejercicio de las imágenes. Son la misma
-imagen completa y sus dos ampliaciones; NO dupliques operaciones entre recortes.
+Transcribe todas las operaciones del ejercicio de la imagen completa.
 No generes asientos, cuentas, costo de ventas ni depreciación. Solo extrae datos.
 Si una frase contiene dos compras distintas, sepáralas en dos operaciones.
 No incorpores el texto de pie, título o consignas como una operación.
@@ -96,7 +95,7 @@ NO es una depreciación. Verifica la lista de operaciones contra la imagen antes
 
 
 def preparar_imagenes(imagen_file):
-    """Corrige orientación y entrega vista completa más dos recortes legibles."""
+    """Corrige orientación y conserva una vista completa de alta resolución."""
     try:
         with Image.open(imagen_file) as original:
             if original.format not in ('JPEG', 'PNG', 'WEBP') or getattr(original, 'n_frames', 1) != 1:
@@ -113,8 +112,8 @@ def preparar_imagenes(imagen_file):
             w, h = img.size
             if min(w, h) < 150:
                 raise ValueError('La imagen es demasiado pequeña para leer el caso.')
-            regiones = [img, img.crop((0, 0, w, min(h, h // 2 + h // 20))),
-                        img.crop((0, max(0, h // 2 - h // 20), w, h))]
+            # Cada vista consume 2048 tokens; evitamos triplicar la misma imagen.
+            regiones = [img]
             contenido = []
             for region in regiones:
                 ancho = min(1800, max(1200, region.width))
@@ -136,7 +135,7 @@ def extraer_operaciones(imagen_file, api_key=None):
         raise ValueError('Configure GROQ_API_KEY para utilizar la lectura de imágenes.')
     contenido = [{'type': 'text', 'text': PROMPT_LECTURA}] + preparar_imagenes(imagen_file)
     client = Groq(api_key=key, timeout=90, max_retries=1)
-    respuesta = client.chat.completions.create(
+    respuesta = solicitar_json(client,
         model=getattr(settings, 'GROQ_VISION_MODEL', 'qwen/qwen3.8-27b'),
         messages=[{'role': 'user', 'content': contenido}],
         temperature=0, max_completion_tokens=8192, response_format={'type': 'json_object'},
@@ -145,7 +144,7 @@ def extraer_operaciones(imagen_file, api_key=None):
     if opcion.finish_reason != 'stop':
         raise ValueError('La lectura quedó incompleta. No se guardaron operaciones parciales.')
     try:
-        datos = json.loads(opcion.message.content or '', parse_float=str)
+        datos = leer_json(opcion.message.content)
     except (ValueError, TypeError):
         raise ValueError('La lectura no devolvió una estructura válida. Intente con una imagen más nítida.') from None
     if not isinstance(datos, dict) or not isinstance(datos.get('operaciones'), list):
