@@ -27,9 +27,18 @@
             <h3>Cargar imagen</h3>
         </div>
         <div class="card-body">
-            <p class="helper-text">Incluye todas las operaciones, el inventario físico final y la fecha de cierre. El sistema calcula descuentos, costo de ventas y depreciación cuando el caso proporciona sus datos. En este ciclo simplificado, las compras sin condición de crédito se registran al contado y la depreciación cuenta el mes de inicio de uso. Los casos con saldos iniciales, IGV explícito u operaciones no soportadas requieren registro manual.</p>
+            <p class="helper-text">Puedes cargar ejercicios completos o incompletos. El sistema lee sus operaciones y prepara los asientos que se pueden determinar. Si faltan datos o el caso requiere otra regla contable, abre una revisión editable: podrás completar información, corregir cuentas e importes y elegir qué guardar. Los datos faltantes se señalan sin inventar saldos ni costos.</p>
             <form method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
+                <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;">
+                    <input type="checkbox" name="revisar" checked style="width:auto;min-height:0;margin-top:3px;">
+                    <span>Revisar los asientos antes de guardar <small class="helper-text" style="display:block;">Las propuestas generales y los casos incompletos siempre pasan por revisión.</small></span>
+                </label>
+                <div class="form-group">
+                    <label for="tasa-impuesto">IVA/IGV si el ejercicio no indica una tasa (%)</label>
+                    <input id="tasa-impuesto" name="tasa_impuesto" type="number" min="0" max="100" step="0.01" value="18" required>
+                    <div class="helper-text">Se aplica solo a importes expresamente gravados o netos en el caso con apertura. Si la imagen indica una tasa, se respeta esa tasa. Las letras sin importes individuales se distribuyen en cuotas iguales, ajustando el último céntimo; la apertura sin fecha usa la primera fecha del ejercicio.</div>
+                </div>
 
                 <div class="form-group">
                     <div class="upload-zone">

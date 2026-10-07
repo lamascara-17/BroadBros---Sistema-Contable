@@ -37,7 +37,10 @@ def get_reporte_context():
         if cuenta.tipo == 'activo':
             (activo_no_corriente if 30 <= grupo <= 39 else activo_corriente).append(item)
         elif cuenta.tipo == 'pasivo':
-            (pasivo_no_corriente if 47 <= grupo <= 49 else pasivo_corriente).append(item)
+            if cuenta.codigo.startswith('4011') and saldo < 0:
+                activo_corriente.append({'cuenta': cuenta, 'saldo': -saldo})
+            else:
+                (pasivo_no_corriente if 47 <= grupo <= 49 else pasivo_corriente).append(item)
         elif cuenta.tipo == 'patrimonio':
             patrimonio.append(item)
         else:
@@ -65,6 +68,16 @@ def get_reporte_context():
     ctx['utilidad_antes_impuesto'] = ctx['utilidad_operativa'] - ctx['total_gastos_financieros'] + ctx['total_otros_ingresos'] - ctx['total_otros_gastos']
     # No se presume una tasa tributaria ni un gasto que no esté registrado.
     ctx['resultados_acumulados'] = ctx['utilidad_antes_impuesto']
+    ctx['nota_resultado'] = (
+        'Resultado provisional: el caso no proporciona costo de ventas ni inventario final. '
+        'Los saldos muestran únicamente los movimientos registrados, sin un ajuste de existencias.'
+        if ctx['total_ventas'] and not ctx['total_costo_ventas'] and
+        any(a.descripcion == 'Por los saldos de apertura del ejercicio' for a in asientos)
+        else ''
+    )
+    pendientes_importacion = [a.observaciones_importacion for a in asientos if a.observaciones_importacion]
+    if pendientes_importacion:
+        ctx['nota_resultado'] = 'Registro parcial del ejercicio. Datos pendientes: ' + ' / '.join(dict.fromkeys(pendientes_importacion))
     for clave in ('activo_corriente', 'activo_no_corriente', 'pasivo_corriente', 'pasivo_no_corriente', 'patrimonio'):
         ctx['total_' + clave] = suma(ctx[clave])
     ctx['activos'] = activo_corriente + activo_no_corriente

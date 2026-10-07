@@ -5,6 +5,7 @@
 {% block page_subtitle %}{% if fecha_inicio %}Del {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles{% else %}Ingresos y gastos registrados{% endif %}{% endblock %}
 {% block page_actions %}<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">Imprimir</button><a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
 {% block content %}
+{% if nota_resultado %}<p class="helper-text report-sheet" role="status">{{ nota_resultado }}</p>{% endif %}
 <div class="report-sheet card"><div class="card-header"><h3>Resultado del ejercicio</h3></div>
 <div class="table-container"><table><thead><tr><th>Concepto</th><th class="text-right">Importe (S/)</th></tr></thead><tbody>
 {% for nombre, saldo, tipo in filas_er %}<tr class="financial-{{ tipo }}"><td>{{ nombre }}</td><td class="text-right monto">{{ saldo|formato_moneda }}</td></tr>{% endfor %}

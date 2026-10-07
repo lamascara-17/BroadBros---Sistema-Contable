@@ -1,0 +1,104 @@
+{
+  "empresa_nueva": false,
+  "metodo_inventario": "sin_cierre",
+  "fecha_apertura": null,
+  "fecha_cierre": "2023-06-30",
+  "inventario_inicial": null,
+  "tasa_impuesto_configurada": "18",
+  "errores_lectura": [],
+  "saldos_apertura": [
+    {
+      "concepto": "caja",
+      "monto": 2500000
+    },
+    {
+      "concepto": "banco",
+      "monto": 3500000
+    },
+    {
+      "concepto": "clientes",
+      "monto": 600000
+    },
+    {
+      "concepto": "proveedores",
+      "monto": 800000
+    },
+    {
+      "concepto": "capital",
+      "monto": 5800000
+    }
+  ],
+  "operaciones": [
+    {
+      "fecha": "2023-06-01",
+      "tipo": "compra_mercaderia",
+      "texto": "Se compran mercaderías a Adelco Ltda., por S/.1.000.000 IVA incluido, firmando 10 letras de cambio.",
+      "monto": 1000000,
+      "impuesto": "incluido",
+      "pago": "letras",
+      "numero_letras": 10,
+      "contraparte": "Adelco Ltda."
+    },
+    {
+      "fecha": "2023-06-02",
+      "tipo": "venta",
+      "texto": "Vende mercaderías a Mario Cea Castro por S/.400.000 netos; 40% en efectivo y saldo con letras 101, 102, 103 y 104.",
+      "monto": 400000,
+      "impuesto": "neto",
+      "porcentaje_contado": 40,
+      "medio_pago": "efectivo",
+      "saldo_documentado": true,
+      "numero_letras": 4,
+      "letras_numeros": [
+        "101",
+        "102",
+        "103",
+        "104"
+      ],
+      "contraparte": "Mario Cea Castro"
+    },
+    {
+      "fecha": "2023-06-10",
+      "tipo": "pago_servicios",
+      "texto": "Se cancela arriendo de oficina por S/.100.000 con cheque.",
+      "monto": 100000,
+      "impuesto": "no_indicado",
+      "detalles": [
+        {
+          "concepto": "arriendo de oficina",
+          "monto": 100000
+        }
+      ],
+      "medio_pago": "cheque"
+    },
+    {
+      "fecha": "2023-06-11",
+      "tipo": "pago_proveedor_inicial",
+      "texto": "Se cancela el 50% de la deuda del inventario a proveedores, con cheque.",
+      "monto": null,
+      "porcentaje": 50,
+      "medio_pago": "cheque"
+    },
+    {
+      "fecha": "2023-06-15",
+      "tipo": "cobro_letras",
+      "texto": "Mario Cea Castro cancela letras 101 y 102 con cheque.",
+      "monto": null,
+      "letras_numeros": [
+        "101",
+        "102"
+      ],
+      "contraparte": "Mario Cea Castro",
+      "medio_pago": "cheque"
+    },
+    {
+      "fecha": "2023-06-30",
+      "tipo": "pago_letras",
+      "texto": "Se cancelan 3 letras a Adelco Ltda. con cheque.",
+      "monto": null,
+      "cantidad_letras": 3,
+      "contraparte": "Adelco Ltda.",
+      "medio_pago": "cheque"
+    }
+  ]
+}

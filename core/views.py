@@ -1009,47 +1009,126 @@ REGLAS DE RESPUESTA
         )
 
 
-# ─── INGESTA DE CASO POR IMAGEN / FOTO (GROQ VISION) ──────────────────────────
+# ─── INGESTA Y REVISIÓN DE CASOS POR IMAGEN ────────────────────────────────────
+
+def guardar_importacion(asientos, limpiar, pendientes=''):
+    """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
+    from .importacion_general import validar_asientos, serializar_asientos
+    asientos = validar_asientos(serializar_asientos(asientos))
+    with transaction.atomic():
+        cuentas = {}
+        for item in asientos:
+            for mov in item['movimientos']:
+                codigo = mov['codigo']
+                cuenta, nueva = CuentaContable.objects.get_or_create(codigo=codigo, defaults={
+                    'nombre':mov['nombre'],'tipo':mov['tipo_cuenta'],'subcategoria':mov['subcategoria']})
+                if not nueva and (cuenta.tipo != mov['tipo_cuenta'] or cuenta.subcategoria != mov['subcategoria']):
+                    if not limpiar and cuenta.movimientos.exists():
+                        raise ValueError(f'La cuenta {codigo} tiene otra clasificación y movimientos previos. Revísela antes de importar.')
+                    cuenta.tipo=mov['tipo_cuenta'];cuenta.subcategoria=mov['subcategoria']
+                    cuenta.save(update_fields=['tipo','subcategoria'])
+                cuentas[codigo]=cuenta
+        if limpiar: AsientoContable.objects.all().delete()
+        for numero,item in enumerate(asientos):
+            asiento=AsientoContable.objects.create(fecha=item['fecha'],descripcion=item['descripcion'],
+                observaciones_importacion=pendientes if numero==len(asientos)-1 else '')
+            Movimiento.objects.bulk_create([Movimiento(asiento=asiento,cuenta=cuentas[m['codigo']],
+                tipo=m['tipo_movimiento'],monto=m['monto']) for m in item['movimientos']])
+    return len(asientos)
+
+
+def mostrar_revision(request, payload, error=''):
+    from django.core import signing
+    from .importacion_general import normalizar_borrador
+    borrador=normalizar_borrador(payload['borrador'])
+    payload['borrador']=borrador
+    return render(request,'revisar_importacion.html',{
+        **borrador,'revision_token':signing.dumps(payload,salt='revision-contable',compress=True),
+        'tipos_cuenta':CuentaContable.TIPO_CHOICES,'subcategorias':CuentaContable.SUBCATEGORIA_CHOICES,
+        'texto_ejercicio':payload['datos'].get('texto_leido') or json.dumps(payload['datos'],ensure_ascii=False,indent=2),
+        'limpiar':payload['limpiar'],'error_revision':error,
+    })
+
 
 def cargar_imagen_diario(request):
-    from .ai_diario import interpretar_caso_imagen
-    if request.method != 'POST':
-        return render(request, 'cargar_imagen_diario.html')
-    imagen = request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
+    from .ai_diario import extraer_operaciones
+    from .ciclo_contable import generar_asientos, decimal
+    from .importacion_general import proponer_caso_general, normalizar_borrador, serializar_asientos
+    if request.method!='POST':return render(request,'cargar_imagen_diario.html')
+    imagen=request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
     if not imagen:
-        messages.error(request, 'Adjunte una imagen del caso contable.')
+        messages.error(request,'Adjunte una imagen del caso contable.')
         return redirect('cargar_imagen_diario')
-    if imagen.size > 20 * 1024 * 1024:
-        messages.error(request, 'La imagen supera los 20 MB.')
+    if imagen.size>20*1024*1024:
+        messages.error(request,'La imagen supera los 20 MB.')
         return redirect('cargar_imagen_diario')
     try:
-        asientos = interpretar_caso_imagen(imagen)
-        limpiar = request.POST.get('limpiar') == 'on'
-        with transaction.atomic():
-            # Resolver y clasificar cuentas antes de crear movimientos.
-            cuentas = {}
-            for item in asientos:
-                for mov in item['movimientos']:
-                    codigo = mov['codigo']
-                    cuenta, nueva = CuentaContable.objects.get_or_create(codigo=codigo, defaults={
-                        'nombre': mov['nombre'], 'tipo': mov['tipo_cuenta'], 'subcategoria': mov['subcategoria']})
-                    if not nueva and (cuenta.tipo != mov['tipo_cuenta'] or cuenta.subcategoria != mov['subcategoria']):
-                        if not limpiar and cuenta.movimientos.exists():
-                            raise ValueError(f'La cuenta {codigo} tiene otra clasificación y movimientos previos. Revísela antes de importar.')
-                        cuenta.tipo = mov['tipo_cuenta']
-                        cuenta.subcategoria = mov['subcategoria']
-                        cuenta.save(update_fields=['tipo', 'subcategoria'])
-                    cuentas[codigo] = cuenta
-            if limpiar:
-                AsientoContable.objects.all().delete()
-            for item in asientos:
-                asiento = AsientoContable.objects.create(fecha=item['fecha'], descripcion=item['descripcion'])
-                Movimiento.objects.bulk_create([Movimiento(asiento=asiento, cuenta=cuentas[m['codigo']],
-                    tipo=m['tipo_movimiento'], monto=m['monto']) for m in item['movimientos']])
-        messages.success(request, f"Se registraron {len(asientos)} asientos, incluidos los ajustes de inventario y depreciación aplicables.")
+        tasa=str(decimal(request.POST.get('tasa_impuesto','18'),'tasa de impuesto'))
+        if Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
+        datos=extraer_operaciones(imagen)
+        datos['tasa_impuesto_configurada']=tasa
+        limpiar=request.POST.get('limpiar')=='on'
+        try:
+            asientos=generar_asientos(datos)
+            borrador=normalizar_borrador({'asientos':serializar_asientos(asientos),
+                                         'pendientes':[],'supuestos':[]})
+            if datos.get('saldos_apertura'):
+                borrador['pendientes']=['No se proporciona costo de ventas ni inventario final; el resultado es provisional.']
+                borrador['supuestos']=['Letras sin importes individuales: cuotas iguales y residuo en la última. Apertura sin fecha: primera fecha del ejercicio.']
+        except ValueError as exc:
+            try:borrador=proponer_caso_general(datos,tasa)
+            except Exception:
+                borrador={'asientos':[],'pendientes':[str(exc),'No se pudo preparar la propuesta general. Complete los datos y vuelva a intentarlo.'],'supuestos':[]}
+            return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
+        if request.POST.get('revisar')=='on':
+            return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
+        cantidad=guardar_importacion(asientos,limpiar)
+        messages.success(request,f'Se registraron {cantidad} asientos con cuadre exacto.')
+        if datos.get('saldos_apertura'):
+            messages.info(request,'Caso con apertura y letras registrado. No se calculó costo de ventas: falta el inventario final o el costo indicado.')
         return redirect('libro_diario')
-    except ValueError as exc:
-        messages.error(request, f'No se importó el caso: {exc}')
-    except Exception:
-        messages.error(request, 'No se pudo completar la lectura. Revise la conexión y la configuración del servicio; sus datos se conservaron.')
+    except ValueError as exc:messages.error(request,f'No se importó el caso: {exc}')
+    except Exception:messages.error(request,'No se pudo completar la lectura. Revise la conexión y la configuración del servicio; sus datos se conservaron.')
     return redirect('cargar_imagen_diario')
+
+
+def revisar_importacion(request):
+    from django.core import signing
+    from .importacion_general import proponer_caso_general, normalizar_borrador
+    if request.method!='POST':return redirect('cargar_imagen_diario')
+    try:
+        payload=signing.loads(request.POST.get('revision_token',''),salt='revision-contable',max_age=3600)
+    except (signing.BadSignature,ValueError,TypeError):
+        messages.error(request,'La revisión caducó o no es válida. Vuelva a cargar el ejercicio.')
+        return redirect('cargar_imagen_diario')
+    try:
+        if request.POST.get('accion')=='completar':
+            datos_adicionales=request.POST.get('datos_adicionales','').strip()
+            if not datos_adicionales:raise ValueError('Escriba los datos faltantes o la aclaración del ejercicio.')
+            aclaraciones=(payload.get('aclaraciones','')+'\n'+datos_adicionales).strip()
+            if len(aclaraciones)>10000:raise ValueError('La aclaración es demasiado extensa.')
+            payload['aclaraciones']=aclaraciones
+            payload['borrador']=proponer_caso_general(payload['datos'],payload['tasa'],aclaraciones)
+            return mostrar_revision(request,payload)
+        if request.POST.get('revisado')!='on':raise ValueError('Confirme que revisó las cuentas y los importes antes de guardar.')
+        pendientes=payload['borrador'].get('pendientes',[])
+        if pendientes and request.POST.get('aceptar_parcial')!='on':
+            raise ValueError('El ejercicio tiene datos pendientes. Complételos o confirme el guardado parcial.')
+        entrada=request.POST.get('asientos_json','')
+        if len(entrada)>200000:raise ValueError('La revisión es demasiado extensa.')
+        try:asientos=json.loads(entrada,parse_float=str)
+        except (ValueError,TypeError):raise ValueError('No se pudo leer la revisión. Verifique los campos.') from None
+        if isinstance(asientos,list) and len(asientos)<len(payload['borrador']['asientos']):
+            nota='Se excluyeron asientos de la propuesta original; el registro no incluye todas las operaciones.'
+            if nota not in pendientes:pendientes.append(nota)
+            if request.POST.get('aceptar_parcial')!='on':
+                raise ValueError('Confirme el guardado parcial porque excluyó asientos de la propuesta.')
+        # Conservar las correcciones del usuario si una validación impide guardar.
+        borrador=normalizar_borrador({'asientos':asientos,'pendientes':pendientes,
+                                     'supuestos':payload['borrador'].get('supuestos',[])})
+        payload['borrador']=borrador
+        cantidad=guardar_importacion(asientos,payload['limpiar'],'; '.join(map(str,pendientes)))
+        messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))
+        return redirect('libro_diario')
+    except ValueError as exc:return mostrar_revision(request,payload,str(exc))
+    except Exception:return mostrar_revision(request,payload,'No se pudo completar la operación; sus datos anteriores se conservaron. Intente nuevamente.')

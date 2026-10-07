@@ -1,4 +1,5 @@
 {% load contable_tags %}
+{% if nota_resultado %}<p class="helper-text" role="status">{{ nota_resultado }}</p>{% endif %}
 <div class="balance-grid">
     <div class="card"><div class="card-header"><h3>Activo</h3></div><div class="table-container">
         <table><thead><tr><th>Concepto</th><th class="text-right">Importe (S/)</th></tr></thead><tbody>

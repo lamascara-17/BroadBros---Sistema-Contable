@@ -66,6 +66,7 @@ class AsientoContable(models.Model):
     """
     fecha = models.DateField(verbose_name='Fecha')
     descripcion = models.TextField(blank=True, default='', verbose_name='Descripción')
+    observaciones_importacion = models.TextField(blank=True, default='', verbose_name='Datos pendientes de la importación')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

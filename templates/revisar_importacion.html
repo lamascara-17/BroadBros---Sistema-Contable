@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Revisar ejercicio — BroadBros{% endblock %}
+{% block page_title %}Revisar ejercicio{% endblock %}
+{% block page_subtitle %}Completa lo que falta y guarda únicamente los asientos que hayas revisado.{% endblock %}
+{% block content %}
+{% if error_revision %}<div class="message message-error" role="alert">{{ error_revision }}</div>{% endif %}
+<div class="card"><div class="card-header"><h3>Estado de la lectura</h3></div><div class="card-body">
+<p>{{ asientos|length }} asientos propuestos. {{ pendientes|length }} datos o asuntos pendientes.</p>
+{% if pendientes %}<h4>Información pendiente</h4><ul>{% for nota in pendientes %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
+{% if supuestos %}<h4>Convenciones de la propuesta</h4><ul>{% for nota in supuestos %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
+<p class="helper-text">Una propuesta que cuadra todavía requiere revisar sus cuentas y el significado de la operación. Los datos anteriores se conservan hasta que confirmes el guardado.</p>
+<details><summary>Ver los datos leídos</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;">{{ texto_ejercicio }}</pre></details>
+</div></div>
+<div class="card" style="margin-top:20px;"><div class="card-header"><h3>Completar o aclarar el ejercicio</h3></div><div class="card-body">
+<form method="post" action="{% url 'revisar_importacion' %}">{% csrf_token %}
+<input type="hidden" name="revision_token" value="{{ revision_token }}"><input type="hidden" name="accion" value="completar">
+<label for="datos-adicionales">Datos faltantes o correcciones</label><textarea id="datos-adicionales" name="datos_adicionales" rows="3" maxlength="10000" required placeholder="Por ejemplo: la fecha es 30/06/2023, el IVA es 18 %, el costo de la mercadería vendida es... Solo escribe datos que conozcas."></textarea>
+<button class="btn btn-secondary" type="submit" style="margin-top:12px;">Actualizar propuesta con estos datos</button>
+</form></div></div>
+<form id="revision-form" method="post" action="{% url 'revisar_importacion' %}" style="margin-top:20px;">{% csrf_token %}
+<input type="hidden" name="revision_token" value="{{ revision_token }}"><input type="hidden" name="accion" value="guardar"><input type="hidden" name="asientos_json" id="asientos-json">
+{% for asiento in asientos %}
+<section class="card revision-asiento" style="margin-bottom:20px;">
+<div class="card-header"><h3>Asiento propuesto {{ forloop.counter }}</h3>
+<label style="display:flex;gap:8px;align-items:center;"><input data-incluir type="checkbox" {% if not asiento.error_validacion %}checked{% endif %} style="width:auto;min-height:0;">Guardar este asiento</label></div>
+<div class="card-body">
+{% if asiento.error_validacion %}<p class="helper-text" role="status">{{ asiento.error_validacion }} Corrígelo y marca el asiento para guardarlo.</p>{% endif %}
+{% if asiento.fuente %}<p class="helper-text">Fuente: {{ asiento.fuente }}</p>{% endif %}
+<div class="form-row"><div class="form-group"><label>Fecha<input data-fecha type="date" value="{{ asiento.fecha }}"></label></div><div class="form-group"><label>Descripción<input data-descripcion type="text" maxlength="2000" value="{{ asiento.descripcion }}"></label></div></div>
+</div>
+<div class="table-container"><table><thead><tr><th>Código</th><th>Cuenta</th><th>Clasificación</th><th>Grupo del resultado</th><th>Debe / Haber</th><th>Importe</th><th></th></tr></thead><tbody class="revision-lineas">
+{% for mov in asiento.movimientos %}<tr>
+<td><input type="text" data-codigo aria-label="Código de cuenta" value="{{ mov.codigo }}" maxlength="20" style="min-width:90px;"></td>
+<td><input type="text" data-nombre aria-label="Nombre de cuenta" value="{{ mov.nombre }}" maxlength="200" style="min-width:220px;"></td>
+<td><select data-tipo aria-label="Tipo de cuenta">{% for valor,nombre in tipos_cuenta %}<option value="{{ valor }}" {% if valor == mov.tipo_cuenta %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></td>
+<td><select data-subcategoria aria-label="Subcategoría">{% for valor,nombre in subcategorias %}<option value="{{ valor }}" {% if valor == mov.subcategoria %}selected{% endif %}>{{ nombre }}</option>{% endfor %}</select></td>
+<td><select data-lado aria-label="Debe o Haber"><option value="debe" {% if mov.tipo_movimiento == 'debe' %}selected{% endif %}>Debe</option><option value="haber" {% if mov.tipo_movimiento == 'haber' %}selected{% endif %}>Haber</option></select></td>
+<td><input data-monto aria-label="Importe" type="number" min="0.01" step="0.01" value="{{ mov.monto }}" style="min-width:150px;"></td>
+<td><button type="button" class="btn btn-secondary btn-sm" data-quitar>Quitar</button></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="card-body"><button type="button" class="btn btn-secondary btn-sm" data-agregar>Agregar movimiento</button></div>
+</section>{% endfor %}
+{% if asientos %}
+<div class="card"><div class="card-body">
+<p>{% if limpiar %}Al confirmar, estos asientos reemplazarán los registros anteriores.{% else %}Los asientos seleccionados se añadirán a los registros anteriores.{% endif %}</p>
+<label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="revisado" type="checkbox" required style="width:auto;min-height:0;">He revisado las fechas, cuentas, importes y el cuadre de los asientos seleccionados.</label>
+<label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="aceptar_parcial" type="checkbox" {% if pendientes %}required{% endif %} style="width:auto;min-height:0;">Si hay datos pendientes o excluyo asientos, acepto guardar un registro parcial. Los reportes lo indicarán.</label>
+<button class="btn btn-primary" type="submit">Guardar asientos revisados</button>
+</div></div>{% else %}<p class="helper-text">Todavía no hay asientos para guardar. Añade los datos faltantes arriba para preparar una nueva propuesta.</p>{% endif %}
+</form>
+<template id="revision-linea-modelo"><tr>
+<td><input type="text" data-codigo aria-label="Código de cuenta" maxlength="20" style="min-width:90px;"></td>
+<td><input type="text" data-nombre aria-label="Nombre de cuenta" maxlength="200" style="min-width:220px;"></td>
+<td><select data-tipo aria-label="Tipo de cuenta">{% for valor,nombre in tipos_cuenta %}<option value="{{ valor }}">{{ nombre }}</option>{% endfor %}</select></td>
+<td><select data-subcategoria aria-label="Subcategoría">{% for valor,nombre in subcategorias %}<option value="{{ valor }}">{{ nombre }}</option>{% endfor %}</select></td>
+<td><select data-lado aria-label="Debe o Haber"><option value="debe">Debe</option><option value="haber">Haber</option></select></td>
+<td><input data-monto aria-label="Importe" type="number" min="0.01" step="0.01" style="min-width:150px;"></td>
+<td><button type="button" class="btn btn-secondary btn-sm" data-quitar>Quitar</button></td>
+</tr></template>
+<a class="btn btn-secondary" href="{% url 'cargar_imagen_diario' %}" style="margin-top:16px;">Cargar otra imagen</a>
+{% endblock %}
+{% block extra_js %}
+<script>
+const revisionForm = document.getElementById('revision-form');
+revisionForm?.addEventListener('click', event => {
+    if (event.target.matches('[data-quitar]')) event.target.closest('tr').remove();
+    if (event.target.matches('[data-agregar]')) {
+        const body = event.target.closest('.revision-asiento').querySelector('.revision-lineas');
+        if (body.children.length >= 40) return;
+        const row = document.getElementById('revision-linea-modelo').content.firstElementChild.cloneNode(true);
+        body.appendChild(row);
+    }
+});
+revisionForm?.addEventListener('submit', event => {
+    const selected = [...revisionForm.querySelectorAll('.revision-asiento')].filter(card => card.querySelector('[data-incluir]').checked);
+    if (!selected.length) { event.preventDefault(); alert('Marca al menos un asiento para guardar.'); return; }
+    const value = (node, field) => node.querySelector(`[data-${field}]`).value.trim();
+    const asientos = selected.map(card => ({fecha:value(card,'fecha'),descripcion:value(card,'descripcion'),
+        movimientos:[...card.querySelectorAll('.revision-lineas tr')].map(row => ({
+            codigo:value(row,'codigo'),nombre:value(row,'nombre'),tipo_cuenta:value(row,'tipo'),
+            subcategoria:value(row,'subcategoria'),tipo_movimiento:value(row,'lado'),monto:value(row,'monto')
+        }))}));
+    document.getElementById('asientos-json').value = JSON.stringify(asientos);
+});
+</script>
+{% endblock %}

@@ -37,9 +37,11 @@ th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; 
 </tr>{% endfor %}</tbody></table>
 <p><strong>Activo {{ total_activos|formato_moneda }} = Pasivo {{ total_pasivos|formato_moneda }} + Patrimonio {{ total_patrimonio_con_resultados|formato_moneda }}</strong></p>
 <p class="nota">Depreciación acumulada presentada como deducción del activo. Clasificación corriente/no corriente por código de cuenta; revise vencimientos especiales.</p>
+{% if nota_resultado %}<p class="nota">{{ nota_resultado }}</p>{% endif %}
 
 <div class="break"><p class="marca">BROADBROS / RESULTADOS</p><h1>{{ empresa }}</h1>
 <h2>Estado de Resultados</h2><p class="meta">Del {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles</p>
+{% if nota_resultado %}<p class="meta">{{ nota_resultado }}</p>{% endif %}
 <table repeat="1"><thead><tr><th style="width: 75%;">Concepto</th><th style="width: 25%;" class="right">Importe</th></tr></thead><tbody>
 {% for nombre, saldo, tipo in filas_er %}<tr class="{{ tipo }}"><td>{{ nombre }}</td><td class="right">{{ saldo|formato_importe }}</td></tr>{% endfor %}
 </tbody></table><p class="nota">Los gastos se presentan con signo negativo. El resultado no incluye un impuesto calculado con una tasa supuesta.</p></div>

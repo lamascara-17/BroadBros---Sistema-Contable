@@ -107,3 +107,4 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
 GROQ_VISION_MODEL = os.getenv('GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')
+GROQ_TEXT_MODEL = os.getenv('GROQ_TEXT_MODEL', 'openai/gpt-oss-20b')

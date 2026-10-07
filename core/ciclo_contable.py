@@ -55,6 +55,9 @@ def generar_asientos(datos):
     operaciones = datos.get('operaciones')
     if not isinstance(operaciones, list) or not operaciones:
         raise ValueError('No se identificaron operaciones en la imagen.')
+    if datos.get('saldos_apertura'):
+        from .ciclo_documentado import generar_ciclo_documentado
+        return generar_ciclo_documentado(datos)
     if datos.get('metodo_inventario') != 'periodico':
         raise ValueError('Esta importación requiere un caso de inventario periódico. No se guardó ningún asiento.')
     cierre = fecha(datos.get('fecha_cierre'))

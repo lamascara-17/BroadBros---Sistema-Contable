@@ -1,6 +1,7 @@
 """Libro de trabajo financiero con datos numéricos y formato de impresión."""
 from io import BytesIO
 from itertools import zip_longest
+from math import ceil
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -82,7 +83,19 @@ def exportar_excel_contable(empresa='BroadBros'):
         ws.row_dimensions[index].height = 30
         return index
 
+    def nota(ws, contenido):
+        # Dividir las notas largas evita ocultar información en una fila fija.
+        for inicio in range(0, len(contenido), 400):
+            parte = contenido[inicio:inicio + 400]
+            index = fila(ws, [parte])
+            columnas = ws.max_column
+            ws.merge_cells(start_row=index, start_column=1, end_row=index, end_column=columnas)
+            ancho = sum(ws.column_dimensions[get_column_letter(c)].width for c in range(1, columnas + 1))
+            ws.row_dimensions[index].height = max(30, 16 * (ceil(len(parte) / max(20, ancho * .8)) + 1))
+
     ws = hoja('Situación Financiera', ['Activo', 'Importe', 'Pasivo y patrimonio', 'Importe'], [55, 20, 55, 20])
+    if ctx['nota_resultado']:
+        nota(ws, ctx['nota_resultado'])
     for izquierda, derecha in ctx['filas_esf']:
         left = izquierda or ('', None, 'detalle')
         right = derecha or ('', None, 'detalle')
@@ -97,6 +110,8 @@ def exportar_excel_contable(empresa='BroadBros'):
     fila(ws, ['Agrupación por código contable; revise vencimientos especiales.', None, None, None])
 
     ws = hoja('Estado de Resultados', ['Concepto', 'Importe (S/)'], [80, 24])
+    if ctx['nota_resultado']:
+        nota(ws, ctx['nota_resultado'])
     for concepto, saldo, tipo in ctx['filas_er']:
         fila(ws, [concepto, saldo], tipo)
     fila(ws, ['Resultado antes de impuestos; no se presume una tasa tributaria.', None])
