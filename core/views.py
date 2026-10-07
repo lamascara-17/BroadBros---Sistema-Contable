@@ -1041,107 +1041,68 @@ def mostrar_revision(request, payload, error=''):
     from django.core import signing
     from .importacion_general import normalizar_borrador
     borrador=normalizar_borrador(payload['borrador'])
-    if payload.get('error_propuesta') and not borrador['asientos']:borrador['pendientes']=[]
     payload['borrador']=borrador
     return render(request,'revisar_importacion.html',{
         **borrador,'revision_token':signing.dumps(payload,salt='revision-contable',compress=True),
         'tipos_cuenta':CuentaContable.TIPO_CHOICES,'subcategorias':CuentaContable.SUBCATEGORIA_CHOICES,
         'texto_ejercicio':payload['datos'].get('texto_leido') or json.dumps(payload['datos'],ensure_ascii=False,indent=2),
-        'limpiar':payload['limpiar'],'error_revision':error or payload.get('error_propuesta',''),'error_propuesta':payload.get('error_propuesta',''),
+        'limpiar':payload['limpiar'],'error_revision':error,
     })
 
 
 def cargar_imagen_diario(request):
-    return cargar_caso_contable(request, 'imagen')
-
-
-def cargar_texto_diario(request):
-    return cargar_caso_contable(request, 'texto')
-
-
-def cargar_caso_contable(request, origen):
-    from .servicio_ia import presupuesto_ia
-    with presupuesto_ia():
-        return procesar_caso_contable(request, origen)
-
-
-def procesar_caso_contable(request, origen):
-    plantilla='cargar_texto_diario.html' if origen=='texto' else 'cargar_imagen_diario.html'
-    ruta='cargar_texto_diario' if origen=='texto' else 'cargar_imagen_diario'
-    texto=request.POST.get('texto_caso','').strip()
-    from .ai_diario import extraer_operaciones, extraer_operaciones_texto
+    from .ai_diario import extraer_operaciones
     from .ciclo_contable import generar_asientos, decimal
     from .importacion_general import proponer_caso_general, normalizar_borrador, serializar_asientos
-    if request.method!='POST':return render(request,plantilla)
+    if request.method!='POST':return render(request,'cargar_imagen_diario.html')
     from django.core import signing
     from .importacion_impuestos import necesita_tasa
     lectura_token=request.POST.get('lectura_token','')
     if lectura_token:
         try:
             lectura=signing.loads(lectura_token,salt='lectura-impuesto',max_age=3600)
-            if lectura.get('origen','imagen')!=origen:raise ValueError('Origen inválido.')
             datos=lectura['datos'];limpiar=lectura['limpiar'];revisar=lectura['revisar']
         except (signing.BadSignature,ValueError,TypeError,KeyError):
-            messages.error(request,'La lectura caducó o no es válida. Vuelva a cargar el ejercicio.')
-            return render(request,plantilla,{'texto_caso':texto}) if origen=='texto' else redirect(ruta)
+            messages.error(request,'La lectura caducó o no es válida. Vuelva a subir la imagen.')
+            return redirect('cargar_imagen_diario')
     else:
-        imagen=None
-        if origen=='imagen':
-            imagen=request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
-            if not imagen:
-                messages.error(request,'Adjunte una imagen del caso contable.')
-                return render(request,plantilla,{'texto_caso':texto}) if origen=='texto' else redirect(ruta)
-            if imagen.size>20*1024*1024:
-                messages.error(request,'La imagen supera los 20 MB.')
-                return render(request,plantilla,{'texto_caso':texto}) if origen=='texto' else redirect(ruta)
+        imagen=request.FILES.get('imagen_caso') or request.FILES.get('foto_camara')
+        if not imagen:
+            messages.error(request,'Adjunte una imagen del caso contable.')
+            return redirect('cargar_imagen_diario')
+        if imagen.size>20*1024*1024:
+            messages.error(request,'La imagen supera los 20 MB.')
+            return redirect('cargar_imagen_diario')
         datos=None
         limpiar=request.POST.get('limpiar')=='on'
-        revisar=origen=='texto' or request.POST.get('revisar')=='on'
+        revisar=request.POST.get('revisar')=='on'
     try:
-        if datos is None:
-            if origen=='texto':
-                archivo=request.FILES.get('archivo_texto')
-                if archivo:
-                    if texto:raise ValueError('Pegue el texto o adjunte un archivo, use una sola opción.')
-                    if not archivo.name.lower().endswith('.txt') or archivo.size>100000:
-                        raise ValueError('Adjunte un archivo .txt de hasta 100 KB.')
-                    contenido=archivo.read()
-                    try:texto=contenido.decode('utf-16' if contenido.startswith((b'\xff\xfe',b'\xfe\xff')) else 'utf-8-sig').strip()
-                    except UnicodeDecodeError:raise ValueError('Guarde el archivo de texto con codificación UTF-8.') from None
-                    if '\x00' in texto:raise ValueError('El archivo no contiene texto válido.')
-                datos=extraer_operaciones_texto(texto)
-            else:datos=extraer_operaciones(imagen)
+        if datos is None:datos=extraer_operaciones(imagen)
         if necesita_tasa(datos) and not request.POST.get('tasa_impuesto','').strip():
-            token=lectura_token or signing.dumps({'datos':datos,'limpiar':limpiar,'revisar':revisar,'origen':origen},salt='lectura-impuesto',compress=True)
-            return render(request,plantilla,{'lectura_token':token})
+            token=lectura_token or signing.dumps({'datos':datos,'limpiar':limpiar,'revisar':revisar},salt='lectura-impuesto',compress=True)
+            return render(request,'cargar_imagen_diario.html',{'lectura_token':token})
         try:
             tasa=str(decimal(request.POST['tasa_impuesto'],'tasa de impuesto')) if request.POST.get('tasa_impuesto','').strip() else None
             if tasa is not None and Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
         except ValueError as exc:
             if lectura_token:
-                return render(request,plantilla,{'lectura_token':lectura_token,'error_tasa':str(exc),'tasa_ingresada':request.POST.get('tasa_impuesto','')})
+                return render(request,'cargar_imagen_diario.html',{'lectura_token':lectura_token,'error_tasa':str(exc),'tasa_ingresada':request.POST.get('tasa_impuesto','')})
             raise
         datos['tasa_impuesto_configurada']=tasa
         try:
             asientos=generar_asientos(datos)
             borrador=normalizar_borrador({'asientos':serializar_asientos(asientos),
                                          'pendientes':[],'supuestos':[]})
-            if any(op.get('tipo') in ('cobro_factura','pago_proveedor') and not op.get('medio_pago') for op in datos.get('operaciones',[])):
-                borrador['supuestos'].append('Los cobros y pagos sin medio indicado se registran en efectivo. Confirme este tratamiento antes de guardar.')
             if datos.get('saldos_apertura'):
                 borrador['pendientes']=['No se proporciona costo de ventas ni inventario final; el resultado es provisional.']
                 borrador['supuestos']=['Letras sin importes individuales: cuotas iguales y residuo en la última. Apertura sin fecha: primera fecha del ejercicio.']
-        except ValueError:
-            payload={'datos':datos,'tasa':tasa,'limpiar':limpiar}
+        except ValueError as exc:
             try:borrador=proponer_caso_general(datos,tasa)
             except ValueError as error_propuesta:
-                borrador={'asientos':[],'pendientes':[],'supuestos':[]}
-                payload['error_propuesta']=str(error_propuesta)
+                borrador={'asientos':[],'pendientes':[str(exc),str(error_propuesta)],'supuestos':[]}
             except Exception:
-                borrador={'asientos':[],'pendientes':[],'supuestos':[]}
-                payload['error_propuesta']='No se pudo preparar la propuesta. La lectura se conservó; puede reintentar sin volver a cargar el caso.'
-            payload['borrador']=borrador
-            return mostrar_revision(request,payload)
+                borrador={'asientos':[],'pendientes':[str(exc),'No se pudo preparar la propuesta general. Complete los datos y vuelva a intentarlo.'],'supuestos':[]}
+            return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
         if revisar:
             return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':limpiar,'borrador':borrador})
         cantidad=guardar_importacion(asientos,limpiar)
@@ -1151,16 +1112,10 @@ def procesar_caso_contable(request, origen):
         return redirect('libro_diario')
     except ValueError as exc:messages.error(request,f'No se importó el caso: {exc}')
     except Exception:messages.error(request,'No se pudo completar la lectura. Revise la conexión y la configuración del servicio; sus datos se conservaron.')
-    return render(request,plantilla,{'texto_caso':texto}) if origen=='texto' else redirect(ruta)
+    return redirect('cargar_imagen_diario')
 
 
 def revisar_importacion(request):
-    from .servicio_ia import presupuesto_ia
-    with presupuesto_ia():
-        return procesar_revision_importacion(request)
-
-
-def procesar_revision_importacion(request):
     from django.core import signing
     from .importacion_general import proponer_caso_general, normalizar_borrador
     if request.method!='POST':return redirect('cargar_imagen_diario')
@@ -1170,14 +1125,13 @@ def procesar_revision_importacion(request):
         messages.error(request,'La revisión caducó o no es válida. Vuelva a cargar el ejercicio.')
         return redirect('cargar_imagen_diario')
     try:
-        if request.POST.get('accion') in ('completar','reintentar'):
+        if request.POST.get('accion')=='completar':
             datos_adicionales=request.POST.get('datos_adicionales','').strip()
-            if request.POST.get('accion')=='completar' and not datos_adicionales:raise ValueError('Escriba los datos faltantes o la aclaración del ejercicio.')
+            if not datos_adicionales:raise ValueError('Escriba los datos faltantes o la aclaración del ejercicio.')
             aclaraciones=(payload.get('aclaraciones','')+'\n'+datos_adicionales).strip()
             if len(aclaraciones)>10000:raise ValueError('La aclaración es demasiado extensa.')
             payload['aclaraciones']=aclaraciones
             payload['borrador']=proponer_caso_general(payload['datos'],payload['tasa'],aclaraciones)
-            payload.pop('error_propuesta',None)
             return mostrar_revision(request,payload)
         if request.POST.get('revisado')!='on':raise ValueError('Confirme que revisó las cuentas y los importes antes de guardar.')
         pendientes=payload['borrador'].get('pendientes',[])

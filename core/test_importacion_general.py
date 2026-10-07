@@ -55,56 +55,16 @@ class ValidadorGeneralTests(SimpleTestCase):
             borrador=proponer_caso_general(datos_generales(),'18','El retiro fue de 100.')
             parametros=groq.return_value.chat.completions.create.call_args.kwargs
             self.assertIn('El retiro fue de 100.',parametros['messages'][1]['content'])
-            self.assertEqual(parametros['reasoning_effort'],'low')
-            self.assertEqual(parametros['response_format']['type'],'json_schema')
-            self.assertIs(parametros['response_format']['json_schema']['strict'],True)
             self.assertEqual(borrador['pendientes'],propuesta()['pendientes'])
             groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
-
-    @override_settings(GROQ_API_KEY='test-key')
-    def test_catalogo_compacto_conserva_importes_cuentas_y_cuadre(self):
-        original=propuesta()
-        compacto=deepcopy(original)
-        compacto['cuentas']={}
-        for a in compacto['asientos']:
-            lineas=[]
-            for m in a['movimientos']:
-                compacto['cuentas'][m['codigo']]=[m['nombre'],m['tipo_cuenta'],m['subcategoria']]
-                lineas.append([m['codigo'],m['tipo_movimiento'],m['monto']])
-            a['movimientos']=lineas
-        with patch('core.importacion_general.Groq') as groq:
-            groq.return_value.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(compacto)))])
-            self.assertEqual(proponer_caso_general(datos_generales(),'18'),normalizar_borrador(original))
-            compacto['cuentas'].pop('1041')
-            groq.return_value.chat.completions.create.return_value.choices[0].message.content=json.dumps(compacto)
-            with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
-
-    def test_nuevo_catalogo_y_asientos_anteriores_conservan_datos(self):
-        from .importacion_general import expandir_propuesta
-        original=propuesta()
-        compacto=deepcopy(original)
-        compacto['cuentas']=[]
-        for a in compacto['asientos']:
-            lineas=[]
-            for m in a['movimientos']:
-                compacto['cuentas'].append({k:m[k] for k in ('codigo','nombre','tipo_cuenta','subcategoria')})
-                lineas.append({k:m[k] for k in ('codigo','tipo_movimiento','monto')})
-            a['movimientos']=lineas
-        self.assertEqual(normalizar_borrador(expandir_propuesta(compacto)),normalizar_borrador(original))
-        a=compacto['asientos'][0]
-        compacto['asientos']=[[a['fecha'],a['descripcion'],a['fuente'],a['movimientos']]]
-        self.assertEqual(normalizar_borrador(expandir_propuesta(compacto)),normalizar_borrador(original))
-        compacto['cuentas'].append({**compacto['cuentas'][0],'tipo_cuenta':'gasto'})
-        with self.assertRaisesMessage(ValueError,'incompatibles'):
-            expandir_propuesta(compacto)
 
     @override_settings(GROQ_API_KEY='test-key')
     def test_lectura_de_apertura_sin_operaciones_no_se_rechaza(self):
         from .ai_diario import extraer_operaciones
         datos={'operaciones':[],'saldos_apertura':[{'concepto':'capital','monto':1000}],'texto_leido':'Capital 1000 y caja 1000.'}
         with patch('core.ai_diario.Groq') as groq:
-            groq.return_value.chat.completions.create.side_effect=[SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=datos['texto_leido']))]),SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(datos)))])]
+            groq.return_value.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(datos)))])
             self.assertEqual(extraer_operaciones(imagen()),datos)
 
 

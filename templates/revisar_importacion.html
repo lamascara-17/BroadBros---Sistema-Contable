@@ -3,10 +3,9 @@
 {% block page_title %}Revisar ejercicio{% endblock %}
 {% block page_subtitle %}Completa lo que falta y guarda únicamente los asientos que hayas revisado.{% endblock %}
 {% block content %}
-{% if error_propuesta %}<form method="post" action="{% url 'revisar_importacion' %}" style="margin-bottom:16px;">{% csrf_token %}<input type="hidden" name="revision_token" value="{{ revision_token }}"><input type="hidden" name="accion" value="reintentar"><button type="submit" class="btn btn-secondary">Reintentar con la lectura conservada</button></form>{% endif %}
 {% if error_revision %}<div class="message message-error" role="alert">{{ error_revision }}</div>{% endif %}
 <div class="card"><div class="card-header"><h3>Estado de la lectura</h3></div><div class="card-body">
-{% if error_propuesta %}<p>La lectura está conservada. La generación de asientos no se completó.</p>{% else %}<p>{{ asientos|length }} asientos propuestos. {{ pendientes|length }} datos o asuntos pendientes.</p>{% endif %}
+<p>{{ asientos|length }} asientos propuestos. {{ pendientes|length }} datos o asuntos pendientes.</p>
 {% if pendientes %}<h4>Información pendiente</h4><ul>{% for nota in pendientes %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
 {% if supuestos %}<h4>Convenciones de la propuesta</h4><ul>{% for nota in supuestos %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
 <p class="helper-text">Una propuesta que cuadra todavía requiere revisar sus cuentas y el significado de la operación. Los datos anteriores se conservan hasta que confirmes el guardado.</p>
@@ -48,7 +47,7 @@
 <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="revisado" type="checkbox" required style="width:auto;min-height:0;">He revisado las fechas, cuentas, importes y el cuadre de los asientos seleccionados.</label>
 <label style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"><input name="aceptar_parcial" type="checkbox" {% if pendientes %}required{% endif %} style="width:auto;min-height:0;">Si hay datos pendientes o excluyo asientos, acepto guardar un registro parcial. Los reportes lo indicarán.</label>
 <button class="btn btn-primary" type="submit">Guardar asientos revisados</button>
-</div></div>{% elif error_propuesta %}<p class="helper-text">El análisis no se completó. El texto leído está conservado; reintenta el procesamiento.</p>{% else %}<p class="helper-text">Todavía no hay asientos para guardar. Añade los datos faltantes arriba para preparar una nueva propuesta.</p>{% endif %}
+</div></div>{% else %}<p class="helper-text">Todavía no hay asientos para guardar. Añade los datos faltantes arriba para preparar una nueva propuesta.</p>{% endif %}
 </form>
 <template id="revision-linea-modelo"><tr>
 <td><input type="text" data-codigo aria-label="Código de cuenta" maxlength="20" style="min-width:90px;"></td>

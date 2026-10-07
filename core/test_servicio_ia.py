@@ -5,7 +5,7 @@ import httpx
 from groq import APIStatusError, APIConnectionError, APITimeoutError
 from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
-from .servicio_ia import solicitar_json, leer_json, presupuesto_ia
+from .servicio_ia import solicitar_json, leer_json
 from .test_ciclo_contable import imagen
 
 
@@ -15,25 +15,6 @@ def fallo(estado, codigo='invalid_api_key'):
 
 
 class ServicioIATests(SimpleTestCase):
-    def test_esquema_estricto_no_se_descarta_ante_un_error(self):
-        client = Mock()
-        client.chat.completions.create.side_effect = fallo(400, 'json_validate_failed')
-        with self.assertRaises(ValueError):
-            solicitar_json(client, model='text', response_format={'type':'json_schema'})
-        self.assertEqual(client.chat.completions.create.call_count, 1)
-
-    def test_presupuesto_acota_llamadas_y_se_restauran_los_plazos(self):
-        client = Mock()
-        with patch('core.servicio_ia.monotonic', side_effect=[100, 160, 176]):
-            with presupuesto_ia(75):
-                solicitar_json(client, model='text')
-                self.assertEqual(client.chat.completions.create.call_args.kwargs['timeout'], 15)
-                with self.assertRaisesMessage(ValueError, 'tiempo límite'):
-                    solicitar_json(client, model='text')
-        self.assertEqual(client.chat.completions.create.call_count, 1)
-        solicitar_json(client, model='text')
-        self.assertEqual(client.chat.completions.create.call_args.kwargs['timeout'], 25)
-
     def test_errores_concretos_sin_exponer_respuesta(self):
         for estado, texto in [(401, 'clave'), (403, 'permiso'), (404, 'modelo'), (429, 'límite'), (500, 'temporalmente')]:
             with self.subTest(estado=estado):
@@ -54,17 +35,6 @@ class ServicioIATests(SimpleTestCase):
         self.assertEqual(client.chat.completions.create.call_count, 2)
         client.chat.completions.create.side_effect = fallo(400, 'request_too_large')
         with self.assertRaises(ValueError): solicitar_json(client, model='vision')
-
-    def test_solicitud_demasiado_grande_no_sugiere_esperar(self):
-        client = Mock()
-        error = fallo(429, 'rate_limit_exceeded')
-        error.body={'error':{'code':'rate_limit_exceeded','message':'Request too large for model on output tokens per minute (OTPM): Limit 1000, Requested 1469. org_privada'}}
-        client.chat.completions.create.side_effect=error
-        with self.assertRaises(ValueError) as resultado:
-            solicitar_json(client,model='vision')
-        self.assertIn('Límite: 1000; solicitud: 1469 tokens',str(resultado.exception))
-        self.assertIn('Esperar no reduce',str(resultado.exception))
-        self.assertNotIn('org_privada',str(resultado.exception))
 
     def test_conexion_y_timeout(self):
         request = httpx.Request('POST', 'https://api.groq.com')

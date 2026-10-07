@@ -88,24 +88,13 @@ class ReglasCicloTests(SimpleTestCase):
     @patch('core.ai_diario.Groq')
     def test_vision_recibe_imagen_completa_sin_triplicar_tokens(self, groq):
         from .ai_diario import extraer_operaciones
-        crear=groq.return_value.chat.completions.create
-        texto='Enunciado literal del ejercicio.'
-        respuesta=lambda contenido, fin='stop': SimpleNamespace(choices=[SimpleNamespace(finish_reason=fin,message=SimpleNamespace(content=contenido))])
-        crear.side_effect=[respuesta(texto),respuesta(json.dumps(caso()))]
-        self.assertEqual(extraer_operaciones(imagen()), {**caso(),'texto_leido':texto})
-        vision, extraccion=[call.kwargs for call in crear.call_args_list]
-        self.assertEqual(len(vision['messages'][0]['content']),2)
-        self.assertEqual(vision['max_completion_tokens'],1000)
-        self.assertNotIn('response_format',vision)
-        self.assertEqual(extraccion['model'],'openai/gpt-oss-20b')
-        self.assertEqual(extraccion['messages'][1]['content'],texto)
-        self.assertEqual(extraccion['max_completion_tokens'],4096)
-        crear.reset_mock();crear.side_effect=[respuesta('Texto cortado','length')]
+        groq.return_value.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(caso())))])
+        self.assertEqual(extraer_operaciones(imagen()), caso())
+        params=groq.return_value.chat.completions.create.call_args.kwargs
+        self.assertEqual(len(params['messages'][0]['content']),2)
+        self.assertEqual(params['max_completion_tokens'],8192)
+        groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
         with self.assertRaises(ValueError):extraer_operaciones(imagen())
-        self.assertEqual(crear.call_count,1)
-        crear.reset_mock();crear.side_effect=[respuesta(texto),respuesta('{}','length')]
-        with self.assertRaises(ValueError):extraer_operaciones(imagen())
-
 
 
 class ImportacionReportesTests(TestCase):

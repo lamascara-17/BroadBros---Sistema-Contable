@@ -24,12 +24,11 @@
             </div>
             <nav class="workspace-nav" id="workspace-nav" aria-label="Navegación principal">
                 <a href="{% url 'index' %}" class="workspace-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}" {% if request.resolver_match.url_name == 'index' %}aria-current="page"{% endif %}><img class="source-icon" src="{% static 'icons/inicio.png' %}" alt="">Inicio</a>
-                <details class="nav-group {% if request.resolver_match.url_name == 'registrar_asiento' or request.resolver_match.url_name == 'cargar_imagen_diario' or request.resolver_match.url_name == 'cargar_texto_diario' or request.resolver_match.url_name == 'gestionar_cuentas' %}active{% endif %}">
+                <details class="nav-group {% if request.resolver_match.url_name == 'registrar_asiento' or request.resolver_match.url_name == 'cargar_imagen_diario' or request.resolver_match.url_name == 'gestionar_cuentas' %}active{% endif %}">
                     <summary><img class="source-icon" src="{% static 'icons/operaciones.png' %}" alt="">Operaciones<span class="nav-chevron" aria-hidden="true">⌄</span></summary>
                     <div class="nav-dropdown">
                         <a href="{% url 'registrar_asiento' %}" {% if request.resolver_match.url_name == 'registrar_asiento' %}aria-current="page"{% endif %}><strong>Registrar asiento</strong><small>Registro manual de movimientos</small></a>
                         <a href="{% url 'cargar_imagen_diario' %}" {% if request.resolver_match.url_name == 'cargar_imagen_diario' %}aria-current="page"{% endif %}><strong>Importar imagen</strong><small>Captura de un ejercicio contable</small></a>
-                        <a href="{% url 'cargar_texto_diario' %}" {% if request.resolver_match.url_name == 'cargar_texto_diario' %}aria-current="page"{% endif %}><strong>Importar texto</strong><small>Pega el caso o sube un archivo .txt</small></a>
                         <a href="{% url 'gestionar_cuentas' %}" {% if request.resolver_match.url_name == 'gestionar_cuentas' %}aria-current="page"{% endif %}><strong>Plan de cuentas</strong><small>Catálogo y clasificación</small></a>
                     </div>
                 </details>
