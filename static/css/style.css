@@ -1301,3 +1301,9 @@ td { font-size: 13px; line-height: 1.7; }
     .section-heading { flex-wrap: wrap; }
 }
 @media print { .site-credits { display: none; } }
+
+.audio-options { padding: 8px 12px; background: #fff; border-top: 1px solid #d8e1e3; font-size: 11px; line-height: 1.5; }
+.audio-options label { display: flex; align-items: center; gap: 7px; margin: 0; }
+.audio-options input { width: auto; margin: 0; }
+.audio-options span { display: block; color: #2c666e; }
+.chat-audio-button { display: block; margin-top: 10px; padding: 5px 10px; font-size: 12px; }

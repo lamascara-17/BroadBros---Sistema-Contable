@@ -92,7 +92,7 @@
             <div class="chat-message bot">
                 <div class="chat-avatar nonobot-photo" aria-hidden="true"><img src="{% static 'img/nonobot.jpg' %}" alt=""></div>
                 <div class="chat-bubble">
-                    Soy ÑoñoBot. Puedo ayudarte con contabilidad y el uso de BROADBROS: cargos y abonos, asientos, cuentas del PCGE y estados financieros. No respondo consultas sobre otros temas.
+                    Soy ÑoñoBot. Puedo ayudarte con contabilidad, finanzas, cálculos, estados financieros y el uso de BROADBROS.
                 </div>
             </div>
             <div class="assistant-suggestions">
@@ -102,6 +102,10 @@
             </div>
         </div>
 
+        <div class="audio-options" id="nonobot-audio-options" data-url="{% url 'respuesta_audio' %}" data-csrf="{{ csrf_token }}">
+            <label><input id="nonobot-auto-audio" type="checkbox"> Leer respuestas en voz alta</label>
+            <span id="nonobot-audio-status" role="status" aria-live="polite"></span>
+        </div>
         <div class="assistant-composer">
             <label class="sr-only" for="tutor-texto">Consulta a ÑoñoBot</label>
             <textarea id="tutor-texto" rows="1" placeholder="Escribe tu consulta..."></textarea>
@@ -149,7 +153,7 @@
         const historial = document.getElementById('tutor-historial');
 
         function setAssistant(open) {
-            if (!open) window.NonobotVoice?.cancel();
+            if (!open) { window.NonobotVoice?.cancel(); window.NonobotAudio?.stop(); }
             assistantPanel.classList.toggle('open', open);
             assistantPanel.setAttribute('aria-hidden', String(!open));
             assistantPanel.inert = !open;
@@ -216,6 +220,7 @@
             const consulta = (prefill || inputTexto.value).trim();
             if (!consulta) return;
 
+            window.NonobotAudio?.stop();
             consultaPendiente = true;
             btnEnviar.disabled = true;
             window.NonobotVoice?.setBusy(true);
@@ -239,6 +244,7 @@
                 if (!r.ok) throw new Error(d.error || 'El asistente no pudo completar la consulta.');
                 botBubble.classList.remove('loading');
                 mostrarRespuesta(botBubble, d);
+                window.NonobotAudio?.attach(botBubble, d);
             } catch (err) {
                 botBubble.classList.remove('loading');
                 botBubble.textContent = err.message === 'Failed to fetch' ? 'No se pudo conectar con el asistente. Intenta nuevamente.' : err.message;
@@ -266,6 +272,7 @@
     </script>
     <script src="{% static 'js/nonobot-voz.js' %}?v=2" defer></script>
 
+    <script src="{% static 'js/nonobot-audio.js' %}?v=1" defer></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

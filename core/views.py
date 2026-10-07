@@ -935,10 +935,12 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
         # ==========================================================
 
         respuesta, segmentos = formato_chat(respuesta)
+        from .audio_respuesta import datos_audio
         return JsonResponse(
             {
                 'response': respuesta,
                 'segments': segmentos,
+                **datos_audio(respuesta),
                 'status': 'success',
                 'asiento_consultado': (
                     asiento_encontrado['numero']

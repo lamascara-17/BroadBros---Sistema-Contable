@@ -102,6 +102,7 @@
             } else if (current.stage === 'starting') cancel();
             return;
         }
+        window.NonobotAudio?.stop();
         const session = { stage: 'starting', previous: input.value.trimEnd(), chunks: [] };
         current = session;
         controls();
