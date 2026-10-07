@@ -1050,6 +1050,48 @@ def mostrar_revision(request, payload, error=''):
     })
 
 
+def cargar_texto_diario(request):
+    from django.core import signing
+    from .ciclo_contable import decimal
+    from .importacion_general import proponer_caso_general
+    plantilla='cargar_texto_diario.html'
+    texto=request.POST.get('texto_caso','').strip()
+    if request.method!='POST':return render(request,plantilla)
+    try:
+        token=request.POST.get('texto_token','')
+        if token:
+            texto=signing.loads(token,salt='texto-impuesto',max_age=3600)['texto']
+        else:
+            archivo=request.FILES.get('archivo_texto')
+            if archivo:
+                if texto:raise ValueError('Pegue el texto o adjunte un archivo, use una sola opción.')
+                if not archivo.name.lower().endswith('.txt') or archivo.size>100000:
+                    raise ValueError('Adjunte un archivo .txt de hasta 100 KB.')
+                contenido=archivo.read()
+                try:texto=contenido.decode('utf-16' if contenido.startswith((b'\xff\xfe',b'\xfe\xff')) else 'utf-8-sig').strip()
+                except UnicodeDecodeError:raise ValueError('Guarde el archivo de texto con codificación UTF-8.') from None
+        if not texto:raise ValueError('Escriba el enunciado o adjunte un archivo .txt.')
+        if len(texto)>20000 or '\x00' in texto:raise ValueError('Use texto válido de hasta 20 000 caracteres.')
+        menciona_impuesto=re.search(r'\b(?:IGV|IVA)\b',texto,re.I)
+        tasa_escrita=re.search(r'\b(?:IGV|IVA)\b[^.\n%]{0,40}?\d+(?:[.,]\d+)?\s*%|\d+(?:[.,]\d+)?\s*%\s*(?:de\s+)?(?:IGV|IVA)\b',texto,re.I)
+        tasa=request.POST.get('tasa_impuesto','').strip()
+        if menciona_impuesto and not tasa_escrita and not tasa:
+            token=token or signing.dumps({'texto':texto},salt='texto-impuesto',compress=True)
+            return render(request,plantilla,{'texto_caso':texto,'texto_token':token})
+        if tasa:
+            tasa=str(decimal(tasa,'tasa de impuesto'))
+            if Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
+        else:tasa=None
+        datos={'texto_leido':texto}
+        borrador=proponer_caso_general(datos,tasa)
+        return mostrar_revision(request,{'datos':datos,'tasa':tasa,'limpiar':False,'borrador':borrador})
+    except signing.BadSignature:
+        messages.error(request,'La lectura caducó. Vuelva a procesar el texto conservado.')
+    except ValueError as exc:messages.error(request,str(exc))
+    except Exception:messages.error(request,'No se pudo procesar el caso. El texto se conservó; vuelva a intentarlo.')
+    return render(request,plantilla,{'texto_caso':texto})
+
+
 def cargar_imagen_diario(request):
     from .ai_diario import extraer_operaciones
     from .ciclo_contable import generar_asientos, decimal

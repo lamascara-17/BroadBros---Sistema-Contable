@@ -6,6 +6,7 @@ urlpatterns = [
 
     # Vista de captura por imagen
     path('cargar-imagen/', views.cargar_imagen_diario, name='cargar_imagen_diario'),
+    path('cargar-texto/', views.cargar_texto_diario, name='cargar_texto_diario'),
     path('cargar-imagen/revisar/', views.revisar_importacion, name='revisar_importacion'),
 
     # Cuentas y Asientos
