@@ -45,6 +45,13 @@ Tipos y campos:
 - compra_mercaderia: monto, pago = contado, credito o letras; null si no se indica.
 - compra_activo: monto, pago (null si no se indica); vida_util_anios, residual_porcentaje y
   fecha_inicio_uso SOLO si el texto los indica. Si no indica vida útil omite esos campos.
+- compra_activo y compra_mercaderia: si parte se paga y parte queda pendiente,
+  pago = mixto, monto_pagado y monto_pendiente son los importes escritos.
+  monto es el valor TOTAL adquirido. Conserva ambos componentes; no omitas la compra.
+- ingreso_servicios: monto TOTAL del servicio prestado, monto_contado y
+  monto_pendiente escritos, o porcentaje_contado si se indica un porcentaje.
+  Es un ingreso del negocio, distinto de pago_servicios (gasto).
+  Los cobros posteriores de estos servicios son cobro_factura.
 - venta: monto total, porcentaje_contado (100 si dice contado, 0 si crédito;
   usa el porcentaje explícito en ventas mixtas), descuento_porcentaje,
   descuento_dias, plazo_dias si aparecen condiciones de factura.
@@ -81,6 +88,8 @@ Tipos y campos:
 Los aportes de los socios para iniciar operaciones son aporte_efectivo en su
 fecha: empresa_nueva=true, saldos_apertura=[] e inventario_inicial=null.
 No fabriques apertura de caja y capital con ese aporte ni lo dupliques.
+Una empresa que solo presta servicios, sin movimientos de mercaderías, no
+requiere inventario físico final: metodo_inventario = "sin_inventario".
 "Sin valor residual" significa residual_porcentaje=0. Si se usa el mismo día,
 fecha_inicio_uso es la fecha de adquisición.
 

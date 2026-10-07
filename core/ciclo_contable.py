@@ -73,13 +73,15 @@ def generar_asientos(datos):
     if datos.get('saldos_apertura'):
         from .ciclo_documentado import generar_ciclo_documentado
         return generar_ciclo_documentado(datos)
-    if datos.get('metodo_inventario') != 'periodico':
+    sin_mercaderias = not any(op.get('tipo') in ('compra_mercaderia','venta','devolucion_proveedor','donacion_mercaderia','perdida_mercaderia','inventario_final') for op in operaciones if isinstance(op,dict))
+    sin_inventario = sin_mercaderias and datos.get('metodo_inventario') in (None,'sin_inventario','sin_cierre')
+    if datos.get('metodo_inventario') != 'periodico' and not sin_inventario:
         raise ValueError('Esta importación requiere un caso de inventario periódico. No se guardó ningún asiento.')
     cierre = fecha(datos.get('fecha_cierre'))
     inicial = datos.get('inventario_inicial')
     if inicial is None and datos.get('empresa_nueva') is True:
         inicial = '0'
-    inventario = moneda(inicial, 'inventario inicial', permite_cero=True)
+    inventario = moneda(inicial if inicial is not None or not sin_inventario else 0, 'inventario inicial', permite_cero=True)
     if inventario:
         raise ValueError('El caso contiene inventario inicial. Se requieren saldos de apertura completos; use el registro manual para este caso.')
     asientos, activos, facturas, proveedores = [], [], [], []
@@ -101,6 +103,20 @@ def generar_asientos(datos):
         asientos.append({'fecha': dia, 'descripcion': glosa,
                          'movimientos': [movimiento(c, t, m) for c, t, m in lineas]})
 
+    def pago_compra(op, monto):
+        if op.get('monto_pagado') is not None:
+            pagado = moneda(op['monto_pagado'], 'importe pagado', permite_cero=True)
+        else:
+            condicion = op.get('pago') or 'contado'
+            if condicion not in ('contado','credito'):
+                raise ValueError('Falta el importe pagado de la compra mixta.')
+            pagado = monto if condicion == 'contado' else Decimal('0')
+        pendiente = monto - pagado
+        if pendiente < 0:raise ValueError('El importe pagado supera el valor de la compra.')
+        if op.get('monto_pendiente') is not None and moneda(op['monto_pendiente'],'saldo pendiente',permite_cero=True) != pendiente:
+            raise ValueError('El valor de la compra no coincide con lo pagado y lo pendiente.')
+        return pagado, pendiente
+
     # Convención del ciclo simplificado: compra sin condición de crédito, al contado.
     # Mantener el orden original cuando hay varias operaciones el mismo día.
     orden = sorted(operaciones, key=lambda op: fecha(op.get('fecha')) if isinstance(op, dict) else date.min)
@@ -113,6 +129,8 @@ def generar_asientos(datos):
         tipo = op.get('tipo')
         if op.get('igv') not in (None, 0, '0'):
             raise ValueError('El caso incluye IGV explícito. Este ciclo simplificado requiere revisión manual.')
+        if op.get('impuesto') in ('incluido','neto') or op.get('medio_pago') in ('cheque','banco'):
+            raise ValueError('La operación requiere revisar sus impuestos o su cuenta bancaria.')
         if tipo == 'pago_servicios':
             detalles = op.get('detalles')
             if not isinstance(detalles, list) or not detalles:
@@ -127,19 +145,14 @@ def generar_asientos(datos):
         if tipo == 'aporte_efectivo':
             asiento(dia, 'Por el aporte de capital en efectivo', [('10', 'debe', monto), ('50', 'haber', monto)])
         elif tipo == 'compra_mercaderia':
-            pago_compra = op.get('pago') or 'contado'
-            contrapartida = {'contado': '10', 'credito': '42'}.get(pago_compra)
-            if not contrapartida:
-                raise ValueError('La compra debe indicar contado o crédito.')
+            pagado, pendiente = pago_compra(op, monto)
             inventario += monto
-            if pago_compra == 'credito':proveedores.append({'fecha':dia,'saldo':monto})
-            asiento(dia, f'Por la compra de mercaderías al {pago_compra}', [('20', 'debe', monto), (contrapartida, 'haber', monto)])
+            if pendiente:proveedores.append({'fecha':dia,'saldo':pendiente})
+            asiento(dia, 'Por la compra de mercaderías', [('20', 'debe', monto), ('10', 'haber', pagado), ('42','haber',pendiente)])
         elif tipo == 'compra_activo':
-            pago = {'contado': '10', 'credito': '42'}.get(op.get('pago') or 'contado')
-            if not pago:
-                raise ValueError('Falta la forma de pago del activo fijo.')
-            if pago == '42':proveedores.append({'fecha':dia,'saldo':monto})
-            asiento(dia, 'Por la adquisición de activo fijo', [('33', 'debe', monto), (pago, 'haber', monto)])
+            pagado, pendiente = pago_compra(op, monto)
+            if pendiente:proveedores.append({'fecha':dia,'saldo':pendiente})
+            asiento(dia, 'Por la adquisición de activo fijo', [('33', 'debe', monto), ('10', 'haber', pagado), ('42','haber',pendiente)])
             # Solo depreciar si el caso indica vida útil y valor residual.
             if op.get('vida_util_anios') is not None:
                 vida = decimal(op['vida_util_anios'], 'vida útil', Decimal('0.01'))
@@ -150,7 +163,7 @@ def generar_asientos(datos):
                 if inicio < dia:
                     raise ValueError('El inicio de uso no puede preceder a la compra.')
                 activos.append((inicio, monto, vida, residual))
-        elif tipo == 'venta':
+        elif tipo in ('venta','ingreso_servicios'):
             comercial = decimal(op.get('descuento_comercial_porcentaje') or 0, 'descuento comercial')
             if comercial >= 100:raise ValueError('El descuento comercial debe ser menor al 100%.')
             monto = (monto * (1 - comercial / 100)).quantize(CENTIMO, rounding=ROUND_HALF_UP)
@@ -162,7 +175,9 @@ def generar_asientos(datos):
                 if contado > 100:raise ValueError('El porcentaje al contado no puede superar el 100%.')
                 efectivo = (monto * contado / 100).quantize(CENTIMO, rounding=ROUND_HALF_UP)
             credito = monto - efectivo
-            asiento(dia, 'Por la venta de mercaderías', [('10', 'debe', efectivo), ('12', 'debe', credito), ('70', 'haber', monto)])
+            if op.get('monto_pendiente') is not None and moneda(op['monto_pendiente'],'saldo por cobrar',permite_cero=True) != credito:
+                raise ValueError('El ingreso no coincide con lo cobrado y lo pendiente.')
+            asiento(dia, 'Por los servicios prestados' if tipo=='ingreso_servicios' else 'Por la venta de mercaderías', [('10', 'debe', efectivo), ('12', 'debe', credito), ('70', 'haber', monto)])
             if credito:
                 tasa = decimal(op.get('descuento_porcentaje') or 0, 'descuento')
                 if comercial and op.get('descuento_dias') is None:tasa = Decimal('0')
@@ -238,9 +253,9 @@ def generar_asientos(datos):
         if inventario < 0:
             raise ValueError('Las salidas de mercadería superan el inventario disponible.')
 
-    if cierre_inventario is None:
+    if cierre_inventario is None and not sin_inventario:
         raise ValueError('Falta el inventario físico final para calcular el costo de ventas.')
-    costo = inventario - cierre_inventario
+    costo = inventario - (cierre_inventario if cierre_inventario is not None else 0)
     if costo < 0:
         raise ValueError('El inventario final supera las existencias disponibles.')
     if costo:
