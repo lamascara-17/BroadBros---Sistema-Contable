@@ -107,7 +107,7 @@ def exportar_excel_contable(empresa='BroadBros'):
                     cell.fill = PatternFill('solid', fgColor=AZUL if item[2] == 'total' else LILA)
                     cell.font = Font(name='Fira Mono', size=10, bold=True, color='FFFFFF' if item[2] == 'total' else AZUL)
     fila(ws, ['Activo = Pasivo + Patrimonio', ctx['total_activos'], 'Pasivo + Patrimonio', ctx['total_pasivo_patrimonio']], 'subtotal')
-    fila(ws, ['Agrupación por código contable; revise vencimientos especiales.', None, None, None])
+    fila(ws, ['Agrupación por subcategoría, naturaleza del activo y código; revise vencimientos especiales.', None, None, None])
 
     ws = hoja('Estado de Resultados', ['Concepto', 'Importe (S/)'], [80, 24])
     if ctx['nota_resultado']:

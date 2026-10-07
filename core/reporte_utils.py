@@ -79,7 +79,8 @@ def get_reporte_context():
         except ValueError:
             grupo = 0
         if cuenta.tipo == 'activo':
-            (activo_no_corriente if 30 <= grupo <= 39 else activo_corriente).append(item)
+            from .clasificacion import activo_no_corriente as clasificar_activo
+            (activo_no_corriente if clasificar_activo(cuenta.codigo, cuenta.nombre, cuenta.subcategoria) else activo_corriente).append(item)
         elif cuenta.tipo == 'pasivo':
             if cuenta.codigo.startswith('4011') and saldo < 0:
                 activo_corriente.append({'cuenta': cuenta, 'saldo': -saldo})
@@ -107,7 +108,7 @@ def get_reporte_context():
     suma = lambda items: sum((item['saldo'] for item in items), CERO)
     ctx = {'asientos': asientos, 'bal_comp_datos': balance, 'mayor_datos': mayor,
            'fecha_inicio': asientos[0].fecha if asientos else None,
-           'fecha_cierre': asientos[-1].fecha if asientos else None, 'generado_el': timezone.localtime(),
+           'fecha_cierre': max([a.fecha_cierre_ejercicio for a in asientos if a.fecha_cierre_ejercicio] + [asientos[-1].fecha]) if asientos else None, 'generado_el': timezone.localtime(),
            'activo_corriente': activo_corriente, 'activo_no_corriente': activo_no_corriente,
            'pasivo_corriente': pasivo_corriente, 'pasivo_no_corriente': pasivo_no_corriente,
            'patrimonio': patrimonio, **er}

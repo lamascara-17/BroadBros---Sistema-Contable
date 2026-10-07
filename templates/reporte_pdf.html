@@ -36,7 +36,7 @@ th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; 
     <td class="{{ derecha.2 }}">{{ derecha.0|default:'' }}</td><td class="right {{ derecha.2 }}">{% if derecha and derecha.1 != None %}{{ derecha.1|formato_importe }}{% endif %}</td>
 </tr>{% endfor %}</tbody></table>
 <p><strong>Activo {{ total_activos|formato_moneda }} = Pasivo {{ total_pasivos|formato_moneda }} + Patrimonio {{ total_patrimonio_con_resultados|formato_moneda }}</strong></p>
-<p class="nota">Depreciación acumulada presentada como deducción del activo. Clasificación corriente/no corriente por código de cuenta; revise vencimientos especiales.</p>
+<p class="nota">Depreciación acumulada presentada como deducción del activo. Clasificación por subcategoría financiera, naturaleza del activo y código de cuenta; revise vencimientos especiales.</p>
 {% if nota_resultado %}<p class="nota">{{ nota_resultado }}</p>{% endif %}
 
 <div class="break"><p class="marca">BROADBROS / RESULTADOS</p><h1>{{ empresa }}</h1>

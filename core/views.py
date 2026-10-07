@@ -968,10 +968,12 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
 # ─── INGESTA Y REVISIÓN DE CASOS POR IMAGEN ────────────────────────────────────
 
-def guardar_importacion(asientos, limpiar, pendientes=''):
+def guardar_importacion(asientos, limpiar, pendientes='', fecha_cierre=None):
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
     asientos = validar_asientos(serializar_asientos(asientos))
+    if fecha_cierre and fecha_cierre < max(a['fecha'] for a in asientos):
+        raise ValueError('La fecha de cierre es anterior a una operación del ejercicio.')
     with transaction.atomic():
         cuentas = {}
         for item in asientos:
@@ -989,7 +991,8 @@ def guardar_importacion(asientos, limpiar, pendientes=''):
         for numero,item in enumerate(asientos):
             asiento=AsientoContable.objects.create(fecha=item['fecha'],descripcion=item['descripcion'],
                 clase=item['clase'],flujo_efectivo=item['flujo_efectivo'],
-                observaciones_importacion=pendientes if numero==len(asientos)-1 else '')
+                observaciones_importacion=pendientes if numero==len(asientos)-1 else '',
+                fecha_cierre_ejercicio=fecha_cierre if numero==len(asientos)-1 else None)
             Movimiento.objects.bulk_create([Movimiento(asiento=asiento,cuenta=cuentas[m['codigo']],
                 tipo=m['tipo_movimiento'],monto=m['monto']) for m in item['movimientos']])
     return len(asientos)
@@ -1033,7 +1036,8 @@ def finalizar_propuesta(request, payload, revisar=False):
         return mostrar_revision(request, payload)
     try:
         asientos = validar_asientos(borrador['asientos'])
-        cantidad = guardar_importacion(asientos, payload['limpiar'])
+        from .clasificacion import fecha_cierre_del_caso
+        cantidad = guardar_importacion(asientos, payload['limpiar'], fecha_cierre=fecha_cierre_del_caso(payload['datos']))
     except ValueError as exc:
         return mostrar_revision(request, payload, str(exc))
     except Exception:
@@ -1198,7 +1202,8 @@ def revisar_importacion(request):
         payload['borrador']=borrador
         limpiar=request.POST.get('limpiar')=='on' if request.POST.get('elegir_limpieza')=='1' else payload['limpiar']
         payload['limpiar']=limpiar
-        cantidad=guardar_importacion(asientos,limpiar,'; '.join(map(str,pendientes)))
+        from .clasificacion import fecha_cierre_del_caso
+        cantidad=guardar_importacion(asientos,limpiar,'; '.join(map(str,pendientes)), fecha_cierre_del_caso(payload['datos']))
         messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))
         return redirect('libro_diario')
     except ValueError as exc:return mostrar_revision(request,payload,str(exc))

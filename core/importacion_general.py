@@ -44,6 +44,10 @@ reconocimiento de un ingreso con el efectivo realmente cobrado.
 El impuesto a las ganancias registrado es gasto con subcategoria impuesto_ganancias;
 el IGV/IVA por pagar o crédito fiscal no es ese gasto. No calcules renta sin base.
 La depreciación acumulada es una cuenta correctora del activo, no un pasivo.
+Equipos, mobiliario y maquinaria de uso propio son activo no corriente (PCGE 33).
+No les asignes códigos de cuentas por cobrar (12). Usa subcategoria
+activo_no_corriente para bienes de uso propio y activo_corriente para efectivo,
+existencias y créditos de corto plazo. Los equipos adquiridos para vender son existencias.
 Los ingresos financieros y ganancias por medición van en otros ingresos, no en ventas.
 No dupliques gastos por naturaleza y por destino. No generes asientos analíticos
 9/79 ni saldos intermediarios 80-89 salvo que el ejercicio los solicite.
@@ -57,7 +61,7 @@ Devuelve SOLO JSON con esta estructura:
 "fuente":"operación del ejercicio que sustenta el asiento",
 "movimientos":[{"codigo":"código PCGE", "nombre":"nombre de cuenta",
 "tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto",
-"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias",
+"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias|activo_corriente|activo_no_corriente",
 "tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
 No inventes números de documento ni terceros. Los importes deben tener como
@@ -92,6 +96,8 @@ def validar_asientos(asientos):
                 raise ValueError('La clasificación de una cuenta no es válida.')
             if (sub in ('costo_ventas','gasto_operativo','gasto_financiero','otro_gasto','impuesto_ganancias') and tipo != 'gasto') or (sub == 'otro_ingreso' and tipo != 'ingreso'):
                 raise ValueError('La subcategoría no corresponde al tipo de cuenta.')
+            if sub in ('activo_corriente', 'activo_no_corriente') and tipo != 'activo':
+                raise ValueError('La clasificación corriente/no corriente corresponde a cuentas de activo.')
             if lado not in ('debe','haber'): raise ValueError('Indique Debe o Haber en cada línea.')
             firma = (nombre, tipo, sub)
             if codigo in catalogo and catalogo[codigo] != firma:

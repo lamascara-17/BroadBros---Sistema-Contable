@@ -33,6 +33,8 @@ class CuentaContable(models.Model):
         ('otro_ingreso', 'Otro Ingreso'),
         ('otro_gasto', 'Otro Gasto'),
         ('impuesto_ganancias', 'Impuesto a las ganancias'),
+        ('activo_corriente', 'Activo corriente'),
+        ('activo_no_corriente', 'Activo no corriente'),
     ]
 
     codigo = models.CharField(max_length=20, unique=True, verbose_name='Código')
@@ -43,7 +45,7 @@ class CuentaContable(models.Model):
         choices=SUBCATEGORIA_CHOICES,
         blank=True,
         default='',
-        verbose_name='Subcategoría (EE.RR.)'
+        verbose_name='Subcategoría financiera'
     )
 
     class Meta:
@@ -66,6 +68,7 @@ class AsientoContable(models.Model):
     Agrupa uno o más movimientos que deben estar balanceados (Debe == Haber).
     """
     fecha = models.DateField(verbose_name='Fecha')
+    fecha_cierre_ejercicio = models.DateField(null=True, blank=True, verbose_name='Fecha de cierre del ejercicio')
     CLASE_CHOICES=[('operacion','Operación o ajuste'),('apertura','Saldo de apertura'),('cierre','Cierre de resultados')]
     FLUJO_CHOICES=[('pendiente','Pendiente de clasificar'),('operacion','Operación'),('inversion','Inversión'),('financiacion','Financiación')]
     clase=models.CharField(max_length=12,choices=CLASE_CHOICES,default='operacion')
