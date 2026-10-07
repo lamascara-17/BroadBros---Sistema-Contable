@@ -32,14 +32,16 @@ iguales, con ajuste de céntimos en la última; informa ese supuesto.
 Una apertura sin fecha explícita puede usar la primera fecha escrita de las
 operaciones, como convención declarada. Si no hay ninguna fecha, déjala pendiente.
 No crees asientos para contenidos ajenos a contabilidad.
-Devuelve SOLO JSON con esta estructura:
-{"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa",
-"fuente":"operación del ejercicio que sustenta el asiento",
-"movimientos":[{"codigo":"código PCGE", "nombre":"nombre de cuenta",
-"tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto",
-"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto",
-"tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
+Devuelve SOLO JSON compacto con esta estructura:
+{"cuentas":{"codigo PCGE":["nombre de cuenta","activo|pasivo|patrimonio|ingreso|gasto","|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto"]},
+"asientos":[{"fecha":"YYYY-MM-DD o null si falta","descripcion":"glosa breve",
+"fuente":"referencia breve a la operación del enunciado",
+"movimientos":[["codigo PCGE","debe|haber","importe decimal o null"]]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
+Define cada cuenta una sola vez en cuentas. Cada movimiento referencia su código;
+no repitas su nombre ni clasificación. Usa glosas y referencias breves, sin
+copiar el enunciado ni explicar los cálculos. Incluye TODAS las operaciones
+resolubles y los ajustes respaldados por el caso. No omitas asientos para ahorrar texto.
 No inventes números de documento ni terceros. Los importes deben tener como
 máximo dos decimales. Cada asiento propuesto debe cuadrar exactamente.
 Estos asientos son un borrador que el usuario revisa antes de guardar.'''
@@ -116,6 +118,29 @@ def normalizar_borrador(datos):
     return {'asientos':borrador, **notas}
 
 
+def expandir_propuesta(propuesta):
+    """Expande el formato compacto antes de aplicar las validaciones habituales."""
+    if not isinstance(propuesta,dict) or 'cuentas' not in propuesta:return propuesta
+    cuentas=propuesta['cuentas']
+    if not isinstance(cuentas,dict) or not isinstance(propuesta.get('asientos'),list):
+        raise ValueError('La propuesta compacta no contiene cuentas y asientos válidos.')
+    resultado={**propuesta,'asientos':[]}
+    for a in propuesta['asientos']:
+        if not isinstance(a,dict) or not isinstance(a.get('movimientos'),list):
+            raise ValueError('La propuesta compacta contiene un asiento inválido.')
+        movimientos=[]
+        for m in a['movimientos']:
+            if not isinstance(m,list) or len(m)!=3 or not isinstance(m[0],str):
+                raise ValueError('La propuesta compacta contiene un movimiento inválido.')
+            cuenta=cuentas.get(m[0])
+            if not isinstance(cuenta,list) or len(cuenta)!=3:
+                raise ValueError('La propuesta referencia una cuenta sin definición válida.')
+            movimientos.append({'codigo':m[0],'nombre':cuenta[0],'tipo_cuenta':cuenta[1],
+                                'subcategoria':cuenta[2],'tipo_movimiento':m[1],'monto':m[2]})
+        resultado['asientos'].append({**a,'movimientos':movimientos})
+    return resultado
+
+
 def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     key = getattr(settings,'GROQ_API_KEY','')
     if not key: raise ValueError('Configure GROQ_API_KEY para preparar la revisión general.')
@@ -124,12 +149,14 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str,separators=(',',':'))
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)
+    modelo=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b')
+    opciones={'reasoning_effort':'low'} if modelo.startswith('openai/gpt-oss') else {}
     respuesta = solicitar_json(client,
-        model=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b'),
+        model=modelo,
         messages=[{'role':'system','content':PROMPT_GENERAL},{'role':'user','content':contenido}],
-        temperature=0,response_format={'type':'json_object'},max_completion_tokens=4096)
+        temperature=0,response_format={'type':'json_object'},max_completion_tokens=4096,**opciones)
     choice=respuesta.choices[0]
     if choice.finish_reason != 'stop': raise ValueError('La propuesta quedó incompleta; no se guardó ningún asiento.')
     try: propuesta=leer_json(choice.message.content)
     except (ValueError,TypeError):raise ValueError('La propuesta no contiene JSON válido.') from None
-    return normalizar_borrador(propuesta)
+    return normalizar_borrador(expandir_propuesta(propuesta))

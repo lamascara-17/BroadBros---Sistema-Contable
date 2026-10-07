@@ -94,6 +94,19 @@ class DistribuidoraTests(TestCase):
         self.assertEqual(saldos['70'],-38000)
         self.assertEqual(saldos['69'],17000)
 
+    def test_formato_compacto_conserva_los_doce_asientos_del_caso(self):
+        from .importacion_general import serializar_asientos, normalizar_borrador, expandir_propuesta
+        completo={'asientos':serializar_asientos(generar_asientos(caso_andina())),'pendientes':[],'supuestos':[]}
+        compacto=deepcopy(completo)
+        compacto['cuentas']={}
+        for a in compacto['asientos']:
+            lineas=[]
+            for m in a['movimientos']:
+                compacto['cuentas'][m['codigo']]=[m['nombre'],m['tipo_cuenta'],m['subcategoria']]
+                lineas.append([m['codigo'],m['tipo_movimiento'],m['monto']])
+            a['movimientos']=lineas
+        self.assertEqual(normalizar_borrador(expandir_propuesta(compacto)),normalizar_borrador(completo))
+
     def test_importes_inconsistentes_y_referencias_ambiguas_se_rechazan(self):
         cambios=[lambda d:d['operaciones'][4].update(monto_contado='32000'),
                  lambda d:d['operaciones'][7].update(monto='10001'),

@@ -55,8 +55,27 @@ class ValidadorGeneralTests(SimpleTestCase):
             borrador=proponer_caso_general(datos_generales(),'18','El retiro fue de 100.')
             parametros=groq.return_value.chat.completions.create.call_args.kwargs
             self.assertIn('El retiro fue de 100.',parametros['messages'][1]['content'])
+            self.assertEqual(parametros['reasoning_effort'],'low')
             self.assertEqual(borrador['pendientes'],propuesta()['pendientes'])
             groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
+            with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
+
+    @override_settings(GROQ_API_KEY='test-key')
+    def test_catalogo_compacto_conserva_importes_cuentas_y_cuadre(self):
+        original=propuesta()
+        compacto=deepcopy(original)
+        compacto['cuentas']={}
+        for a in compacto['asientos']:
+            lineas=[]
+            for m in a['movimientos']:
+                compacto['cuentas'][m['codigo']]=[m['nombre'],m['tipo_cuenta'],m['subcategoria']]
+                lineas.append([m['codigo'],m['tipo_movimiento'],m['monto']])
+            a['movimientos']=lineas
+        with patch('core.importacion_general.Groq') as groq:
+            groq.return_value.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(compacto)))])
+            self.assertEqual(proponer_caso_general(datos_generales(),'18'),normalizar_borrador(original))
+            compacto['cuentas'].pop('1041')
+            groq.return_value.chat.completions.create.return_value.choices[0].message.content=json.dumps(compacto)
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
 
     @override_settings(GROQ_API_KEY='test-key')
