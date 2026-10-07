@@ -5,7 +5,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from groq import Groq
 from django.conf import settings
 from .ciclo_contable import generar_asientos
-from .servicio_ia import solicitar_json, leer_json
+from .servicio_ia import solicitar_json, leer_json, LimiteSalidaTokens
 
 PROMPT_LECTURA = """
 Transcribe todas las operaciones del ejercicio de la imagen completa.
@@ -135,11 +135,24 @@ def extraer_operaciones(imagen_file, api_key=None):
         raise ValueError('Configure GROQ_API_KEY para utilizar la lectura de imágenes.')
     contenido = [{'type': 'text', 'text': PROMPT_LECTURA}] + preparar_imagenes(imagen_file)
     client = Groq(api_key=key, timeout=90, max_retries=1)
-    respuesta = solicitar_json(client,
-        model=getattr(settings, 'GROQ_VISION_MODEL', 'qwen/qwen3.8-27b'),
-        messages=[{'role': 'user', 'content': contenido}],
-        temperature=0, max_completion_tokens=8192, response_format={'type': 'json_object'},
-    )
+    modelo=getattr(settings, 'GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')
+    try:
+        respuesta = solicitar_json(client,
+            model=modelo,
+            messages=[{'role': 'user', 'content': contenido}],
+            temperature=0, max_completion_tokens=8192, response_format={'type': 'json_object'},
+        )
+    except LimiteSalidaTokens as exc:
+        # Ante un presupuesto de salida insuficiente, conservar la transcripción
+        # en lugar de intentar encajar operaciones completas en un JSON truncado.
+        instrucciones='Transcribe literalmente todo el enunciado contable de la imagen. Incluye fechas, importes y condiciones. No calcules ni generes JSON, asientos o explicaciones. No resumas. Marca lo ilegible como [ilegible].'
+        opciones={'reasoning_effort':'none'} if modelo=='qwen/qwen3.8-27b' else {}
+        respuesta=solicitar_json(client,model=modelo,temperature=0,max_completion_tokens=min(exc.limite,1000),
+            messages=[{'role':'user','content':[{'type':'text','text':instrucciones}]+contenido[1:]}],**opciones)
+        opcion=respuesta.choices[0]
+        texto=(opcion.message.content or '').strip()
+        if not texto:raise ValueError('Groq no devolvió una lectura para conservar. Intente más tarde.')
+        return {'operaciones':[],'texto_leido':texto,'lectura_incompleta':opcion.finish_reason!='stop'}
     opcion = respuesta.choices[0]
     if opcion.finish_reason != 'stop':
         raise ValueError('La lectura quedó incompleta. No se guardaron operaciones parciales.')

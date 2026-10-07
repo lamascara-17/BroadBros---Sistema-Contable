@@ -1,9 +1,16 @@
 """Errores del proveedor sin exponer credenciales ni contenido del ejercicio."""
 import json
 import logging
+import re
 from groq import APIConnectionError, APIStatusError, APITimeoutError
 
 logger = logging.getLogger(__name__)
+
+
+class LimiteSalidaTokens(ValueError):
+    def __init__(self, limite):
+        self.limite = limite
+        super().__init__(f'La solicitud supera el límite de salida de Groq ({limite} tokens). No se guardó ningún asiento.')
 
 
 def solicitar_json(client, **parametros):
@@ -24,6 +31,13 @@ def solicitar_json(client, **parametros):
         raise ValueError('No se pudo conectar con Groq. Intente nuevamente; no se guardó ningún asiento.') from None
     except APIStatusError as exc:
         logger.warning('Fallo de Groq: estado=%s modelo=%s', exc.status_code, parametros.get('model'))
+        cuerpo=exc.body if isinstance(exc.body,dict) else {}
+        error=cuerpo.get('error',cuerpo)
+        texto=str(error.get('message','')) if isinstance(error,dict) else ''
+        limite=re.search(r'\bLimit\s*[:=]?\s*([\d,]+)',texto,re.I)
+        if exc.status_code in (400,429) and 'request too large' in texto.lower() and ('OTPM' in texto.upper() or 'output tokens per minute' in texto.lower()) and limite:
+            cantidad=int(limite.group(1).replace(',',''))
+            if cantidad>0:raise LimiteSalidaTokens(cantidad) from None
         mensajes = {
             401: 'La clave de Groq no es válida. Actualice GROQ_API_KEY en el servicio de Render.',
             403: 'La cuenta de Groq no tiene permiso para utilizar el modelo configurado.',
