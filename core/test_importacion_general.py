@@ -56,6 +56,8 @@ class ValidadorGeneralTests(SimpleTestCase):
             parametros=groq.return_value.chat.completions.create.call_args.kwargs
             self.assertIn('El retiro fue de 100.',parametros['messages'][1]['content'])
             self.assertEqual(parametros['reasoning_effort'],'low')
+            self.assertEqual(parametros['response_format']['type'],'json_schema')
+            self.assertIs(parametros['response_format']['json_schema']['strict'],True)
             self.assertEqual(borrador['pendientes'],propuesta()['pendientes'])
             groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
@@ -77,6 +79,25 @@ class ValidadorGeneralTests(SimpleTestCase):
             compacto['cuentas'].pop('1041')
             groq.return_value.chat.completions.create.return_value.choices[0].message.content=json.dumps(compacto)
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')
+
+    def test_nuevo_catalogo_y_asientos_anteriores_conservan_datos(self):
+        from .importacion_general import expandir_propuesta
+        original=propuesta()
+        compacto=deepcopy(original)
+        compacto['cuentas']=[]
+        for a in compacto['asientos']:
+            lineas=[]
+            for m in a['movimientos']:
+                compacto['cuentas'].append({k:m[k] for k in ('codigo','nombre','tipo_cuenta','subcategoria')})
+                lineas.append({k:m[k] for k in ('codigo','tipo_movimiento','monto')})
+            a['movimientos']=lineas
+        self.assertEqual(normalizar_borrador(expandir_propuesta(compacto)),normalizar_borrador(original))
+        a=compacto['asientos'][0]
+        compacto['asientos']=[[a['fecha'],a['descripcion'],a['fuente'],a['movimientos']]]
+        self.assertEqual(normalizar_borrador(expandir_propuesta(compacto)),normalizar_borrador(original))
+        compacto['cuentas'].append({**compacto['cuentas'][0],'tipo_cuenta':'gasto'})
+        with self.assertRaisesMessage(ValueError,'incompatibles'):
+            expandir_propuesta(compacto)
 
     @override_settings(GROQ_API_KEY='test-key')
     def test_lectura_de_apertura_sin_operaciones_no_se_rechaza(self):

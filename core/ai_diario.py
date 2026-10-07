@@ -158,7 +158,7 @@ def extraer_operaciones(imagen_file, api_key=None):
     if not key:
         raise ValueError('Configure GROQ_API_KEY para utilizar la lectura de imágenes.')
     contenido = [{'type': 'text', 'text': PROMPT_TRANSCRIPCION}] + preparar_imagenes(imagen_file)
-    client = Groq(api_key=key, timeout=90, max_retries=1)
+    client = Groq(api_key=key, timeout=25, max_retries=0)
     modelo_vision = getattr(settings, 'GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')
     parametros_vision = {'model': modelo_vision, 'messages': [{'role': 'user', 'content': contenido}],
                          'temperature': 0, 'max_completion_tokens': 1000}
@@ -179,7 +179,7 @@ def extraer_operaciones_texto(texto, api_key=None, client=None):
     if len(texto)>20000:raise ValueError('El enunciado supera los 20 000 caracteres permitidos.')
     key = api_key or getattr(settings, 'GROQ_API_KEY', '')
     if not key:raise ValueError('Configure GROQ_API_KEY para analizar el ejercicio.')
-    client = client or Groq(api_key=key, timeout=90, max_retries=1)
+    client = client or Groq(api_key=key, timeout=25, max_retries=0)
     modelo_texto = getattr(settings, 'GROQ_TEXT_MODEL', 'openai/gpt-oss-20b')
     parametros_texto = {'model': modelo_texto, 'messages': [
         {'role': 'system', 'content': PROMPT_LECTURA},

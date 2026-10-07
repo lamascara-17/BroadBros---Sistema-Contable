@@ -1060,6 +1060,12 @@ def cargar_texto_diario(request):
 
 
 def cargar_caso_contable(request, origen):
+    from .servicio_ia import presupuesto_ia
+    with presupuesto_ia():
+        return procesar_caso_contable(request, origen)
+
+
+def procesar_caso_contable(request, origen):
     plantilla='cargar_texto_diario.html' if origen=='texto' else 'cargar_imagen_diario.html'
     ruta='cargar_texto_diario' if origen=='texto' else 'cargar_imagen_diario'
     texto=request.POST.get('texto_caso','').strip()
@@ -1149,6 +1155,12 @@ def cargar_caso_contable(request, origen):
 
 
 def revisar_importacion(request):
+    from .servicio_ia import presupuesto_ia
+    with presupuesto_ia():
+        return procesar_revision_importacion(request)
+
+
+def procesar_revision_importacion(request):
     from django.core import signing
     from .importacion_general import proponer_caso_general, normalizar_borrador
     if request.method!='POST':return redirect('cargar_imagen_diario')

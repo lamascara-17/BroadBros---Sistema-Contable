@@ -2,22 +2,43 @@
 import json
 import logging
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
+from time import monotonic
 from groq import APIConnectionError, APIStatusError, APITimeoutError
 
 logger = logging.getLogger(__name__)
+_plazo = ContextVar('plazo_analisis', default=None)
+
+
+@contextmanager
+def presupuesto_ia(segundos=75):
+    token = _plazo.set(monotonic() + segundos)
+    try:
+        yield
+    finally:
+        _plazo.reset(token)
+
+
+def completar(client, parametros):
+    plazo = _plazo.get()
+    restante = plazo - monotonic() if plazo is not None else 25
+    if restante <= 0:
+        raise ValueError('El análisis alcanzó su tiempo límite. Reintente con la lectura conservada; no se guardó ningún asiento.')
+    return client.chat.completions.create(**parametros, timeout=min(25, restante))
 
 
 def solicitar_json(client, **parametros):
     try:
         try:
-            return client.chat.completions.create(**parametros)
+            return completar(client, parametros)
         except APIStatusError as exc:
             cuerpo = exc.body if isinstance(exc.body, dict) else {}
             error = cuerpo.get('error', cuerpo)
-            if exc.status_code == 400 and isinstance(error, dict) and error.get('code') == 'json_validate_failed' and 'response_format' in parametros:
+            if exc.status_code == 400 and isinstance(error, dict) and error.get('code') == 'json_validate_failed' and parametros.get('response_format',{}).get('type') == 'json_object':
                 alternativos = dict(parametros)
                 alternativos.pop('response_format', None)
-                return client.chat.completions.create(**alternativos)
+                return completar(client, alternativos)
             raise
     except APITimeoutError:
         raise ValueError('Groq tardó demasiado en responder. Intente nuevamente; no se guardó ningún asiento.') from None

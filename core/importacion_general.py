@@ -33,12 +33,12 @@ Una apertura sin fecha explícita puede usar la primera fecha escrita de las
 operaciones, como convención declarada. Si no hay ninguna fecha, déjala pendiente.
 No crees asientos para contenidos ajenos a contabilidad.
 Devuelve SOLO JSON compacto con esta estructura:
-{"cuentas":{"codigo PCGE":["nombre de cuenta","activo|pasivo|patrimonio|ingreso|gasto","|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto"]},
+{"cuentas":[{"codigo":"PCGE","nombre":"nombre de cuenta","tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto","subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto"}],
 "asientos":[{"fecha":"YYYY-MM-DD o null si falta","descripcion":"glosa breve",
 "fuente":"referencia breve a la operación del enunciado",
-"movimientos":[["codigo PCGE","debe|haber","importe decimal o null"]]}],
+"movimientos":[{"codigo":"PCGE","tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
-Define cada cuenta una sola vez en cuentas. Cada movimiento referencia su código;
+Define cada cuenta una sola vez. Cada movimiento referencia su código;
 no repitas su nombre ni clasificación. Usa glosas y referencias breves, sin
 copiar el enunciado ni explicar los cálculos. Incluye TODAS las operaciones
 resolubles y los ajustes respaldados por el caso. No omitas asientos para ahorrar texto.
@@ -118,25 +118,56 @@ def normalizar_borrador(datos):
     return {'asientos':borrador, **notas}
 
 
+def objeto_esquema(propiedades):
+    return {'type':'object','properties':propiedades,'required':list(propiedades),'additionalProperties':False}
+
+
+TEXTO_ESQUEMA={'type':'string'}
+CUENTA_ESQUEMA=objeto_esquema({'codigo':TEXTO_ESQUEMA,'nombre':TEXTO_ESQUEMA,
+    'tipo_cuenta':{'type':'string','enum':['activo','pasivo','patrimonio','ingreso','gasto']},
+    'subcategoria':{'type':'string','enum':['','costo_ventas','gasto_operativo','gasto_financiero','otro_ingreso','otro_gasto']}})
+MOVIMIENTO_ESQUEMA=objeto_esquema({'codigo':TEXTO_ESQUEMA,
+    'tipo_movimiento':{'type':'string','enum':['debe','haber']},'monto':{'type':['string','null']}})
+ASIENTO_ESQUEMA=objeto_esquema({'fecha':{'type':['string','null']},'descripcion':TEXTO_ESQUEMA,
+    'fuente':TEXTO_ESQUEMA,'movimientos':{'type':'array','items':MOVIMIENTO_ESQUEMA}})
+ESQUEMA_PROPUESTA=objeto_esquema({'cuentas':{'type':'array','items':CUENTA_ESQUEMA},
+    'asientos':{'type':'array','items':ASIENTO_ESQUEMA},
+    'pendientes':{'type':'array','items':TEXTO_ESQUEMA},'supuestos':{'type':'array','items':TEXTO_ESQUEMA}})
+
+
 def expandir_propuesta(propuesta):
-    """Expande el formato compacto antes de aplicar las validaciones habituales."""
+    """Expande el catálogo sin adivinar cuentas, importes ni contrapartidas."""
     if not isinstance(propuesta,dict) or 'cuentas' not in propuesta:return propuesta
     cuentas=propuesta['cuentas']
+    if isinstance(cuentas,list):
+        catalogo={}
+        for c in cuentas:
+            if not isinstance(c,dict) or not isinstance(c.get('codigo'),str):
+                raise ValueError('El catálogo contiene una cuenta inválida.')
+            definicion=[c.get('nombre'),c.get('tipo_cuenta'),c.get('subcategoria')]
+            if c['codigo'] in catalogo and catalogo[c['codigo']]!=definicion:
+                raise ValueError('Una cuenta tiene dos definiciones incompatibles.')
+            catalogo[c['codigo']]=definicion
+        cuentas=catalogo
     if not isinstance(cuentas,dict) or not isinstance(propuesta.get('asientos'),list):
         raise ValueError('La propuesta compacta no contiene cuentas y asientos válidos.')
     resultado={**propuesta,'asientos':[]}
     for a in propuesta['asientos']:
+        # Compatibilidad con propuestas anteriores conservadas en una revisión.
+        if isinstance(a,list) and len(a) in (3,4):
+            a={'fecha':a[0],'descripcion':a[1],'fuente':a[2] if len(a)==4 else '', 'movimientos':a[-1]}
         if not isinstance(a,dict) or not isinstance(a.get('movimientos'),list):
             raise ValueError('La propuesta compacta contiene un asiento inválido.')
         movimientos=[]
         for m in a['movimientos']:
-            if not isinstance(m,list) or len(m)!=3 or not isinstance(m[0],str):
+            if isinstance(m,list) and len(m)==3:m={'codigo':m[0],'tipo_movimiento':m[1],'monto':m[2]}
+            if not isinstance(m,dict) or not isinstance(m.get('codigo'),str):
                 raise ValueError('La propuesta compacta contiene un movimiento inválido.')
-            cuenta=cuentas.get(m[0])
+            cuenta=cuentas.get(m['codigo'])
             if not isinstance(cuenta,list) or len(cuenta)!=3:
                 raise ValueError('La propuesta referencia una cuenta sin definición válida.')
-            movimientos.append({'codigo':m[0],'nombre':cuenta[0],'tipo_cuenta':cuenta[1],
-                                'subcategoria':cuenta[2],'tipo_movimiento':m[1],'monto':m[2]})
+            movimientos.append({'codigo':m['codigo'],'nombre':cuenta[0],'tipo_cuenta':cuenta[1],
+                                'subcategoria':cuenta[2],'tipo_movimiento':m.get('tipo_movimiento'),'monto':m.get('monto')})
         resultado['asientos'].append({**a,'movimientos':movimientos})
     return resultado
 
@@ -148,13 +179,14 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     contenido = json.dumps({'ejercicio':ejercicio,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str,separators=(',',':'))
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
-    client = Groq(api_key=key,timeout=90,max_retries=1)
+    client = Groq(api_key=key,timeout=25,max_retries=0)
     modelo=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b')
     opciones={'reasoning_effort':'low'} if modelo.startswith('openai/gpt-oss') else {}
+    formato={'type':'json_schema','json_schema':{'name':'propuesta_contable','strict':True,'schema':ESQUEMA_PROPUESTA}} if modelo in ('openai/gpt-oss-20b','openai/gpt-oss-120b','qwen/qwen3.8-27b') else {'type':'json_object'}
     respuesta = solicitar_json(client,
         model=modelo,
         messages=[{'role':'system','content':PROMPT_GENERAL},{'role':'user','content':contenido}],
-        temperature=0,response_format={'type':'json_object'},max_completion_tokens=4096,**opciones)
+        temperature=0,response_format=formato,max_completion_tokens=4096,**opciones)
     choice=respuesta.choices[0]
     if choice.finish_reason != 'stop': raise ValueError('La propuesta quedó incompleta; no se guardó ningún asiento.')
     try: propuesta=leer_json(choice.message.content)
