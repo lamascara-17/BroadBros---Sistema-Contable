@@ -119,14 +119,15 @@ def normalizar_borrador(datos):
 def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     key = getattr(settings,'GROQ_API_KEY','')
     if not key: raise ValueError('Configure GROQ_API_KEY para preparar la revisión general.')
-    contenido = json.dumps({'ejercicio':datos,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
-                            'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str)
+    ejercicio = {'texto_leido':datos['texto_leido']} if datos.get('texto_leido') else datos
+    contenido = json.dumps({'ejercicio':ejercicio,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
+                            'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str,separators=(',',':'))
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)
     respuesta = solicitar_json(client,
         model=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b'),
         messages=[{'role':'system','content':PROMPT_GENERAL},{'role':'user','content':contenido}],
-        temperature=0,response_format={'type':'json_object'},max_completion_tokens=16384)
+        temperature=0,response_format={'type':'json_object'},max_completion_tokens=4096)
     choice=respuesta.choices[0]
     if choice.finish_reason != 'stop': raise ValueError('La propuesta quedó incompleta; no se guardó ningún asiento.')
     try: propuesta=leer_json(choice.message.content)

@@ -99,7 +99,7 @@ class ReglasCicloTests(SimpleTestCase):
         self.assertNotIn('response_format',vision)
         self.assertEqual(extraccion['model'],'openai/gpt-oss-20b')
         self.assertEqual(extraccion['messages'][1]['content'],texto)
-        self.assertEqual(extraccion['max_completion_tokens'],8192)
+        self.assertEqual(extraccion['max_completion_tokens'],4096)
         crear.reset_mock();crear.side_effect=[respuesta('Texto cortado','length')]
         with self.assertRaises(ValueError):extraer_operaciones(imagen())
         self.assertEqual(crear.call_count,1)

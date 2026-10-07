@@ -37,7 +37,7 @@ def solicitar_json(client, **parametros):
             401: 'La clave de Groq no es válida. Actualice GROQ_API_KEY en el servicio de Render.',
             403: 'La cuenta de Groq no tiene permiso para utilizar el modelo configurado.',
             404: 'El modelo configurado no está disponible. Revise GROQ_VISION_MODEL y GROQ_TEXT_MODEL en Render.',
-            413: 'La imagen excede el tamaño permitido por Groq. Reduzca su tamaño.',
+            413: 'La solicitud de análisis excede el tamaño o la cantidad de tokens permitidos por Groq.',
             429: 'Groq alcanzó su límite de uso. Espere antes de volver a intentar; si continúa, revise la cuota de la cuenta.',
             400: 'Groq rechazó la solicitud. Revise el modelo configurado y sus límites de imágenes y tokens.',
         }

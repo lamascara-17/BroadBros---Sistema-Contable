@@ -38,6 +38,7 @@
 </div>
 <p id="image-selection" class="image-selection" role="status">JPG, PNG o WEBP · Hasta 20 MB</p>
 <button type="submit" class="btn btn-primary" style="width:100%;">Leer imagen</button>
+<a href="{% url 'cargar_texto_diario' %}" style="display:block;text-align:center;margin-top:16px;">Ingresar el caso como texto</a>
 </form>
 <noscript><style>.image-options{display:none;}#imagen-caso,#foto-camara{display:block!important;}</style><p>Selecciona una imagen en uno de los campos y pulsa Leer imagen.</p></noscript>
 </div></div>
@@ -52,18 +53,7 @@
 <video id="camera-preview" class="camera-preview" autoplay muted playsinline></video>
 <div class="tax-actions"><button id="capture-photo" type="button" class="btn btn-primary" disabled>Usar foto</button><button id="native-camera" type="button" class="btn btn-secondary">Cámara del teléfono</button><button id="close-camera" type="button" class="btn btn-secondary">Cancelar</button></div>
 </dialog>
-{% if lectura_token %}
-<dialog id="tax-dialog" class="tax-dialog" open aria-labelledby="tax-title" aria-describedby="tax-description">
-<h3 id="tax-title">Tasa de IGV / IVA</h3>
-<p id="tax-description">El ejercicio indica operaciones con impuesto, pero no especifica su tasa. ¿Qué porcentaje corresponde?</p>
-{% if error_tasa %}<p class="message message-error" role="alert">{{ error_tasa }}</p>{% endif %}
-<form method="post">{% csrf_token %}
-<input type="hidden" name="lectura_token" value="{{ lectura_token }}">
-<label for="tasa-impuesto">Porcentaje (%)</label>
-<input id="tasa-impuesto" name="tasa_impuesto" type="number" min="0" max="100" step="0.01" required autofocus placeholder="Ej. 18" value="{{ tasa_ingresada }}">
-<div class="tax-actions"><button class="btn btn-primary" type="submit">Continuar</button><a class="btn btn-secondary" href="{% url 'cargar_imagen_diario' %}">Cancelar</a></div>
-</form></dialog>
-{% endif %}
+{% include 'tasa_importacion.html' %}
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>

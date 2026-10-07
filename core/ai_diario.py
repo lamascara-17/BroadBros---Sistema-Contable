@@ -4,7 +4,7 @@ from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
 from groq import Groq
 from django.conf import settings
-from .ciclo_contable import generar_asientos
+from .ciclo_contable import generar_asientos, normalizar_aportes
 from .servicio_ia import solicitar_json, leer_json
 
 PROMPT_TRANSCRIPCION = """Transcribe literalmente el enunciado contable de la imagen.
@@ -56,6 +56,15 @@ Tipos y campos:
 - donacion_mercaderia: monto de la donación recibida.
 - perdida_mercaderia: monto de pérdida por siniestro.
 - sueldos_pendientes: monto pendiente de pago.
+- sueldos_mixtos: monto TOTAL del gasto, monto_pagado y monto_pendiente escritos.
+  No registres solo el saldo pendiente si también se pagó parte del sueldo.
+- pago_proveedor: monto pagado por una compra a crédito; fecha_compra solo si indicada.
+- venta: descuento_comercial_porcentaje si se aplica al precio de lista en la venta.
+  monto es el precio de lista, monto_contado es el importe de efectivo escrito.
+  NO confundas descuento comercial con descuento por pronto pago ni calcules
+  porcentaje_contado cuando se proporciona un importe de efectivo.
+- cobro_factura: si no aparece fecha_factura, usa null, sin inventar fecha.
+  El monto de un pago parcial del cliente es el importe efectivamente cobrado.
 - pago_servicios: monto total SOLO si escrito; si no, null.
   detalles = [{"concepto":"alquiler, luz, agua u otro texto", "monto":importe escrito}].
 - inventario_final: monto del inventario físico (puede ser cero), fecha de cierre.
@@ -68,6 +77,12 @@ Tipos y campos:
   No la omitas ni la marques como ilegible por no pertenecer a los tipos anteriores.
   Se analizará en la revisión general. Una fecha o importe realmente ausente
   puede ser null; especifica el dato faltante en errores_lectura y conserva el resto.
+
+Los aportes de los socios para iniciar operaciones son aporte_efectivo en su
+fecha: empresa_nueva=true, saldos_apertura=[] e inventario_inicial=null.
+No fabriques apertura de caja y capital con ese aporte ni lo dupliques.
+"Sin valor residual" significa residual_porcentaje=0. Si se usa el mismo día,
+fecha_inicio_uso es la fecha de adquisición.
 
 En casos con apertura, el párrafo "presenta el siguiente inventario" es el
 estado inicial, no un inventario físico de mercadería ni un aporte nuevo.
@@ -155,11 +170,21 @@ def extraer_operaciones(imagen_file, api_key=None):
     texto = str(transcripcion.message.content or '').strip()
     if not texto:
         raise ValueError('No se pudo transcribir el ejercicio. Use una imagen más nítida.')
+    return extraer_operaciones_texto(texto, api_key=key, client=client)
+
+
+def extraer_operaciones_texto(texto, api_key=None, client=None):
+    texto = str(texto or '').strip()
+    if not texto:raise ValueError('Escriba el enunciado del ejercicio.')
+    if len(texto)>20000:raise ValueError('El enunciado supera los 20 000 caracteres permitidos.')
+    key = api_key or getattr(settings, 'GROQ_API_KEY', '')
+    if not key:raise ValueError('Configure GROQ_API_KEY para analizar el ejercicio.')
+    client = client or Groq(api_key=key, timeout=90, max_retries=1)
     modelo_texto = getattr(settings, 'GROQ_TEXT_MODEL', 'openai/gpt-oss-20b')
     parametros_texto = {'model': modelo_texto, 'messages': [
         {'role': 'system', 'content': PROMPT_LECTURA},
         {'role': 'user', 'content': texto}],
-        'temperature': 0, 'max_completion_tokens': 8192, 'response_format': {'type': 'json_object'}}
+        'temperature': 0, 'max_completion_tokens': 4096, 'response_format': {'type': 'json_object'}}
     if modelo_texto.startswith('openai/gpt-oss'):
         parametros_texto['reasoning_effort'] = 'low'
     respuesta = solicitar_json(client, **parametros_texto)
@@ -173,7 +198,7 @@ def extraer_operaciones(imagen_file, api_key=None):
     if not isinstance(datos, dict) or not isinstance(datos.get('operaciones'), list):
         raise ValueError('La lectura no contiene una lista de operaciones.')
     datos['texto_leido'] = texto
-    return datos
+    return normalizar_aportes(datos)
 
 
 def interpretar_caso_imagen(imagen_file, api_key=None, tasa_impuesto='18'):

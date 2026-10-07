@@ -48,6 +48,20 @@ def fecha(valor):
         raise ValueError(f'Fecha ilegible o inválida: {valor}.') from None
 
 
+def normalizar_aportes(datos):
+    operaciones = datos.get('operaciones', [])
+    if datos.get('empresa_nueva') is True and datos.get('saldos_apertura'):
+        if not isinstance(operaciones,list) or any(not isinstance(op,dict) for op in operaciones):return datos
+        aportes = [op for op in operaciones if op.get('tipo') == 'aporte_efectivo']
+        saldos = datos['saldos_apertura']
+        # Quitar únicamente una duplicación comprobable del mismo aporte.
+        if isinstance(saldos,list) and all(isinstance(x,dict) for x in saldos) and len(aportes) == 1 and len(saldos) == 2 and {x.get('concepto') for x in saldos} == {'caja', 'capital'}:
+            importe = moneda(aportes[0].get('monto'))
+            if all(moneda(x.get('monto')) == importe for x in saldos):
+                datos = {**datos, 'saldos_apertura': []}
+    return datos
+
+
 def generar_asientos(datos):
     """Genera operaciones y ajustes sin deducir importes mediante un modelo."""
     if not isinstance(datos, dict) or datos.get('errores_lectura'):
@@ -55,6 +69,7 @@ def generar_asientos(datos):
     operaciones = datos.get('operaciones')
     if not isinstance(operaciones, list) or not operaciones:
         raise ValueError('No se identificaron operaciones en la imagen.')
+    datos = normalizar_aportes(datos)
     if datos.get('saldos_apertura'):
         from .ciclo_documentado import generar_ciclo_documentado
         return generar_ciclo_documentado(datos)
@@ -67,7 +82,7 @@ def generar_asientos(datos):
     inventario = moneda(inicial, 'inventario inicial', permite_cero=True)
     if inventario:
         raise ValueError('El caso contiene inventario inicial. Se requieren saldos de apertura completos; use el registro manual para este caso.')
-    asientos, activos, facturas = [], [], []
+    asientos, activos, facturas, proveedores = [], [], [], []
     cierre_inventario = None
 
     def movimiento(codigo, tipo, monto):
@@ -117,11 +132,13 @@ def generar_asientos(datos):
             if not contrapartida:
                 raise ValueError('La compra debe indicar contado o crédito.')
             inventario += monto
+            if pago_compra == 'credito':proveedores.append({'fecha':dia,'saldo':monto})
             asiento(dia, f'Por la compra de mercaderías al {pago_compra}', [('20', 'debe', monto), (contrapartida, 'haber', monto)])
         elif tipo == 'compra_activo':
             pago = {'contado': '10', 'credito': '42'}.get(op.get('pago') or 'contado')
             if not pago:
                 raise ValueError('Falta la forma de pago del activo fijo.')
+            if pago == '42':proveedores.append({'fecha':dia,'saldo':monto})
             asiento(dia, 'Por la adquisición de activo fijo', [('33', 'debe', monto), (pago, 'haber', monto)])
             # Solo depreciar si el caso indica vida útil y valor residual.
             if op.get('vida_util_anios') is not None:
@@ -134,24 +151,32 @@ def generar_asientos(datos):
                     raise ValueError('El inicio de uso no puede preceder a la compra.')
                 activos.append((inicio, monto, vida, residual))
         elif tipo == 'venta':
-            contado = decimal(op.get('porcentaje_contado'), 'porcentaje al contado')
-            if contado > 100:
-                raise ValueError('El porcentaje al contado no puede superar el 100%.')
-            efectivo = (monto * contado / 100).quantize(CENTIMO, rounding=ROUND_HALF_UP)
+            comercial = decimal(op.get('descuento_comercial_porcentaje') or 0, 'descuento comercial')
+            if comercial >= 100:raise ValueError('El descuento comercial debe ser menor al 100%.')
+            monto = (monto * (1 - comercial / 100)).quantize(CENTIMO, rounding=ROUND_HALF_UP)
+            if op.get('monto_contado') is not None:
+                efectivo = moneda(op['monto_contado'], 'importe al contado', permite_cero=True)
+                if efectivo > monto:raise ValueError('El cobro al contado supera el importe neto de la venta.')
+            else:
+                contado = decimal(op.get('porcentaje_contado'), 'porcentaje al contado')
+                if contado > 100:raise ValueError('El porcentaje al contado no puede superar el 100%.')
+                efectivo = (monto * contado / 100).quantize(CENTIMO, rounding=ROUND_HALF_UP)
             credito = monto - efectivo
             asiento(dia, 'Por la venta de mercaderías', [('10', 'debe', efectivo), ('12', 'debe', credito), ('70', 'haber', monto)])
             if credito:
-                tasa = decimal(op.get('descuento_porcentaje', 0), 'descuento')
-                dias = decimal(op.get('descuento_dias', 0), 'días del descuento')
+                tasa = decimal(op.get('descuento_porcentaje') or 0, 'descuento')
+                if comercial and op.get('descuento_dias') is None:tasa = Decimal('0')
+                dias = decimal(op.get('descuento_dias') or 0, 'días del descuento')
                 if tasa >= 100 or dias != int(dias):
                     raise ValueError('Las condiciones del descuento son inválidas.')
                 facturas.append({'fecha': dia, 'saldo': credito, 'tasa': tasa, 'dias': int(dias)})
         elif tipo == 'cobro_factura':
-            referencia = fecha(op.get('fecha_factura'))
-            candidatas = [f for f in facturas if f['fecha'] == referencia and f['saldo'] > 0]
+            referencia = fecha(op['fecha_factura']) if op.get('fecha_factura') else None
+            candidatas = [f for f in facturas if f['saldo'] > 0 and (referencia is None or f['fecha'] == referencia)]
             if len(candidatas) != 1:
                 raise ValueError('No se puede identificar de forma única la factura cobrada.')
             factura = candidatas[0]
+            referencia = factura['fecha']
             # El monto transcrito es el nominal de la factura, nunca el cobro neto calculado.
             if monto is None:
                 monto = factura['saldo']
@@ -176,6 +201,23 @@ def generar_asientos(datos):
         elif tipo == 'perdida_mercaderia':
             inventario -= monto
             asiento(dia, 'Por la pérdida de mercadería por siniestro', [('66', 'debe', monto), ('20', 'haber', monto)])
+        elif tipo == 'pago_proveedor':
+            referencia = fecha(op['fecha_compra']) if op.get('fecha_compra') else None
+            candidatas = [f for f in proveedores if f['saldo'] > 0 and (referencia is None or f['fecha'] == referencia)]
+            if len(candidatas) != 1:raise ValueError('No se puede identificar de forma única la compra pagada al proveedor.')
+            compra = candidatas[0]
+            deuda = sum(m['monto'] if m['tipo_movimiento']=='haber' else -m['monto'] for a in asientos for m in a['movimientos'] if m['codigo']=='42')
+            if dia < compra['fecha'] or monto > compra['saldo'] or monto > deuda:
+                raise ValueError('El pago al proveedor supera la deuda o precede a la compra.')
+            compra['saldo'] -= monto
+            asiento(dia,'Por el pago parcial de la compra a crédito',[('42','debe',monto),('10','haber',monto)])
+        elif tipo == 'sueldos_mixtos':
+            pagado = moneda(op.get('monto_pagado'),'sueldo pagado',permite_cero=True)
+            pendiente = monto - pagado
+            if pendiente < 0:raise ValueError('El sueldo pagado supera el gasto del mes.')
+            if op.get('monto_pendiente') is not None and moneda(op['monto_pendiente'],'sueldo pendiente',permite_cero=True) != pendiente:
+                raise ValueError('El sueldo total no coincide con lo pagado y lo pendiente.')
+            asiento(dia,'Por los sueldos del mes, pagados y pendientes',[('62','debe',monto),('10','haber',pagado),('41','haber',pendiente)])
         elif tipo == 'sueldos_pendientes':
             asiento(dia, 'Por los gastos de personal pendientes de pago', [('62', 'debe', monto), ('41', 'haber', monto)])
         elif tipo == 'pago_servicios':
