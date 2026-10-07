@@ -105,7 +105,7 @@
         <div class="assistant-composer">
             <label class="sr-only" for="tutor-texto">Consulta a ÑoñoBot</label>
             <textarea id="tutor-texto" rows="1" placeholder="Escribe tu consulta..."></textarea>
-            <button id="tutor-microfono" class="btn btn-secondary voice-button" type="button" aria-label="Dictar consulta" title="Dictar consulta" aria-pressed="false" aria-describedby="tutor-voz-estado">
+            <button id="tutor-microfono" data-url="{% url 'transcribir_voz' %}" data-csrf="{{ csrf_token }}" class="btn btn-secondary voice-button" type="button" aria-label="Dictar consulta" title="Dictar consulta" aria-pressed="false" aria-describedby="tutor-voz-estado">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>
             </button>
             <button id="tutor-enviar" class="btn btn-primary" type="button">Enviar</button>
@@ -264,7 +264,7 @@
             button.addEventListener('click', () => ejecutarConsulta(button.dataset.prompt));
         });
     </script>
-    <script src="{% static 'js/nonobot-voz.js' %}" defer></script>
+    <script src="{% static 'js/nonobot-voz.js' %}?v=2" defer></script>
 
     {% block extra_js %}{% endblock %}
 </body>

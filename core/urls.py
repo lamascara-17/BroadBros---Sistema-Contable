@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .voz import transcribir_voz
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -25,5 +26,6 @@ urlpatterns = [
     path('reporte-completo/', views.reporte_completo, name='reporte_completo'),
 
     # Chatbot Tutor
+    path('chatbot/voz/', transcribir_voz, name='transcribir_voz'),
     path('chatbot/', views.chatbot_api, name='chatbot_api'),
 ]
