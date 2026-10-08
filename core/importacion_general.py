@@ -1,6 +1,7 @@
 """Borradores revisables para ejercicios fuera de las reglas automáticas."""
 import json
 import re
+import unicodedata
 from datetime import date
 from decimal import Decimal
 from groq import Groq
@@ -76,12 +77,31 @@ Devuelve SOLO JSON con esta estructura:
 "fuente":"operación del ejercicio que sustenta el asiento",
 "movimientos":[{"codigo":"código PCGE", "nombre":"nombre de cuenta",
 "tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto",
-"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias|activo_corriente|activo_no_corriente",
+"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias|activo_corriente|activo_no_corriente|pasivo_corriente|pasivo_no_corriente",
 "tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
 No inventes números de documento ni terceros. Los importes deben tener como
 máximo dos decimales. Cada asiento propuesto debe cuadrar exactamente.
 Estos asientos son un borrador que el usuario revisa antes de guardar.'''
+
+
+def clasificacion_normalizada(tipo, sub):
+    def etiqueta(valor):
+        texto = ''.join(c for c in unicodedata.normalize('NFKD', str(valor or '').strip().lower())
+                        if not unicodedata.combining(c))
+        return re.sub(r'[\s-]+', '_', texto)
+    tipo, sub = etiqueta(tipo), etiqueta(sub)
+    tipo = {'activos': 'activo', 'pasivos': 'pasivo', 'ingresos': 'ingreso',
+            'gastos': 'gasto', 'patrimonio_neto': 'patrimonio', 'capital': 'patrimonio'}.get(tipo, tipo)
+    if tipo in ('activo_corriente', 'activo_no_corriente', 'pasivo_corriente', 'pasivo_no_corriente'):
+        if not sub or sub in ('general', tipo): sub = tipo
+        tipo = tipo.split('_')[0]
+    if sub in ('general', 'ninguna', 'no_aplica', 'sin_subcategoria'): sub = ''
+    if tipo == 'patrimonio' and sub in ('capital', 'capital_social', 'patrimonio', 'patrimonio_neto'):
+        sub = ''
+    if tipo in ('activo', 'pasivo') and sub in ('corriente', 'no_corriente'):
+        sub = tipo + '_' + sub
+    return tipo, sub
 
 
 def validar_asientos(asientos):
@@ -103,16 +123,18 @@ def validar_asientos(asientos):
             if not isinstance(m, dict): raise ValueError('Movimiento inválido.')
             codigo = str(m.get('codigo') or '').strip()
             nombre = str(m.get('nombre') or '').strip()
-            tipo = m.get('tipo_cuenta'); sub = m.get('subcategoria', '')
+            tipo, sub = clasificacion_normalizada(m.get('tipo_cuenta'), m.get('subcategoria', ''))
             lado = m.get('tipo_movimiento')
             if not re.fullmatch(r'\d{2,20}', codigo) or not nombre or len(nombre) > 200:
                 raise ValueError(f'Revise el código y nombre de cuenta del asiento {numero}.')
             if tipo not in dict(CuentaContable.TIPO_CHOICES) or sub not in dict(CuentaContable.SUBCATEGORIA_CHOICES):
-                raise ValueError('La clasificación de una cuenta no es válida.')
+                raise ValueError(f'Cuenta {codigo} — {nombre}: revise el tipo «{tipo}» y la subcategoría «{sub}».')
             if (sub in ('costo_ventas','gasto_operativo','gasto_financiero','otro_gasto','impuesto_ganancias') and tipo != 'gasto') or (sub == 'otro_ingreso' and tipo != 'ingreso'):
                 raise ValueError('La subcategoría no corresponde al tipo de cuenta.')
             if sub in ('activo_corriente', 'activo_no_corriente') and tipo != 'activo':
                 raise ValueError('La clasificación corriente/no corriente corresponde a cuentas de activo.')
+            if sub in ('pasivo_corriente', 'pasivo_no_corriente') and tipo != 'pasivo':
+                raise ValueError('La clasificación corriente/no corriente corresponde a cuentas de pasivo.')
             if lado not in ('debe','haber'): raise ValueError('Indique Debe o Haber en cada línea.')
             firma = (nombre, tipo, sub)
             if codigo in catalogo and catalogo[codigo] != firma:
@@ -150,6 +172,8 @@ def normalizar_borrador(datos):
             if not isinstance(m, dict): raise ValueError('Movimiento inválido en el borrador.')
             a['movimientos'].append({k:str(m.get(k) or '')[:200] for k in
                                     ('codigo','nombre','tipo_cuenta','subcategoria','tipo_movimiento','monto')})
+            linea = a['movimientos'][-1]
+            linea['tipo_cuenta'], linea['subcategoria'] = clasificacion_normalizada(linea['tipo_cuenta'], linea['subcategoria'])
         try: validar_asientos([a]);a['error_validacion']=''
         except ValueError as exc:a['error_validacion']=str(exc)
         borrador.append(a)

@@ -35,6 +35,8 @@ class CuentaContable(models.Model):
         ('impuesto_ganancias', 'Impuesto a las ganancias'),
         ('activo_corriente', 'Activo corriente'),
         ('activo_no_corriente', 'Activo no corriente'),
+        ('pasivo_corriente', 'Pasivo corriente'),
+        ('pasivo_no_corriente', 'Pasivo no corriente'),
     ]
 
     codigo = models.CharField(max_length=20, unique=True, verbose_name='Código')

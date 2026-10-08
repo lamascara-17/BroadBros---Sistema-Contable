@@ -85,7 +85,9 @@ def get_reporte_context():
             if cuenta.codigo.startswith('4011') and saldo < 0:
                 activo_corriente.append({'cuenta': cuenta, 'saldo': -saldo})
             else:
-                (pasivo_no_corriente if 47 <= grupo <= 49 else pasivo_corriente).append(item)
+                no_corriente = (cuenta.subcategoria == 'pasivo_no_corriente' or
+                                (cuenta.subcategoria != 'pasivo_corriente' and 47 <= grupo <= 49))
+                (pasivo_no_corriente if no_corriente else pasivo_corriente).append(item)
         elif cuenta.tipo == 'patrimonio':
             patrimonio.append(item)
             inicial=aperturas[cuenta.pk];resultado=cierres[cuenta.pk]
