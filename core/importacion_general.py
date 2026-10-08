@@ -21,6 +21,11 @@ No conviertas información ilegible en un supuesto. No sustituyas saldos ausente
 Los reportes están en soles. Si hay otra moneda, requiere el tipo de cambio y
 la fecha correspondiente; no registres dólares como si fueran soles.
 No mezcles caja con banco; un cheque afecta banco. No confundas IVA incluido con neto.
+Si al constituir la empresa se aportan efectivo y bienes (máquinas, equipos,
+mercaderías), registra todos los activos aportados al Debe y su suma como Capital
+al Haber en un único asiento. El aporte en especie no es una compra: no acredita
+Caja, no crea una deuda al proveedor ni reduce el efectivo aportado. Cada bien
+aportado conserva su clasificación según su naturaleza.
 La tasa configurada solo puede usarse en operaciones explícitamente gravadas;
 no inventes impuestos sobre arriendo u otras operaciones sin base en el texto.
 Si no hay costo de ventas o datos para calcularlo, déjalo pendiente, no lo calcules

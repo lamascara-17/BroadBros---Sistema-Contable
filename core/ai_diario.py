@@ -33,6 +33,12 @@ Devuelve únicamente este objeto JSON:
 
 Tipos y campos:
 - aporte_efectivo: monto.
+- aporte_mixto: monto_efectivo y monto_bienes de uso propio (cero si explícitamente
+  no hay ese componente). Un aporte inicial de efectivo y máquinas o equipos
+  es UNA operación de capital, no una compra. Conserva ambos importes y el
+  texto completo; no conviertas el aporte en especie en un pago de efectivo.
+  Si se aportan mercaderías u otros componentes, usa no_soportada y conserva
+  todos los importes para el análisis general, sin clasificarlos como máquinas.
 - compra_mercaderia: monto, pago = contado, credito o letras; null si no se indica.
 - compra_activo: monto, pago (null si no se indica); vida_util_anios, residual_porcentaje y
   fecha_inicio_uso SOLO si el texto los indica. Si no indica vida útil omite esos campos.

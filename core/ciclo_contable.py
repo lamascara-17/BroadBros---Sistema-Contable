@@ -98,7 +98,13 @@ def generar_asientos(datos):
         tipo = op.get('tipo')
         if op.get('igv') not in (None, 0, '0'):
             raise ValueError('El caso incluye IGV explícito. Este ciclo simplificado requiere revisión manual.')
-        if tipo == 'pago_servicios':
+        if tipo == 'aporte_mixto':
+            efectivo = moneda(op.get('monto_efectivo'), 'aporte en efectivo', permite_cero=True)
+            bienes = moneda(op.get('monto_bienes'), 'aporte de bienes de uso', permite_cero=True)
+            monto = efectivo + bienes
+            if op.get('monto') is not None and moneda(op['monto']) != monto:
+                raise ValueError('El capital leído no coincide con la suma de los aportes.')
+        elif tipo == 'pago_servicios':
             detalles = op.get('detalles')
             if not isinstance(detalles, list) or not detalles:
                 raise ValueError('Falta el detalle de los servicios pagados.')
@@ -109,7 +115,10 @@ def generar_asientos(datos):
             monto = None  # Se determina con la factura referenciada, no con la IA.
         else:
             monto = moneda(op.get('monto'), 'monto', tipo == 'inventario_final')
-        if tipo == 'aporte_efectivo':
+        if tipo == 'aporte_mixto':
+            asiento(dia, 'Por el aporte de capital en efectivo y bienes de uso',
+                    [('10', 'debe', efectivo), ('33', 'debe', bienes), ('50', 'haber', monto)])
+        elif tipo == 'aporte_efectivo':
             asiento(dia, 'Por el aporte de capital en efectivo', [('10', 'debe', monto), ('50', 'haber', monto)])
         elif tipo == 'compra_mercaderia':
             pago_compra = op.get('pago') or 'contado'
