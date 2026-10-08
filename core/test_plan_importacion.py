@@ -1,52 +1,44 @@
 from copy import deepcopy
+from unittest.mock import patch
 from django.test import TestCase
-from .models import CuentaContable, AsientoContable
+from .models import CuentaContable, AsientoContable, Movimiento
 from .test_estados_financieros import novatech
 from .views import guardar_importacion
 from .reporte_utils import contexto_estados
 
 
 class PlanImportacionTests(TestCase):
-    def test_duplicados_heredados_no_bloquean_y_eleccion_es_estable(self):
-        original = CuentaContable.objects.create(codigo='5101', nombre='Capital social', tipo='patrimonio')
-        duplicada = CuentaContable.objects.create(codigo='50', nombre='Capital', tipo='patrimonio')
-        for codigo in ('50', '501', '5101'):
-            nuevos = deepcopy(novatech()[:1])
-            nuevos[0]['movimientos'][1]['codigo'] = codigo
-            guardar_importacion(nuevos, False)
-        self.assertEqual(original.movimientos.count(), 3)
-        self.assertEqual(duplicada.movimientos.count(), 0)
-        self.assertEqual(CuentaContable.objects.filter(tipo='patrimonio').count(), 2)
-        self.assertEqual(AsientoContable.objects.count(), 3)
-
-    def test_reimportar_con_codigos_distintos_conserva_plan_y_saldos(self):
+    def test_cada_caso_reemplaza_asientos_y_crea_cuentas_nuevas(self):
         guardar_importacion(novatech(), False)
-        plan = list(CuentaContable.objects.values_list('codigo', 'nombre', 'tipo'))
+        anteriores = set(CuentaContable.objects.values_list('pk', flat=True))
+        CuentaContable.objects.create(codigo='999', nombre='Cuenta anterior sin uso', tipo='activo')
         nuevos = deepcopy(novatech())
         for a in nuevos:
             for m in a['movimientos']:
                 m['codigo'] = '9' + m['codigo']
-                if m['nombre'] == 'Caja': m['nombre'] = 'Efectivo en caja'
-                if m['nombre'] == 'Capital': m['nombre'] = 'Capital social'
-        guardar_importacion(nuevos, True)
-        self.assertEqual(list(CuentaContable.objects.values_list('codigo', 'nombre', 'tipo')), plan)
+        guardar_importacion(nuevos, False)
+        self.assertFalse(anteriores & set(CuentaContable.objects.values_list('pk', flat=True)))
+        self.assertFalse(CuentaContable.objects.filter(codigo='999').exists())
+        self.assertFalse(CuentaContable.objects.filter(codigo='101').exists())
+        self.assertTrue(CuentaContable.objects.filter(codigo='9101').exists())
         self.assertEqual(AsientoContable.objects.count(), 7)
         self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
 
-    def test_colision_no_sobrescribe_ni_borra_movimientos(self):
+    def test_propuesta_invalida_conserva_el_caso_anterior(self):
         guardar_importacion(novatech(), False)
+        ids = list(AsientoContable.objects.values_list('pk', flat=True))
+        cuentas = list(CuentaContable.objects.values_list('pk', flat=True))
         nuevos = deepcopy(novatech())
-        nuevos[0]['movimientos'][0]['nombre'] = 'Banco'
-        ids = list(AsientoContable.objects.values_list('id', flat=True))
-        with self.assertRaisesMessage(ValueError, 'ya pertenece a Caja'):
-            guardar_importacion(nuevos, True)
-        self.assertEqual(list(AsientoContable.objects.values_list('id', flat=True)), ids)
-        self.assertEqual(CuentaContable.objects.get(codigo='101').nombre, 'Caja')
+        nuevos[0]['movimientos'][0]['monto'] = '30001'
+        with self.assertRaises(ValueError): guardar_importacion(nuevos, False)
+        self.assertEqual(list(AsientoContable.objects.values_list('pk', flat=True)), ids)
+        self.assertEqual(list(CuentaContable.objects.values_list('pk', flat=True)), cuentas)
 
-    def test_cuenta_nueva_se_crea_y_se_reutiliza(self):
-        nuevos = novatech()[:1]
-        guardar_importacion(nuevos, False)
-        nuevos[0]['movimientos'][0]['codigo'] = '111'
-        guardar_importacion(nuevos, False)
-        self.assertEqual(CuentaContable.objects.filter(nombre='Caja').count(), 1)
-        self.assertFalse(CuentaContable.objects.filter(codigo='111').exists())
+    def test_fallo_de_guardado_revierte_la_limpieza(self):
+        guardar_importacion(novatech(), False)
+        ids = list(AsientoContable.objects.values_list('pk', flat=True))
+        cuentas = list(CuentaContable.objects.values_list('pk', flat=True))
+        with patch.object(Movimiento.objects, 'bulk_create', side_effect=RuntimeError('Fallo de escritura')):
+            with self.assertRaises(RuntimeError): guardar_importacion(novatech(), True)
+        self.assertEqual(list(AsientoContable.objects.values_list('pk', flat=True)), ids)
+        self.assertEqual(list(CuentaContable.objects.values_list('pk', flat=True)), cuentas)

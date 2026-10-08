@@ -25,6 +25,7 @@
 <div class="image-import">
 <div class="card"><div class="card-body">
 <form method="post" enctype="multipart/form-data" id="image-form">
+<p class="helper-text">Cada caso guardado reemplaza el anterior y crea un nuevo plan de cuentas.</p>
 {% csrf_token %}
 <input id="imagen-caso" type="file" name="imagen_caso" aria-label="Subir imagen" accept="image/*" hidden>
 <input id="foto-camara" type="file" name="foto_camara" aria-label="Tomar foto" accept="image/*" capture="environment" hidden>

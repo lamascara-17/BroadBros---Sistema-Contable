@@ -57,7 +57,7 @@ class ValidadorGeneralTests(TestCase):
             borrador=proponer_caso_general(datos_generales(),'18','El retiro fue de 100.')
             parametros=groq.return_value.chat.completions.create.call_args.kwargs
             self.assertIn('El retiro fue de 100.',parametros['messages'][1]['content'])
-            self.assertEqual(json.loads(parametros['messages'][1]['content'])['plan_cuentas'][0]['codigo'], '1101')
+            self.assertNotIn('plan_cuentas', json.loads(parametros['messages'][1]['content']))
             self.assertEqual(borrador['pendientes'],propuesta()['pendientes'])
             groq.return_value.chat.completions.create.return_value.choices[0].finish_reason='length'
             with self.assertRaises(ValueError):proponer_caso_general(datos_generales(),'18')

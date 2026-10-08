@@ -6,6 +6,7 @@
 <div class="card" style="max-width:760px;margin:0 auto;"><div class="card-body">
 <form method="post" enctype="multipart/form-data" id="text-form">{% csrf_token %}
 <label for="texto-caso">Enunciado del ejercicio</label>
+<p class="helper-text">Cada caso guardado reemplaza el anterior y crea un nuevo plan de cuentas.</p>
 <textarea id="texto-caso" name="texto_caso" rows="12" maxlength="20000" placeholder="Escribe o pega las operaciones, fechas, importes y condiciones del caso." style="width:100%;box-sizing:border-box;">{{ texto_caso }}</textarea>
 <div class="form-group" style="margin-top:20px;"><label for="archivo-texto">O subir un archivo .txt</label><input id="archivo-texto" name="archivo_texto" type="file" accept=".txt,text/plain"><p class="helper-text">Hasta 100 KB y 20 000 caracteres.</p></div>
 <button type="submit" class="btn btn-primary" style="width:100%;">Procesar texto</button>

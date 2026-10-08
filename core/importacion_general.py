@@ -56,10 +56,9 @@ iguales, con ajuste de céntimos en la última; informa ese supuesto.
 Una apertura sin fecha explícita puede usar la primera fecha escrita de las
 operaciones, como convención declarada. Si no hay ninguna fecha, déjala pendiente.
 No crees asientos para contenidos ajenos a contabilidad.
-El plan_cuentas recibido es el catálogo persistente del sistema. Reutiliza sus
-códigos y nombres para la misma cuenta; no inventes otro código ni uses un código
-ocupado para otra cuenta. Distingue caja de banco y proveedores comerciales de
-proveedores de activos. Solo propón una nueva cuenta PCGE cuando falte en el plan.
+Cada ejercicio tiene su propio plan de cuentas. Usa códigos PCGE coherentes
+dentro de este caso, sin consultar cuentas de ejercicios anteriores. Distingue
+caja de banco y proveedores comerciales de proveedores de activos.
 Devuelve SOLO JSON con esta estructura:
 {"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa", "clase":"operacion|apertura|cierre", "flujo_efectivo":"operacion|inversion|financiacion|pendiente",
 "fuente":"operación del ejercicio que sustenta el asiento",
@@ -162,8 +161,7 @@ def _proponer_base(datos, tasa_impuesto, adicionales=''):
     ejercicio={'texto_leido':datos['texto_leido']} if datos.get('texto_leido') else datos
     if datos.get('bloques_lectura'):
         ejercicio = {**ejercicio, 'operaciones_organizadas': datos['bloques_lectura']}
-    plan = list(CuentaContable.objects.values('codigo', 'nombre', 'tipo', 'subcategoria'))
-    contenido = json.dumps({'ejercicio':ejercicio,'plan_cuentas':plan,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
+    contenido = json.dumps({'ejercicio':ejercicio,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str)
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)

@@ -69,18 +69,15 @@ class EstadosFinancierosTests(TestCase):
         self.assertEqual(AsientoContable.objects.count(), 7)
         self.assertEqual(contexto_estados()['mayor_datos'][0]['saldo_final'], 29000)
 
-    def test_no_omite_revision_por_supuestos_errores_o_conflictos(self):
+    def test_no_omite_revision_por_supuestos_o_errores(self):
         from copy import deepcopy
         completo = {'asientos': novatech(), 'pendientes': [], 'supuestos': []}
-        for clase in ('supuesto', 'descuadre', 'conflicto'):
+        for clase in ('supuesto', 'descuadre'):
             with self.subTest(clase=clase):
                 AsientoContable.objects.all().delete()
                 borrador = deepcopy(completo)
                 if clase == 'supuesto': borrador['supuestos'] = ['Fecha asumida.']
                 if clase == 'descuadre': borrador['asientos'][0]['movimientos'][0]['monto'] = '30001'
-                if clase == 'conflicto':
-                    guardar_importacion(novatech(), False)
-                    borrador['asientos'][0]['movimientos'][0]['tipo_cuenta'] = 'pasivo'
                 previos = list(AsientoContable.objects.values_list('id', flat=True))
                 with patch('core.importacion_general.proponer_caso_general', return_value=borrador):
                     response = self.client.post(reverse('cargar_texto_diario'), {'texto_caso': 'Caso contable'})

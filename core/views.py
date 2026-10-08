@@ -971,24 +971,19 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 def guardar_importacion(asientos, limpiar, pendientes='', fecha_cierre=None):
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
-    from .plan_importacion import reutilizar_plan
-    asientos = validar_asientos(reutilizar_plan(serializar_asientos(asientos)))
+    asientos = validar_asientos(serializar_asientos(asientos))
     if fecha_cierre and fecha_cierre < max(a['fecha'] for a in asientos):
         raise ValueError('La fecha de cierre es anterior a una operación del ejercicio.')
     with transaction.atomic():
+        AsientoContable.objects.all().delete()
+        CuentaContable.objects.all().delete()
         cuentas = {}
         for item in asientos:
             for mov in item['movimientos']:
                 codigo = mov['codigo']
-                cuenta, nueva = CuentaContable.objects.get_or_create(codigo=codigo, defaults={
+                cuenta, _ = CuentaContable.objects.get_or_create(codigo=codigo, defaults={
                     'nombre':mov['nombre'],'tipo':mov['tipo_cuenta'],'subcategoria':mov['subcategoria']})
-                if not nueva and (cuenta.tipo != mov['tipo_cuenta'] or cuenta.subcategoria != mov['subcategoria']):
-                    if not limpiar and cuenta.movimientos.exists():
-                        raise ValueError(f'La cuenta {codigo} tiene otra clasificación y movimientos previos. Revísela antes de importar.')
-                    cuenta.tipo=mov['tipo_cuenta'];cuenta.subcategoria=mov['subcategoria']
-                    cuenta.save(update_fields=['tipo','subcategoria'])
                 cuentas[codigo]=cuenta
-        if limpiar: AsientoContable.objects.all().delete()
         for numero,item in enumerate(asientos):
             asiento=AsientoContable.objects.create(fecha=item['fecha'],descripcion=item['descripcion'],
                 clase=item['clase'],flujo_efectivo=item['flujo_efectivo'],
