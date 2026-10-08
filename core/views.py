@@ -1198,6 +1198,11 @@ def revisar_importacion(request):
         payload['borrador']=borrador
         limpiar=request.POST.get('limpiar')=='on' if request.POST.get('elegir_limpieza')=='1' else payload['limpiar']
         payload['limpiar']=limpiar
+        from .orientacion import orientar_revision
+        pendientes, _ = orientar_revision(payload['datos'], borrador)
+        borrador['pendientes'] = pendientes
+        if pendientes and request.POST.get('aceptar_parcial') != 'on':
+            raise ValueError('La propuesta omite operaciones o ajustes. Complete el análisis o confirme expresamente el guardado parcial.')
         from .clasificacion import fecha_cierre_del_caso
         cantidad=guardar_importacion(asientos,limpiar,'; '.join(map(str,pendientes)), fecha_cierre_del_caso(payload['datos']))
         messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))

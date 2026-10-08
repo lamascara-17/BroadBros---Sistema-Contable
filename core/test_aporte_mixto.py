@@ -11,7 +11,11 @@ from .reporte_utils import contexto_estados
 def caso():
     return {'empresa_nueva': True, 'metodo_inventario': 'periodico',
             'inventario_inicial': 0, 'fecha_cierre': '2026-10-31',
-            'texto_leido': '10/10/2026 Se crea una empresa con 100,000 al contado y 100,000 en máquinas.',
+            'texto_leido': ('10/10/2026 Se crea una empresa con 100,000 al contado y 100,000 en máquinas.\n'
+                            '15/10/2026 Se compra 50,000 de mercadería al crédito de 15 días.\n'
+                            '20/10/2026 Se realiza una venta por 100,000 soles (60% crédito y 40% al contado).\n'
+                            '25/10/2026 Se pagan gastos operativos por 50,000 soles al contado.\n'
+                            'En el inventario se observa un saldo final de 25,000 soles al cierre del mes.'),
             'operaciones': [
                 {'fecha': '2026-10-10', 'tipo': 'aporte_mixto', 'monto_efectivo': 100000,
                  'monto_bienes': 100000, 'texto': 'Empresa con 100,000 al contado y 100,000 en máquinas'},
@@ -27,6 +31,34 @@ def caso():
 
 
 class AporteMixtoTests(TestCase):
+    def test_propuesta_de_tres_asientos_se_reanaliza_y_guarda_los_cinco(self):
+        from .importacion_general import normalizar_borrador, serializar_asientos
+        from .orientacion import orientar_revision
+        datos = caso()
+        completo = normalizar_borrador({'asientos': serializar_asientos(generar_asientos(datos))})
+        parcial = deepcopy(completo)
+        parcial['asientos'] = [a for a in completo['asientos'] if a['fecha'] in ('2026-10-10', '2026-10-20', '2026-10-25')]
+        pendientes, _ = orientar_revision({'texto_leido': datos['texto_leido']}, parcial)
+        self.assertTrue(any('2026-10-15' in p for p in pendientes))
+        self.assertTrue(any('costo de ventas' in p for p in pendientes))
+        with patch('core.importacion_general._proponer_base', side_effect=[parcial, completo]) as analizar, \
+             patch('core.importacion_general.organizar_lectura', return_value=datos):
+            r = self.client.post(reverse('cargar_texto_diario'), {'texto_caso': datos['texto_leido']})
+        self.assertEqual(analizar.call_count, 2)
+        self.assertRedirects(r, reverse('libro_diario'))
+        self.assertEqual(AsientoContable.objects.count(), 5)
+        self.assertEqual(contexto_estados()['resultado_neto'], 25000)
+
+    def test_no_guarda_automaticamente_una_propuesta_con_operaciones_omitidas(self):
+        from .importacion_general import normalizar_borrador, serializar_asientos
+        datos = caso()
+        borrador = normalizar_borrador({'asientos': serializar_asientos(generar_asientos(datos))})
+        borrador['asientos'] = [a for a in borrador['asientos'] if a['fecha'] in ('2026-10-10', '2026-10-20', '2026-10-25')]
+        with patch('core.importacion_general.proponer_caso_general', return_value=borrador):
+            r = self.client.post(reverse('cargar_texto_diario'), {'texto_caso': datos['texto_leido']})
+        self.assertContains(r, '2026-10-15')
+        self.assertContains(r, 'costo de ventas')
+        self.assertEqual(AsientoContable.objects.count(), 0)
     def test_aporte_en_especie_no_reduce_caja_y_capital_incluye_ambos_aportes(self):
         with patch('core.ai_diario.extraer_operaciones', return_value=caso()):
             r = self.client.post(reverse('cargar_imagen_diario'), {'imagen_caso': imagen()})

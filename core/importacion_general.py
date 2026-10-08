@@ -37,6 +37,13 @@ exacto debe aportar el usuario. Si el dato ya está escrito, úsalo, no lo pidas
 Revisa cada operación del enunciado antes de responder. Incluye pagos iniciales
 de compras mixtas, cobros y pagos parciales. No omitas una operación conocida.
 Una prestación de servicios no necesita inventario final de mercaderías.
+Si la empresa inicia operaciones con efectivo y máquinas, su inventario inicial
+de mercaderías es cero: no confundas la maquinaria con existencias. Cuando hay
+compras de mercaderías e inventario físico final, incluye el ajuste del costo de
+ventas: inventario inicial más compras netas menos inventario final. No omitas
+la compra a crédito por tener un plazo de pago; registra la deuda en su fecha.
+Las fechas al inicio de una línea identifican operaciones aunque no empiecen
+con «El día» ni tengan numeración. Revisa todas esas líneas antes de responder.
 La falta de vida útil o valor residual no impide registrar la adquisición de un
 equipo; solo deja pendiente su depreciación cuando el ejercicio pida ese ajuste.
 No generes asientos de cierre salvo que el caso lo solicite expresamente.
