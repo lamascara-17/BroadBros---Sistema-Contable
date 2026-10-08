@@ -27,9 +27,11 @@ def reutilizar_plan(asientos):
         for m in asiento['movimientos']:
             clave = (identidad(m['nombre']), m['tipo_cuenta'])
             coincidencias = por_nombre.get(clave, [])
-            if len(coincidencias) > 1:
-                raise ValueError(f'Hay varias cuentas para {m["nombre"]} en el plan. Unifique o seleccione la cuenta antes de importar.')
             if coincidencias:
+                # Las cuentas equivalentes heredadas no deben impedir importar.
+                # Conservar una elección estable entre casos, sin fusionar ni
+                # modificar movimientos anteriores.
+                coincidencias = sorted(coincidencias, key=lambda c: c.pk)
                 cuenta = coincidencias[0]
                 m['codigo'], m['nombre'] = cuenta.codigo, cuenta.nombre
             elif clave in nuevas:

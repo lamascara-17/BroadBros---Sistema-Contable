@@ -7,6 +7,18 @@ from .reporte_utils import contexto_estados
 
 
 class PlanImportacionTests(TestCase):
+    def test_duplicados_heredados_no_bloquean_y_eleccion_es_estable(self):
+        original = CuentaContable.objects.create(codigo='5101', nombre='Capital social', tipo='patrimonio')
+        duplicada = CuentaContable.objects.create(codigo='50', nombre='Capital', tipo='patrimonio')
+        for codigo in ('50', '501', '5101'):
+            nuevos = deepcopy(novatech()[:1])
+            nuevos[0]['movimientos'][1]['codigo'] = codigo
+            guardar_importacion(nuevos, False)
+        self.assertEqual(original.movimientos.count(), 3)
+        self.assertEqual(duplicada.movimientos.count(), 0)
+        self.assertEqual(CuentaContable.objects.filter(tipo='patrimonio').count(), 2)
+        self.assertEqual(AsientoContable.objects.count(), 3)
+
     def test_reimportar_con_codigos_distintos_conserva_plan_y_saldos(self):
         guardar_importacion(novatech(), False)
         plan = list(CuentaContable.objects.values_list('codigo', 'nombre', 'tipo'))
