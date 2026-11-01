@@ -110,6 +110,8 @@ def exportar_excel_contable(empresa='BroadBros'):
     fila(ws, ['Agrupación por subcategoría, naturaleza del activo y código; revise vencimientos especiales.', None, None, None])
 
     ws = hoja('Estado de Resultados', ['Concepto', 'Importe (S/)'], [80, 24])
+    for contenido in ctx['notas_consistencia']:
+        nota(ws, contenido)
     if ctx['nota_resultado']:
         nota(ws, ctx['nota_resultado'])
     for concepto, saldo, tipo in ctx['filas_er']:

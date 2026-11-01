@@ -5,6 +5,7 @@
 {% block page_subtitle %}{% if fecha_cierre %}Al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles{% else %}Activos, pasivos y patrimonio{% endif %}{% endblock %}
 {% block page_actions %}<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">Imprimir</button><a href="{% url 'reporte_completo' %}" class="btn btn-primary btn-sm">Exportar</a>{% endblock %}
 {% block content %}
+{% for nota in notas_consistencia %}<p class="helper-text report-sheet" role="alert">{{ nota }}</p>{% endfor %}
 {% if asientos %}
 {% include 'includes/estado_situacion.html' %}
 <div class="balance-check {% if esta_balanceado %}balanced{% else %}unbalanced{% endif %}">
