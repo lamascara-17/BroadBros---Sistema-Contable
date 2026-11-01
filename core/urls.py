@@ -2,8 +2,10 @@ from django.urls import path
 from . import views
 from .voz import transcribir_voz
 from .audio_respuesta import respuesta_audio
+from .ratio_views import financial_ratios
 
 urlpatterns = [
+    path('ratios-financieros/', financial_ratios, name='ratios_financieros'),
     path('', views.index, name='index'),
 
     # Vista de captura por imagen

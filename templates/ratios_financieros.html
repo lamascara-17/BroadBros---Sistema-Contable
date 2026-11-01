@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Ratios financieros · {{ ticker }} — BroadBros{% endblock %}
+{% block page_title %}Análisis financiero{% endblock %}
+{% block page_subtitle %}Tu empresa, su evolución y sus referentes. Los 17 indicadores del taller UNI.{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/ratios.css' %}">
+<div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
+    <section class="ratio-hero" aria-labelledby="ratio-company">
+        <div class="ratio-hero-main"><span class="ratio-eyebrow">ANÁLISIS COMPARATIVO / FY{{ year }}</span>
+            <h2 id="ratio-company">{{ company.name }} <span>{{ ticker }}</span></h2>
+            <p>{{ company.industry }}</p>
+            <div class="ratio-tags"><span>{{ period.start }} → {{ period.end }}</span><span>Datos en {{ period.currency }} millones</span><span>{% if period.edited %}Datos editados{% else %}Fuente: SEC · US GAAP{% endif %}</span></div>
+        </div>
+        <div class="ratio-hero-aside"><strong>17</strong><span>indicadores financieros</span><small>{{ peer_count }} empresas en el grupo seleccionado</small></div>
+    </section>
+
+    <form method="get" class="ratio-controls" aria-label="Configurar comparación">
+        <label>Empresa<select name="empresa">{% for c in companies %}<option value="{{ c.ticker }}" {% if c.ticker == ticker %}selected{% endif %}>{{ c.ticker }} · {{ c.name }}</option>{% endfor %}</select></label>
+        <label>Ejercicio<select name="year">{% for y in years %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>FY{{ y }}</option>{% endfor %}</select></label>
+        <label>Líder / referente<select name="lider">{% for c in companies %}<option value="{{ c.ticker }}" {% if c.ticker == leader %}selected{% endif %}>{{ c.ticker }} · {{ c.name }}</option>{% endfor %}</select></label>
+        <label>Grupo de comparación<select name="grupo"><option value="all" {% if group == 'all' %}selected{% endif %}>Todas las empresas del trabajo</option><option value="chips" {% if group == 'chips' %}selected{% endif %}>Diseño, chips y fundición</option><option value="equipment" {% if group == 'equipment' %}selected{% endif %}>Equipos de semiconductores</option></select></label>
+        <button class="btn btn-primary" type="submit">Comparar <span aria-hidden="true">→</span></button>
+        <details class="ratio-options"><summary>Supuestos de cálculo</summary><div>
+            <label>Tasa para ROA (%)<input name="tasa" type="number" min="0" max="100" step="0.01" value="{{ tax_rate }}"></label>
+            <label>Deuda financiera<select name="deuda"><option value="total" {% if debt_basis == 'total' %}selected{% endif %}>CP + LP · fórmula del PPT</option><option value="current" {% if debt_basis == 'current' %}selected{% endif %}>Solo CP · variante del curso</option></select></label>
+            <p>ROA usa la tasa de referencia del taller (30%), no la tasa efectiva de cada compañía. EBITDA = utilidad operativa + D&A; no es EBITDA ajustado. La deuda financiera excluye otros pasivos no financieros.</p>
+        </div></details>
+    </form>
+
+    <div class="ratio-context"><span class="ratio-context-dot" aria-hidden="true"></span><p>Grupo académico de semiconductores, equipos y redes; no es un índice oficial del sector. NVIDIA es el referente inicial por sus mayores ventas FY2025 dentro de la lista; puedes cambiarlo. La lista recibida tiene nueve empresas: <a href="#datos" id="ratio-add-company">añadir la décima</a>.</p></div>
+    {% for note in selected.warnings %}<p class="ratio-warning" role="alert">{{ note }}</p>{% endfor %}
+
+    <section class="ratio-diagnoses" aria-label="Diagnóstico financiero">
+        {% for d in diagnoses %}<article class="ratio-diagnosis"><span class="ratio-eyebrow">{{ d.title }}</span><h3>{{ d.status }}</h3><p>{{ d.text }}</p></article>{% endfor %}
+    </section>
+
+    <section class="ratio-panel" id="comparativo" aria-labelledby="comparison-title">
+        <header class="ratio-panel-header"><div><span class="ratio-eyebrow">LOS 17 INDICADORES</span><h3 id="comparison-title">{{ ticker }} frente a sus referentes</h3><p>Promedio aritmético de los ratios disponibles. <strong>n</strong> indica cuántas empresas participan en cada indicador.</p></div>
+            <a class="btn btn-secondary btn-sm" href="?{{ export_query }}&amp;descargar=csv">Descargar CSV ↓</a></header>
+        <div class="ratio-tabs" role="group" aria-label="Filtrar indicadores"><button type="button" class="is-active" data-category="all" aria-pressed="true">Todos <span>17</span></button>{% for category in categories %}<button type="button" data-category="{{ category }}" aria-pressed="false">{{ category }}</button>{% endfor %}</div>
+        <div class="ratio-table-scroll"><table class="ratio-table"><caption class="sr-only">Comparación de {{ ticker }}, ejercicio anterior, {{ leader }} y grupo académico</caption>
+            <thead><tr><th scope="col">Indicador / fórmula</th><th scope="col">FY{{ year|add:'-1' }}<small>{{ ticker }}</small></th><th scope="col" class="ratio-own">FY{{ year }}<small>{{ ticker }}</small></th><th scope="col">Variación<small>vs. año anterior</small></th><th scope="col">{{ leader }}<small>Referente FY{{ year }}</small></th><th scope="col">Promedio<small>Grupo FY{{ year }}</small></th><th scope="col">Lectura comparativa</th></tr></thead>
+            <tbody>{% for r in rows %}<tr data-ratio-category="{{ r.category }}"><th scope="row"><span class="ratio-row-number">{{ r.number|stringformat:'02d' }}</span><span>{{ r.label }} <small class="ratio-unit">{{ r.unit }}</small><small class="ratio-formula">{{ r.formula }}</small>{% if r.reason %}<small class="ratio-missing">{{ r.reason }}</small>{% endif %}</span></th><td>{{ r.previous }}</td><td class="ratio-own"><strong>{{ r.own }}</strong></td><td class="ratio-delta">{{ r.delta }}</td><td>{{ r.leader }}</td><td>{{ r.sector }}<small>n = {{ r.n }}</small></td><td class="ratio-reading"><span class="ratio-status {{ r.tone }}">{{ r.interpretation }}</span></td></tr>{% endfor %}</tbody>
+        </table></div>
+        <p class="ratio-panel-foot">Las variaciones porcentuales se expresan en puntos porcentuales. Capital de trabajo: USD millones; ASML se convierte solo para ese indicador al tipo de cambio de cierre del BCE. Una comparación favorable no garantiza solvencia.</p>
+    </section>
+
+    <div class="ratio-lower-grid">
+        <section class="ratio-panel ratio-chart-panel" aria-labelledby="chart-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">PERSPECTIVA DEL GRUPO</span><h3 id="chart-title">Comparar empresa por empresa</h3></div></header>
+            <label class="ratio-chart-picker">Indicador<select id="ratio-chart-select">{% for r in rows %}<option value="{{ r.key }}" {% if r.key == 'net_margin' %}selected{% endif %}>{{ r.label }}</option>{% endfor %}</select></label>
+            <div class="ratio-chart-key"><span><i></i>{{ ticker }}</span><span><i class="leader"></i>{{ leader }}</span><span><i class="others"></i>Otras empresas</span></div>
+            <div id="ratio-chart" class="ratio-chart" aria-live="polite"></div><p id="ratio-chart-note" class="ratio-chart-note"></p>
+            <noscript><p>Los valores completos están disponibles en la tabla de indicadores.</p></noscript>
+        </section>
+        <section class="ratio-panel ratio-dupont" aria-labelledby="dupont-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">MÉTODO DUPONT</span><h3 id="dupont-title">De dónde viene el ROE</h3><p>La rentabilidad del accionista, en tres factores.</p></div></header>
+            <div class="ratio-dupont-factor"><span>Margen neto<small>Utilidad neta / ventas</small></span><strong>{{ dupont.margin }}</strong></div>
+            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Eficiencia de activos<small>Ventas / activo promedio</small></span><strong>{{ dupont.turnover }}</strong></div>
+            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Multiplicador del capital<small>Activo promedio / patrimonio promedio</small></span><strong>{{ dupont.multiplier }}</strong></div>
+            <div class="ratio-dupont-result"><span>ROE DuPont</span><strong>{{ dupont.roe }}</strong><small>{% if dupont.matches %}Coincide con utilidad neta / patrimonio promedio.{% else %}No evaluable: revisa denominadores y datos pendientes.{% endif %}</small></div>
+        </section>
+    </div>
+
+    <section class="ratio-panel ratio-method" aria-labelledby="method-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">CÁLCULOS QUE PUEDES SUSTENTAR</span><h3 id="method-title">Método, supuestos y períodos</h3></div></header>
+        <div class="ratio-method-grid"><div><h4>Fórmulas del profesor</h4><p>Basadas en S7 Alicorp y el PPT S3/S4 de Análisis de Estados Financieros. Promedios = (saldo inicial + saldo final) / 2. Gestión usa 365 días. EBITDA de {{ ticker }}: <strong>{{ ebitda }} {{ period.currency }} MM</strong>.</p><ul>{% for note in selected.assumptions %}<li>{{ note }}</li>{% endfor %}<li>La prueba ácida del taller suma caja y clientes; no agrega inversiones de corto plazo.</li><li>ROE usa utilidad y patrimonio atribuibles al accionista; endeudamiento usa patrimonio consolidado total.</li></ul></div>
+            <div><h4>Cómo leer la comparación</h4><p>Datos anuales FY2024/FY2025, disponibles al {{ as_of }}. Las fechas fiscales difieren: FY2025 de NVIDIA termina en enero, Broadcom en noviembre. Son ejercicios fiscales comparados, no el mismo período calendario ni datos en tiempo real.</p><p>Los datos ausentes y los denominadores cero o negativos no se sustituyen por cero. Las medias excluyen los valores N/D y mantienen pérdidas válidas. La media incluye la empresa analizada si pertenece al grupo.</p><p><a href="{{ fx_source }}" target="_blank" rel="noopener noreferrer">Fuente BCE de conversión EUR/USD ↗</a> · 2024: 1.0389 · 2025: 1.1750. Se convierten saldos monetarios, no los ratios.</p></div></div>
+        {% for note in period.notes %}<p class="ratio-warning">{{ note }}</p>{% endfor %}
+        <details class="ratio-periods"><summary>Ver empresas, fechas y fuentes</summary><div class="ratio-table-scroll"><table><thead><tr><th>Empresa</th><th>Actividad</th><th>Inicio</th><th>Cierre</th><th>Moneda</th><th>Fuente</th></tr></thead><tbody>{% for item in peer_periods %}<tr><td><strong>{{ item.company.ticker }}</strong><small>{{ item.company.name }}</small></td><td>{{ item.company.industry }}</td><td>{{ item.period.start }}</td><td>{{ item.period.end }}</td><td>{{ item.period.currency }}</td><td>{% if item.period.edited %}Datos manuales{% if item.period.manual_source %} · <a href="{{ item.period.manual_source }}" target="_blank" rel="noopener noreferrer">Fuente ↗</a>{% endif %}{% else %}<a href="{{ item.company.source_url }}" target="_blank" rel="noopener noreferrer">SEC XBRL ↗</a>{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>
+    </section>
+
+    <details class="ratio-panel ratio-data" id="datos" {% if form.is_bound %}open{% endif %}><summary><span><span class="ratio-eyebrow">DATOS Y FUENTES</span><strong>Revisar partidas o incorporar otra empresa</strong><small>Datos en millones. Los cambios se guardan separados del libro diario.</small></span><span aria-hidden="true">＋</span></summary>
+        <form method="post" id="ratio-input-form">{% csrf_token %}{{ form.non_field_errors }}
+            <p class="ratio-warning">Al guardar se reemplazan los datos de ratios de este ticker y año. Se identifican como datos ingresados por el usuario. Para una empresa nueva, usa otro ticker y completa sus partidas; un campo vacío significa dato desconocido.</p>
+            <div class="ratio-input-grid ratio-meta-grid">{% for field in metadata_fields %}<label>{{ field.label }}{{ field }}{{ field.errors }}</label>{% endfor %}</div>
+            <div class="ratio-input-grid">{% for row in input_rows %}<label>{{ row.label }} <small>Millones de {{ period.currency }}</small>{{ row.field }}{{ row.field.errors }}{% if row.source %}<a href="{{ row.source }}" target="_blank" rel="noopener noreferrer">Fuente SEC{% if row.end %} · {{ row.end }}{% endif %} ↗</a>{% endif %}{% if row.tag %}<small class="ratio-source-tag">{{ row.tag }}</small>{% endif %}{% if row.note %}<small>{{ row.note }}</small>{% endif %}</label>{% endfor %}</div>
+            <div class="ratio-form-actions"><button type="submit" class="btn btn-primary">Guardar datos y recalcular</button><button type="button" id="ratio-new-company" class="btn btn-secondary">Preparar empresa nueva</button><span>No se modifican los asientos ni los cinco reportes existentes.</span></div>
+        </form>
+    </details>
+</div>
+{{ chart_data|json_script:'ratio-chart-data' }}
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/ratios.js' %}" defer></script>{% endblock %}
