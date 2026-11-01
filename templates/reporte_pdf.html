@@ -41,6 +41,7 @@ th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; 
 
 <div class="break"><p class="marca">BROADBROS / RESULTADOS</p><h1>{{ empresa }}</h1>
 <h2>Estado de Resultados</h2><p class="meta">Del {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_cierre|date:"d/m/Y" }} · Importes en soles</p>
+{% for nota in notas_consistencia %}<p class="nota">{{ nota }}</p>{% endfor %}
 {% if nota_resultado %}<p class="meta">{{ nota_resultado }}</p>{% endif %}
 <table repeat="1"><thead><tr><th style="width: 75%;">Concepto</th><th style="width: 25%;" class="right">Importe</th></tr></thead><tbody>
 {% for nombre, saldo, tipo in filas_er %}<tr class="{{ tipo }}"><td>{{ nombre }}</td><td class="right">{{ saldo|formato_importe }}</td></tr>{% endfor %}

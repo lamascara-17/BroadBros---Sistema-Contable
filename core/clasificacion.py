@@ -3,6 +3,42 @@ import re
 import unicodedata
 
 
+def rubro_resultados(cuenta):
+    """Respeta la clasificación explícita y los nombres de catálogos históricos."""
+    sub = cuenta.subcategoria
+    if cuenta.tipo == 'ingreso':
+        if sub == 'otro_ingreso':
+            return 'otros_ingresos'
+    else:
+        explicitos = {'costo_ventas': 'costo_ventas', 'gasto_operativo': 'gastos_operativos',
+                      'gasto_financiero': 'gastos_financieros', 'otro_gasto': 'otros_gastos',
+                      'impuesto_ganancias': 'impuesto_ganancias'}
+        if sub in explicitos:
+            return explicitos[sub]
+    nombre = ''.join(c for c in unicodedata.normalize('NFKD', cuenta.nombre.lower())
+                     if not unicodedata.combining(c))
+    try:
+        grupo = int(cuenta.codigo[:2])
+    except ValueError:
+        grupo = 0
+    # Los códigos antiguos (por ejemplo 4901 y 6901) no siguen el PCGE.
+    if cuenta.tipo == 'ingreso':
+        otros = re.search(r'donacion|ingresos? financieros?|intereses|otros ingresos', nombre)
+        return 'otros_ingresos' if otros or grupo in (73, 75, 76, 77) else 'ventas'
+    if re.search(r'impuesto.*(?:ganancia|renta)', nombre):
+        return 'impuesto_ganancias'
+    if re.search(r'incendio|siniestro', nombre):
+        return 'otros_gastos'
+    if re.search(r'gastos? financieros?|intereses', nombre):
+        return 'gastos_financieros'
+    if re.search(r'costo.*ventas?', nombre):
+        return 'costo_ventas'
+    return ('impuesto_ganancias' if grupo in (87, 88) else
+            'costo_ventas' if grupo == 69 else
+            'gastos_financieros' if grupo == 67 else
+            'otros_gastos' if grupo == 66 else 'gastos_operativos')
+
+
 def activo_no_corriente(codigo, nombre, subcategoria=''):
     if subcategoria in ('activo_corriente', 'activo_no_corriente'):
         return subcategoria == 'activo_no_corriente'

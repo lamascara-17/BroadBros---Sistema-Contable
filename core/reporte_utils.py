@@ -61,6 +61,7 @@ def get_reporte_context():
     pasivo_corriente, pasivo_no_corriente, patrimonio = [], [], []
     er = {k: [] for k in ('ventas', 'costo_ventas', 'gastos_operativos', 'gastos_financieros', 'otros_ingresos', 'otros_gastos','impuesto_ganancias')}
     ecp=[];transferido=CERO
+    resultado_libros=CERO
     for cuenta in cuentas:
         t = totales.get(cuenta.pk, {'debe': CERO, 'haber': CERO})
         d, h = t['debe'], t['haber']
@@ -94,17 +95,16 @@ def get_reporte_context():
             transferido+=resultado
             ecp.append({'nombre':f'{cuenta.codigo} · {cuenta.nombre}','inicial':inicial,'variacion':saldo-inicial-resultado,'resultado':resultado,'final':saldo})
         else:
+            # Conciliación independiente: saldos del mayor, sin apertura,
+            # más el resultado transferido por los cierres al patrimonio.
+            resultado_libros += h - d - aperturas[cuenta.pk]
             # El destino analítico 9/79 no vuelve a reconocer el gasto por naturaleza.
             if cuenta.codigo.startswith('9') or grupo==79:
                 continue
             op=operativos[cuenta.pk]
             item={'cuenta':cuenta,'saldo':op['haber']-op['debe'] if cuenta.tipo=='ingreso' else op['debe']-op['haber']}
-            if cuenta.tipo == 'ingreso':
-                clave = 'otros_ingresos' if cuenta.subcategoria == 'otro_ingreso' or grupo in (73,75,76,77) else 'ventas'
-            else:
-                clave = {'costo_ventas': 'costo_ventas', 'gasto_financiero': 'gastos_financieros', 'otro_gasto': 'otros_gastos','impuesto_ganancias':'impuesto_ganancias'}.get(cuenta.subcategoria)
-                if clave is None:
-                    clave = 'impuesto_ganancias' if grupo in (87,88) else 'costo_ventas' if grupo == 69 else 'gastos_financieros' if grupo==67 else 'otros_gastos' if grupo == 66 else 'gastos_operativos'
+            from .clasificacion import rubro_resultados
+            clave = rubro_resultados(cuenta)
             er[clave].append(item)
 
     suma = lambda items: sum((item['saldo'] for item in items), CERO)
@@ -134,10 +134,12 @@ def get_reporte_context():
     ctx['pendientes_flujo']=pendientes_flujo
     ctx['nota_flujos']='Flujos calculados a partir de cobros y pagos registrados; las operaciones sin efectivo se excluyen. Revise la clasificación de los asientos señalados y los saldos de apertura.'
     ctx['nota_resultado'] = (
-        'Resultado provisional: el caso no proporciona costo de ventas ni inventario final. '
-        'Los saldos muestran únicamente los movimientos registrados, sin un ajuste de existencias.'
-        if ctx['total_ventas'] and not ctx['total_costo_ventas'] and any(c.codigo.startswith('20') for c in cuentas if c.pk in totales) and
-        any(a.descripcion == 'Por los saldos de apertura del ejercicio' for a in asientos)
+        'Resultado provisional: hay ventas y mercaderías, pero no hay costo de ventas registrado. '
+        'Verifique el inventario y su ajuste antes de considerar definitivo el resultado.'
+        if ctx['total_ventas'] and not ctx['total_costo_ventas'] and any(
+            c.tipo == 'activo' and (c.codigo.startswith('20') or
+                re.search(r'mercader|inventario|existencias', c.nombre, re.I))
+            for c in cuentas if c.pk in totales)
         else ''
     )
     pendientes_importacion = [a.observaciones_importacion for a in asientos if a.observaciones_importacion]
@@ -152,6 +154,22 @@ def get_reporte_context():
     ctx['total_patrimonio_con_resultados'] = ctx['total_patrimonio'] + ctx['resultados_acumulados']
     ctx['total_pasivo_patrimonio'] = ctx['total_pasivos'] + ctx['total_patrimonio_con_resultados']
     ctx['esta_balanceado'] = ctx['total_activos'] == ctx['total_pasivo_patrimonio']
+    ctx['resultado_segun_libros'] = resultado_libros + transferido
+    ctx['diferencia_resultado'] = ctx['resultado_neto'] - ctx['resultado_segun_libros']
+    ctx['notas_consistencia'] = []
+    if ctx['diferencia_resultado']:
+        ctx['notas_consistencia'].append(
+            f"El resultado no coincide con los saldos del mayor y los cierres: diferencia S/ {ctx['diferencia_resultado']:,.2f}. Revise la clasificación de cuentas y asientos.")
+    if not ctx['esta_balanceado'] or ctx['gran_total_debe'] != ctx['gran_total_haber']:
+        ctx['notas_consistencia'].append('Los libros o el estado de situación financiera no cuadran. Revise los movimientos registrados.')
+    for a in asientos:
+        movs = list(a.movimientos.all())
+        inventario = any(m.cuenta.tipo == 'activo' and
+                         (m.cuenta.codigo.startswith('20') or re.search(r'mercader|inventario|existencias', m.cuenta.nombre, re.I))
+                         for m in movs)
+        if inventario and any(m.cuenta.tipo == 'patrimonio' for m in movs) and re.search(r'ajuste.*inventario|costo de ventas', a.descripcion, re.I):
+            ctx['notas_consistencia'].append(
+                f'Asiento {a.numero}: el ajuste de inventario afecta directamente al patrimonio. Verifique si corresponde registrar costo de ventas; el cuadre no garantiza que el resultado sea correcto.')
     return ctx
 
 
