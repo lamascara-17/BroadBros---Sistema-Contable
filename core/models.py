@@ -141,3 +141,21 @@ class Movimiento(models.Model):
     def __str__(self):
         return f"{self.cuenta} — {self.get_tipo_display()}: S/ {self.monto:,.2f}"
     #a
+
+
+class FinancialRatioPeriod(models.Model):
+    """Datos externos independientes del ejercicio contable activo."""
+    ticker = models.CharField(max_length=12)
+    year = models.PositiveIntegerField()
+    name = models.CharField(max_length=120)
+    industry = models.CharField(max_length=160, blank=True)
+    currency = models.CharField(max_length=3, default='USD')
+    period_start = models.DateField()
+    period_end = models.DateField()
+    previous_end = models.DateField()
+    values = models.JSONField(default=dict)
+    source_url = models.URLField(max_length=600, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['ticker', 'year'], name='ratio_company_year_unique')]
