@@ -122,7 +122,9 @@ class PreparacionRenderTests(Visitantes, TransactionTestCase):
             self.assertEqual(historico.read(),vigente.read())
 
     def test_parser_rechaza_profundo_campo_gigante_duplicado_y_listas_no_acotadas(self):
-        casos = [b'[' * 13 + b'0' + b']' * 13,
+        casos = [b'{"asientos":[],"cuentas":[{"nombre":"'+b'a'*201+b'"}]}',
+            b'{"asientos":[],"cuentas":[{"fuente":"dato fuera de lugar"}]}',
+            b'[' * 13 + b'0' + b']' * 13,
             b'{"asientos":[],"cuentas":[],"version":1,"version":1}',
             b'{"asientos":[],"cuentas":[],"formato":"'+b'a'*200001+b'"}',
             b'{"asientos":[],"cuentas":[[]]}',

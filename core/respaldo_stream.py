@@ -133,6 +133,15 @@ def validar_archivo(archivo):
     proteger_parser(archivo)
     try:
         claves = set()
+        campos = {
+            '': {'formato','version','asientos','cuentas'},
+            'cuentas.item': {'codigo','nombre','tipo','subcategoria'},
+            'asientos.item': {'fecha','descripcion','clase','flujo_efectivo','fecha_cierre','fuente','observaciones','movimientos'},
+            'asientos.item.movimientos.item': {'codigo','nombre','tipo_cuenta','subcategoria','tipo_movimiento','monto'},
+        }
+        largos = {'fuente':20000,'observaciones':10000,'descripcion':2000,'nombre':200,
+            'codigo':20,'fecha':10,'fecha_cierre':10,'tipo':20,'tipo_cuenta':20,
+            'subcategoria':20,'clase':12,'flujo_efectivo':12,'tipo_movimiento':5,'monto':100,'formato':9}
         archivo.seek(0)
         inicio = True
         objetos = []
@@ -141,6 +150,10 @@ def validar_archivo(archivo):
             if inicio:
                 if (prefijo, evento) != ('', 'start_map'): raise ValueError('El respaldo debe ser un objeto JSON.')
                 inicio = False
+            if evento == 'string' and len(valor) > largos.get(prefijo.rsplit('.',1)[-1], 200):
+                raise ValueError('Un campo del respaldo excede el tamaño permitido.')
+            if evento == 'map_key' and valor not in campos.get(prefijo, set()):
+                raise ValueError('Campo no permitido en esta parte del respaldo.')
             if prefijo in ('asientos.item', 'cuentas.item', 'asientos.item.movimientos.item') and evento not in ('start_map', 'map_key', 'end_map'):
                 raise ValueError('Cada cuenta, asiento y movimiento debe ser un objeto.')
             if evento == 'start_map':
