@@ -53,8 +53,9 @@ class WorkspaceMiddleware:
         request.session['workspace_id'] = str(workspace.pk)
         token = actual.set(workspace.pk)
         try:
-            recurso = (request.method == 'POST' and request.path.startswith('/casos-anteriores/') and
-                       (request.path.endswith('/importar/') or request.path.endswith('/restaurar/')))
+            recurso = (request.method == 'POST' and (request.path == '/caso/nuevo/' or
+                       (request.path.startswith('/casos-anteriores/') and
+                        (request.path.endswith('/importar/') or request.path.endswith('/restaurar/')))))
             descarga = (request.method == 'GET' and request.path.startswith('/casos-anteriores/') and
                         (request.path.endswith('/actual/') or request.path.endswith('/descargar/')))
             if recurso or descarga:

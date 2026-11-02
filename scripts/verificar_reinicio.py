@@ -59,6 +59,13 @@ with tempfile.TemporaryDirectory(prefix='broadbros-http-') as carpeta:
             proceso=iniciar()
             assert a.get('/casos-anteriores/actual/').json()==antes
             assert b.get('/casos-anteriores/actual/').json()['asientos']==[]
-            print('HTTP/Gunicorn: registro con CSRF, 7 reportes, ratios, importadores y dos visitantes: OK. Reinicio conserva sesión y caso: OK.')
+            a.post('/caso/nuevo/',data={'csrfmiddlewaretoken':csrf(a,'/')}).raise_for_status()
+            assert a.get('/casos-anteriores/actual/').json()['asientos']==[]
+            historial=a.get('/casos-anteriores/').text
+            restauracion=re.search(r'action="(/casos-anteriores/\d+/restaurar/)"',historial).group(1)
+            a.post(restauracion,data={'csrfmiddlewaretoken':csrf(a,'/casos-anteriores/')}).raise_for_status()
+            assert a.get('/casos-anteriores/actual/').json()==antes
+            assert b.get('/casos-anteriores/actual/').json()['asientos']==[]
+            print('HTTP/Gunicorn: registro con CSRF, 7 reportes, ratios, importadores y dos visitantes: OK. Reinicio, nuevo caso y restauración conservan datos: OK.')
         finally:
             proceso.terminate();proceso.wait(timeout=10)

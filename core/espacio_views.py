@@ -114,3 +114,36 @@ def importar_respaldo(request):
     except (ValueError, ArithmeticError) as exc:
         messages.error(request,str(exc))
     return redirect('respaldos')
+
+
+@require_POST
+def nuevo_caso(request):
+    """Un único ejercicio activo, con recuperación del anterior en la misma sesión."""
+    from django.contrib import messages
+    from django.db import transaction, DatabaseError
+    from django.db.models import F
+    from .contexto_bot import bloquear_caso, limpiar_tras_guardado
+    from .models import AsientoContable, CuentaContable, Workspace
+    from .respaldos import crear_respaldo
+    from .workspaces import workspace_actual
+    workspace = workspace_actual()
+    if workspace is None:
+        return HttpResponse('Recarga la página para recuperar tu espacio de trabajo.', status=400)
+    try:
+        with transaction.atomic():
+            bloquear_caso()
+            crear_respaldo()
+            AsientoContable.objects.all().delete()
+            CuentaContable.objects.all().delete()
+            # Incluso un caso vacío puede tener conversación. Invalida respuestas
+            # pendientes y limpia turnos dentro de la misma transacción.
+            Workspace.objects.filter(pk=workspace).update(
+                revision_contable=F('revision_contable') + 1,
+                bot_sequence=F('bot_sequence') + 1, bot_revision=None, bot_turnos=[])
+            limpiar_tras_guardado(request.session)
+        messages.success(request, 'Puedes empezar otro caso. El anterior, si tenía datos, está en Casos anteriores.')
+    except (ValueError, ArithmeticError) as exc:
+        messages.error(request, f'No se inició otro caso: {exc} El caso actual se conserva.')
+    except DatabaseError:
+        messages.error(request, 'No se pudo iniciar otro caso. No se guardaron cambios; inténtalo nuevamente.')
+    return redirect('index')

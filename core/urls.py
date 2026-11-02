@@ -6,6 +6,7 @@ from .audio_respuesta import respuesta_audio
 from .ratio_views import financial_ratios, ratios_caso
 
 urlpatterns = [
+    path('caso/nuevo/', espacio_views.nuevo_caso, name='nuevo_caso'),
     path('ratios-caso/', ratios_caso, name='ratios_caso'),
     path('ingresar/', espacio_views.acceso_libre, name='login'),
     path('salir/', espacio_views.acceso_libre, name='logout'),
