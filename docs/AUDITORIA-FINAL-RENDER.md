@@ -31,7 +31,7 @@ Por indicación del propietario, esta fase trabaja exclusivamente con GitHub y p
 
 No se modificó el diseño ni se eliminaron módulos. Continúa el acceso público sin login y el aislamiento por sesión anónima. Las rutas antiguas de registro/login siguen redirigiendo al inicio sin crear cuentas.
 
-La revisión crece por modificación de fila, no necesariamente una sola vez por operación de negocio. Su función es detectar cambios confirmados, no numerar documentos. Las copias/archivos temporales se preparan antes de devolver la descarga, por lo que una validación fallida no entrega un JSON parcial.
+La revisión cambia por escritura SQL; PostgreSQL agrupa las filas afectadas mediante tablas de transición para evitar actualizar miles de veces el mismo workspace en un bulk. No corresponde necesariamente a una sola versión por operación de negocio. Su función es detectar cambios confirmados, no numerar documentos. Las copias/archivos temporales se preparan antes de devolver la descarga, por lo que una validación fallida no entrega un JSON parcial.
 
 ## Pruebas y evidencia
 

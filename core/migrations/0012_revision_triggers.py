@@ -27,8 +27,21 @@ def install(apps, schema_editor):
             if vendor == 'sqlite':
                 schema_editor.execute(f'CREATE TRIGGER {name} AFTER {event} ON {table} BEGIN {update} END')
             else:
-                schema_editor.execute(f'CREATE FUNCTION {name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN {update} RETURN NULL; END; $$')
-                schema_editor.execute(f'CREATE TRIGGER {name} AFTER {event} ON {table} FOR EACH ROW EXECUTE FUNCTION {name}()')
+                # Las tablas de transición agrupan los workspaces afectados por
+                # un bulk INSERT/UPDATE/DELETE. Evita una cadena MVCC de decenas
+                # de miles de versiones de la misma fila durante una importación.
+                transiciones = [('newrows' if row == 'NEW' else 'oldrows', row) for row in rows]
+                consultas = []
+                for alias, row in transiciones:
+                    if table == 'core_movimiento':
+                        consultas.append(f'SELECT a.workspace_id FROM core_asientocontable a JOIN {alias} r ON a.id = r.asiento_id')
+                    else:
+                        consultas.append(f'SELECT workspace_id FROM {alias}')
+                afectados = ' UNION '.join(consultas)
+                referencia = ' '.join(f'{row} TABLE AS {alias}' for alias, row in transiciones)
+                statement = f'UPDATE core_workspace SET revision_contable = revision_contable + 1 WHERE id IN ({afectados});'
+                schema_editor.execute(f'CREATE FUNCTION {name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN {statement} RETURN NULL; END; $$')
+                schema_editor.execute(f'CREATE TRIGGER {name} AFTER {event} ON {table} REFERENCING {referencia} FOR EACH STATEMENT EXECUTE FUNCTION {name}()')
 
 
 def uninstall(apps, schema_editor):
