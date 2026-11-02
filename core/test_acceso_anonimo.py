@@ -284,3 +284,123 @@ class AccesoAnonimoTests(TestCase):
         self.assertEqual(len(self.diario(self.a)),7)
         self.assertTrue(self.b.get(reverse('respaldos')).context['respaldos'])
         with self.assertRaises(CommandError):call_command('asignar_historico',workspace=destino,confirmar=True,stdout=StringIO())
+
+    def test_qr_solo_abre_camara_y_explica_como_mover_el_caso(self):
+        self.sembrar(self.a)
+        pantalla=self.a.get(reverse('cargar_imagen_diario'))
+        self.assertContains(pantalla,'no se envían a esta computadora ni se vinculan los espacios')
+        self.assertContains(pantalla,'descarga su respaldo JSON')
+        self.assertContains(pantalla,'id="qrcode-container"')
+        self.assertNotContains(pantalla,'Continuar desde el celular')
+        self.assertNotContains(pantalla,self.a.session['workspace_id'])
+        self.assertIn(reverse('respaldos'),Elementos(pantalla.content.decode()).links)
+        # El URL que genera el QR solo contiene la ruta y camara=1.
+        celular=self.b.get(reverse('cargar_imagen_diario')+'?camara=1')
+        self.assertEqual(celular.status_code,200)
+        self.assertEqual(self.diario(self.b),[])
+        self.assertEqual(len(self.diario(self.a)),7)
+        self.assertNotEqual(self.a.session['workspace_id'],self.b.session['workspace_id'])
+
+    def test_descripcion_obligatoria_en_alta_y_edicion(self):
+        self.sembrar(self.a,novatech()[:1])
+        for ruta,identificador in [('registrar_asiento','id_descripcion'),('libro_diario','edit_descripcion')]:
+            pagina=self.a.get(reverse(ruta))
+            self.assertContains(pagina,'Descripción (obligatoria)')
+            campo=next(c for c in Elementos(pagina.content.decode()).inputs if c.get('id')==identificador)
+            self.assertIn('required',campo)
+            self.assertEqual(campo['maxlength'],'2000')
+        cuentas={c.codigo:c.pk for c in self.a.get(reverse('registrar_asiento')).context['cuentas']}
+        datos={'fecha':'2025-10-02','descripcion':'','num_movimientos':'2',
+               'cuenta_0':cuentas['101'],'cuenta_1':cuentas['50'],'tipo_0':'debe','tipo_1':'haber',
+               'monto_0':'100','monto_1':'100'}
+        original=self.respaldo(self.a)
+        pk=self.diario(self.a)[0].pk
+        for descripcion in ('','   ','x'*2001):
+            entrada={**datos,'descripcion':descripcion}
+            self.assertContains(self.a.post(reverse('registrar_asiento'),entrada),'Revise la descripción')
+            self.assertContains(self.a.post(reverse('editar_asiento',args=[pk]),entrada,follow=True),'Revise la descripción')
+            self.assertEqual(self.respaldo(self.a),original)
+        self.assertRedirects(self.a.post(reverse('registrar_asiento'),{**datos,'descripcion':'Nuevo aporte'}),reverse('libro_diario'))
+        self.assertEqual(len(self.diario(self.a)),2)
+        self.assertEqual(self.diario(self.b),[])
+
+    def preparar_historial(self):
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        self.sembrar(self.a,novatech()[:1])
+        contenido=self.respaldo(self.a)
+        token=actual.set(self.a.session['workspace_id'])
+        try:
+            filas=RespaldoCaso.objects.bulk_create([
+                RespaldoCaso(datos=contenido['asientos'],catalogo=contenido['cuentas']) for _ in range(55)])
+            inicio=datetime(2026,10,1,12,tzinfo=ZoneInfo('America/Lima'))
+            for indice,fila in enumerate(filas):
+                RespaldoCaso.objects.filter(pk=fila.pk).update(created_at=inicio+timedelta(days=indice//20))
+            # Límites exactos: UTC 05:00 equivale a las 00:00 de Lima.
+            RespaldoCaso.objects.filter(pk=filas[20].pk).update(created_at=inicio.replace(day=2,hour=0))
+            RespaldoCaso.objects.filter(pk=filas[39].pk).update(created_at=inicio.replace(day=2,hour=23,minute=59,second=59))
+        finally:actual.reset(token)
+        token=actual.set(self.b.session['workspace_id'])
+        try:
+            ajeno=RespaldoCaso.objects.create(datos=contenido['asientos'],catalogo=contenido['cuentas'])
+            RespaldoCaso.objects.filter(pk=ajeno.pk).update(created_at=inicio.replace(day=2))
+        finally:actual.reset(token)
+        return filas
+
+    def test_paginacion_recupera_respaldos_anteriores_a_los_cincuenta(self):
+        filas=self.preparar_historial()
+        vistos=[]
+        for numero,cuantos in ((1,20),(2,20),(3,15)):
+            pagina=self.a.get(reverse('respaldos'),{'pagina':numero})
+            self.assertEqual(pagina.context['pagina'].paginator.count,55)
+            self.assertEqual(pagina.context['pagina'].number,numero)
+            self.assertEqual(len(pagina.context['respaldos']),cuantos)
+            vistos.extend(r.pk for r in pagina.context['respaldos'])
+            self.assertContains(pagina,f'Página {numero} de 3')
+        self.assertEqual(vistos,[r.pk for r in reversed(filas)])
+        mas_antiguo=filas[0]
+        self.assertEqual(self.a.get(reverse('descargar_respaldo',args=[mas_antiguo.pk])).status_code,200)
+        self.assertRedirects(self.a.post(reverse('restaurar_respaldo',args=[mas_antiguo.pk])),reverse('respaldos'))
+        self.assertEqual(len(self.diario(self.a)),1)
+        self.assertEqual(self.b.get(reverse('descargar_respaldo',args=[mas_antiguo.pk])).status_code,404)
+        self.assertEqual(self.b.post(reverse('restaurar_respaldo',args=[mas_antiguo.pk])).status_code,404)
+        self.assertEqual(self.b.get(reverse('respaldos')).context['pagina'].paginator.count,1)
+
+    def test_busqueda_fechas_inclusivas_lima_conserva_filtros_y_aislamiento(self):
+        filas=self.preparar_historial()
+        url=reverse('respaldos')
+        r=self.a.get(url,{'desde':'2026-10-02','hasta':'2026-10-02'})
+        self.assertEqual({r.pk for r in r.context['respaldos']},{r.pk for r in filas[20:40]})
+        self.assertEqual(r.context['pagina'].paginator.count,20)
+        desde=self.a.get(url,{'desde':'2026-10-02'})
+        self.assertEqual(desde.context['pagina'].paginator.count,35)
+        hasta=self.a.get(url,{'hasta':'2026-10-01'})
+        self.assertEqual(hasta.context['pagina'].paginator.count,20)
+        r=self.a.get(url,{'desde':'2026-10-01','hasta':'2026-10-03'})
+        link=next(link for link in Elementos(r.content.decode()).links if 'pagina=2' in link)
+        self.assertIn('desde=2026-10-01',link);self.assertIn('hasta=2026-10-03',link)
+        siguiente=self.a.get(url+link)
+        self.assertEqual(siguiente.context['pagina'].number,2)
+        self.assertEqual(siguiente.context['pagina'].paginator.count,55)
+        self.assertContains(siguiente,'value="2026-10-01"')
+        self.assertEqual(self.b.get(url,{'desde':'2026-10-01','hasta':'2026-10-03'}).context['pagina'].paginator.count,1)
+        # Una fecha de operación no se usa como fecha de guardado del respaldo.
+        self.assertEqual(self.a.get(url,{'desde':'2025-10-01','hasta':'2025-10-31'}).context['pagina'].paginator.count,0)
+
+    def test_busqueda_invalida_vacia_y_paginas_fuera_de_rango(self):
+        self.preparar_historial()
+        for filtro in ({'desde':'2026-02-30'},{'hasta':'<script>'},{'desde':'2026-10-03','hasta':'2026-10-01'}):
+            with self.subTest(filtro=filtro):
+                r=self.a.get(reverse('respaldos'),filtro)
+                self.assertEqual(r.status_code,200)
+                self.assertFalse(r.context['formulario_busqueda'].is_valid())
+                self.assertEqual(r.context['pagina'].paginator.count,0)
+                if filtro.get('hasta')=='<script>': self.assertContains(r,'&lt;script&gt;')
+        for valor in ('abc','0','-1','9999999999999999999999999999999'):
+            r=self.a.get(reverse('respaldos'),{'pagina':valor})
+            self.assertEqual(r.status_code,200)
+            self.assertLessEqual(r.context['pagina'].number,3)
+            self.assertEqual(r.context['pagina'].paginator.count,55)
+        vacia=self.a.get(reverse('respaldos'),{'desde':'2027-01-01'})
+        self.assertContains(vacia,'No hay respaldos que coincidan')
+        self.assertEqual(vacia.context['pagina'].paginator.count,0)

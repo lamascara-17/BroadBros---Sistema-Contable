@@ -45,7 +45,7 @@ El caso B necesita revisar la contrapartida del ajuste de 3 400 según el enunci
 
 - Suite previa sin cambios: 123 pruebas correctas.
 - CI en `.github/workflows/django-tests.yml`; resultado remoto del nuevo commit verificado por separado al terminar.
-- Suite final: **149 pruebas correctas** (Python 3.12.14, Django 5.2, base temporal/en memoria).
+- Suite final: **154 pruebas correctas** (Python 3.12.14, Django 5.2, base temporal/en memoria).
 - Casos A–H: reglas, importación de texto/TXT/imagen simulada, impuestos explícitos, faltantes, importes inválidos, 17 indicadores, contexto del bot y voz con servicios simulados.
 - Clientes HTTP anónimos con aislamiento real: módulos, enlaces internos resueltos, formularios POST con CSRF y confirmación, registro/edición/borrado, texto/TXT/imagen y revisión, siete reportes PDF/XLSX, CSV, bot, voz y audio. Dos visitantes no pueden leer, editar, eliminar, descargar o restaurar datos ajenos.
 - Mismo usuario administrativo en dos dispositivos conserva espacios públicos independientes; salir de Django Admin preserva el espacio anónimo anterior. Las fixtures históricas emplean `acceso_administrativo()` explícito; las nuevas pruebas públicas no usan ese bypass. No son pruebas de clics de todos los navegadores.
@@ -94,3 +94,11 @@ La eliminación de `db.sqlite3` del índice Git no borra la copia desplegada ni 
 - Para un catálogo didáctico/histórico se preservan los registros originales y se muestran advertencias. Las nuevas altas/importaciones se validan como familias PCGE, sin una conversión masiva de historia.
 
 Las cuotas públicas actuales son 12 consultas de chat y 6 solicitudes de voz, audio, importación o revisión por espacio/endpoint/minuto, además de 120 solicitudes de IA por IP/minuto. Se utiliza REMOTE_ADDR, sin confiar en X-Forwarded-For suministrado por visitantes. Si el proxy concentra visitantes en una sola dirección, comparten ese límite de IP; Redis permite compartir contadores entre procesos. CSRF, validación de archivos y claves exclusivamente en el servidor se mantienen.
+
+
+## Revisión de QR, registro y recuperación de respaldos
+
+- El QR se mantiene como acceso a la cámara del celular. No empareja dispositivos ni envía fotografías o resultados a la computadora. La sección ahora explica esa limitación y enlaza a Casos anteriores y respaldos para mover un caso mediante JSON. Se retiró el título ambiguo «Continuar desde el celular». No se añadió un enlace que permita acceder al espacio ajeno ni se exige una cuenta.
+- Descripción obligatoria en registro y edición, con `required` y `maxlength=2000`, de acuerdo con el validador común del servidor. Vacío, solo espacios y exceso de longitud se rechazan sin modificar el caso.
+- Historial completo de respaldos paginado de 20 en 20, con orden estable por fecha de guardado e ID descendentes. Búsqueda opcional Desde/Hasta por fecha de guardado, ambos extremos incluidos y hora de Lima. Los enlaces conservan los filtros; fechas inválidas o rangos invertidos muestran errores, sin lanzar excepciones. Se mantienen descarga, importación y restauración JSON.
+- Cinco pruebas adicionales: limitación del QR y aislamiento PC/celular, descripción en ambos formularios y servidor, acceso a los 55 respaldos (incluidos los anteriores al límite previo), búsqueda inclusiva con límites horarios y conservación de filtros, fechas/páginas inválidas y resultados vacíos. Se reutiliza la cobertura integral de visitantes anónimos de todos los módulos, registro, importación, libros, siete estados/exportaciones y ratios. Proveedores de IA/audio simulados y base de pruebas aislada.

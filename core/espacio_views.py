@@ -10,7 +10,26 @@ def acceso_libre(request):
 
 
 def respaldos(request):
-    return render(request, 'respaldos.html', {'respaldos': RespaldoCaso.objects.order_by('-created_at')[:50]})
+    from django.core.paginator import Paginator
+    from urllib.parse import urlencode
+    from .forms import BuscarRespaldosForm
+
+    formulario = BuscarRespaldosForm(request.GET)
+    casos = RespaldoCaso.objects.order_by('-created_at', '-pk')
+    filtros = {}
+    if formulario.is_valid():
+        for campo, lookup in (('desde', 'created_at__date__gte'), ('hasta', 'created_at__date__lte')):
+            fecha = formulario.cleaned_data[campo]
+            if fecha:
+                casos = casos.filter(**{lookup: fecha})
+                filtros[campo] = fecha.isoformat()
+    else:
+        casos = casos.none()
+    pagina = Paginator(casos, 20).get_page(request.GET.get('pagina'))
+    return render(request, 'respaldos.html', {
+        'respaldos': pagina.object_list, 'pagina': pagina,
+        'formulario_busqueda': formulario, 'filtros_url': urlencode(filtros),
+    })
 
 
 @require_POST
