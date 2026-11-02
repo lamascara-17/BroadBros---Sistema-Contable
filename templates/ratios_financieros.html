@@ -6,7 +6,7 @@
 {% block content %}<p><a class="btn btn-secondary" href="{% url 'ratios_caso' %}">Ver ratios del caso contable activo</a></p>
 <link rel="stylesheet" href="{% static 'css/ratios.css' %}?v=exports3">
 <div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
-    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-visual" class="btn btn-primary btn-sm">Ver gráficos</a><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><a class="btn btn-secondary btn-sm" id="ratio-print" href="?{{ export_query }}&amp;descargar=pdf">Descargar PDF</a></div></div>
+    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-visual" class="btn btn-primary btn-sm">Ver gráficos</a><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><a class="btn btn-primary btn-sm" href="?{{ export_query }}&amp;descargar=xlsx">Descargar Excel</a><a class="btn btn-secondary btn-sm" id="ratio-print" href="?{{ export_query }}&amp;descargar=pdf">Descargar PDF</a></div></div>
     <p class="ratio-presentation-note" hidden>Modo exposición · {{ company.name }} ({{ ticker }}), FY{{ year }}. Datos externos al {{ as_of }}; grupo académico, no índice oficial del sector.</p>
     <section class="ratio-hero" aria-labelledby="ratio-company">
         <div class="ratio-hero-main"><span class="ratio-eyebrow">ANÁLISIS COMPARATIVO / FY{{ year }}</span>
