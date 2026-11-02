@@ -57,6 +57,44 @@ propiedad y equipo por sí solo no incluye toda la amortización adquirida.
 KLA no presenta subtotal operativo: se deriva de ventas menos costo, I+D,
 administración/ventas y deterioro operativo. Componentes documentados en JSON.
 
+## Cierre de verificación de Broadcom FY2025
+
+El 10-K oficial confirma utilidad neta de **23.126 millones USD** en el estado de
+resultados (p. 48) y como numerador de utilidad por acciones comunes en la nota 8
+(p. 69), con la política de cálculo por acción en p. 57. Fuente:
+https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/avgo-20251102.htm
+
+Por tanto se completa el dato que antes permanecía N/D por falta de verificación:
+
+- Margen neto: 23.126 / 63.887 = **36,20 %**.
+- ROE: 23.126 / ((81.292 + 67.678) / 2) = **31,05 %**.
+- DuPont utiliza las mismas partidas y concilia con ese ROE.
+
+La excepción revisada está en `core/data/verified_financial_inputs.json` y el
+constructor la aplica solamente a esa empresa, periodo, moneda y fecha de
+publicación. No habilita `ProfitLoss` como sustituto genérico de utilidad
+atribuible en otras empresas. La fuente y la explicación se muestran junto al
+dato y se conservan en CSV. Los datos ingresados por el usuario siguen teniendo
+precedencia y no se reemplazan por esta corrección estática.
+
+Se contrastaron de nuevo las 17 fórmulas con los resultados guardados de 2016
+del Excel S7 original recibido (hoja Ratios Financieros: L3, L6, L8, L12, L15,
+L18, L21, L37, L40, L43, L46, L52, L54, L56, L58, L63 y L66), con tolerancia
+inferior a 1e-9. Los libros originales solo se leyeron; no se modificaron.
+
+La pantalla distingue utilidad desconocida, cero, pérdida y ganancia. No
+concluye ausencia de utilidad a partir de un dato faltante. Si la liquidez no es
+calculable tampoco afirma una cobertura numérica. El texto del ROA muestra la
+tasa realmente seleccionada; CSV conserva tasa, supuestos y advertencias de
+aproximación, además de los 17 valores mostrados. Los datos manuales exportan
+su fuente ingresada y su condición de manuales; no se atribuyen a SEC por heredar
+el ticker de una compañía ya incluida.
+
+El grupo sigue teniendo las nueve empresas identificadas. No se incorpora una
+décima inventada. Los indicadores no calculables de otras empresas permanecen
+N/D con su explicación; esta verificación no recertifica cada partida de todos
+los informes de las nueve compañías.
+
 ## Persistencia e integración
 
 `FinancialRatioPeriod` guarda versiones manuales por ticker y ejercicio. GET no

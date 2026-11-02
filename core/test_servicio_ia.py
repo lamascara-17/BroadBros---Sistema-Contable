@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 import httpx
 from groq import APIStatusError, APIConnectionError, APITimeoutError
 from django.test import SimpleTestCase, override_settings
+from .test_support import AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from .servicio_ia import solicitar_json, leer_json
 from .test_ciclo_contable import imagen

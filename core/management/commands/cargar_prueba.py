@@ -13,9 +13,13 @@ siguientes transacciones de octubre 2026:
 7. Gastos administrativos: S/ 3,000
 
 Uso:
-    python manage.py cargar_prueba
+    python manage.py cargar_prueba --workspace UUID
 """
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from core.models import Workspace
+from core.workspaces import actual
 from core.models import CuentaContable, AsientoContable, Movimiento
 from decimal import Decimal
 from datetime import date
@@ -24,7 +28,24 @@ from datetime import date
 class Command(BaseCommand):
     help = 'Carga datos de prueba: empresa AMD Tech Perú S.A.C.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--workspace', required=True, help='UUID del espacio de prueba; nunca se borran otros espacios.')
+
     def handle(self, *args, **options):
+        try:
+            espacio = Workspace.objects.get(pk=options['workspace'])
+        except (ValueError, ValidationError, Workspace.DoesNotExist):
+            raise CommandError('Espacio de prueba inexistente o inválido.')
+        token = actual.set(espacio.pk)
+        try:
+            with transaction.atomic():
+                self.cargar()
+        finally:
+            actual.reset(token)
+
+    def cargar(self):
+        from core.respaldos import crear_respaldo
+        crear_respaldo()
         self.stdout.write(self.style.WARNING('Eliminando datos existentes...'))
         Movimiento.objects.all().delete()
         AsientoContable.objects.all().delete()

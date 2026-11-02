@@ -125,7 +125,32 @@ def financial_ratios(request):
         for c in companies:
             for p in c['periods']:
                 if p['year']==year:
-                    writer.writerow([safe_csv(c['ticker']),p['start'],p['end'],p['currency'],safe_csv(c.get('source_url',''))])
+                    fuente = p.get('manual_source', '') if p.get('edited') else c.get('source_url', '')
+                    origen = 'Datos ingresados por el usuario' if p.get('edited') else 'Datos publicados'
+                    writer.writerow([safe_csv(c['ticker']),p['start'],p['end'],p['currency'],safe_csv(fuente),origen])
+        writer.writerow(['Método y supuestos'])
+        for note in report['selected']['assumptions']:
+            writer.writerow(['Supuesto', safe_csv(note)])
+        writer.writerow(['ROA', 'Tasa académica de referencia; no es la tasa efectiva de la compañía.'])
+        writer.writerow(['EBITDA', 'Utilidad operativa + D&A; no es EBITDA ajustado.'])
+        net_source = period['provenance'].get('net_income', {})
+        if net_source.get('verified'):
+            writer.writerow(['Verificación de utilidad', safe_csv(net_source['url']), safe_csv(net_source['note'])])
         return HttpResponse('\ufeff'+stream.getvalue(),content_type='text/csv; charset=utf-8',
             headers={'Content-Disposition':f'attachment; filename="Ratios_{ticker}_{year}.csv"'})
     return render(request,'ratios_financieros.html',context)
+
+
+def ratios_caso(request):
+    from .ratios_caso import calcular_caso
+    reporte = calcular_caso()
+    if request.GET.get('descargar') == 'csv':
+        stream = StringIO()
+        writer = csv.writer(stream)
+        writer.writerow(['BROADBROS', 'Caso activo', 'Moneda PEN', 'Sin aproximaciones académicas'])
+        writer.writerow(['Indicador', 'Fórmula', 'Valor', 'Dato pendiente'])
+        for r in reporte['filas']:
+            writer.writerow([safe_csv(r[k]) for k in ('nombre', 'formula', 'valor', 'motivo')])
+        return HttpResponse('\ufeff'+stream.getvalue(), content_type='text/csv; charset=utf-8',
+                            headers={'Content-Disposition': 'attachment; filename=Ratios_caso_BROADBROS.csv'})
+    return render(request, 'ratios_caso.html', reporte)

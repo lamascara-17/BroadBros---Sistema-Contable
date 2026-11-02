@@ -1,4 +1,5 @@
 """Una misma fuente de saldos para pantalla, PDF y Excel."""
+from .consultas import movimientos_con_cuentas
 from decimal import Decimal
 from collections import defaultdict
 import re
@@ -21,13 +22,13 @@ def flujo_asiento(asiento, movimientos, neto):
     contrapartidas=[m for m in movimientos if not es_efectivo(m.cuenta)]
     if not contrapartidas:return 'operacion'  # Transferencia entre caja y banco: neto cero.
     if all(m.cuenta.tipo=='patrimonio' or m.cuenta.codigo.startswith('45') for m in contrapartidas):return 'financiacion'
-    if neto<0 and all(m.cuenta.codigo.startswith('33') for m in contrapartidas if m.tipo=='debe') and any(m.tipo=='debe' for m in contrapartidas):return 'inversion'
+    if neto<0 and all(m.cuenta.codigo.startswith(('33', '34', '46')) for m in contrapartidas if m.tipo=='debe') and any(m.tipo=='debe' for m in contrapartidas):return 'inversion'
     if all(m.cuenta.tipo in ('ingreso','gasto') or m.cuenta.codigo.startswith('12') for m in contrapartidas):return 'operacion'
     return 'pendiente'
 
 
 def get_reporte_context():
-    asientos = list(AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id'))
+    asientos = list(AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).order_by('fecha', 'id'))
     cuentas = list(CuentaContable.objects.all())
     totales=defaultdict(lambda:{'debe':CERO,'haber':CERO})
     operativos=defaultdict(lambda:{'debe':CERO,'haber':CERO})
@@ -127,10 +128,11 @@ def get_reporte_context():
     ecp.append({'nombre':'Resultado del período por incorporar','inicial':CERO,'variacion':CERO,'resultado':ctx['resultados_acumulados'],'final':ctx['resultados_acumulados']})
     ctx['filas_patrimonio']=ecp
     ctx['totales_patrimonio']={k:sum((r[k] for r in ecp),CERO) for k in ('inicial','variacion','resultado','final')}
+    ctx['apertura_documentada'] = any(clase_asiento(a) == 'apertura' for a in asientos)
     ctx['nota_patrimonio']='Los saldos iniciales proceden de los asientos de apertura identificados. Si no se proporcionó apertura, se muestran los movimientos registrados, sin presumir saldos anteriores.'
     ctx['filas_flujos']=[('Actividades de operación',flujos['operacion'],'detalle'),('Actividades de inversión',flujos['inversion'],'detalle'),('Actividades de financiación',flujos['financiacion'],'detalle')]
     if pendientes_flujo:ctx['filas_flujos'].append(('Flujos pendientes de clasificación',flujos['pendiente'],'detalle'))
-    ctx['filas_flujos'] += [('Variación neta de efectivo',efectivo_final-efectivo_inicial,'subtotal'),('Efectivo inicial documentado',efectivo_inicial,'detalle'),('EFECTIVO FINAL REGISTRADO',efectivo_final,'total')]
+    ctx['filas_flujos'] += [('Variación neta de efectivo',efectivo_final-efectivo_inicial,'subtotal'),('Efectivo inicial documentado',efectivo_inicial if ctx['apertura_documentada'] else None,'detalle'),('EFECTIVO FINAL REGISTRADO',efectivo_final,'total')]
     ctx['pendientes_flujo']=pendientes_flujo
     ctx['nota_flujos']='Flujos calculados a partir de cobros y pagos registrados; las operaciones sin efectivo se excluyen. Revise la clasificación de los asientos señalados y los saldos de apertura.'
     ctx['nota_resultado'] = (
@@ -157,6 +159,11 @@ def get_reporte_context():
     ctx['resultado_segun_libros'] = resultado_libros + transferido
     ctx['diferencia_resultado'] = ctx['resultado_neto'] - ctx['resultado_segun_libros']
     ctx['notas_consistencia'] = []
+    ctx['notas_plan'] = []
+    from .validacion_contable import validar_cuenta
+    for cuenta in cuentas:
+        try: validar_cuenta(cuenta.codigo, cuenta.nombre, cuenta.tipo)
+        except ValueError as exc: ctx['notas_plan'].append(str(exc))
     if ctx['diferencia_resultado']:
         ctx['notas_consistencia'].append(
             f"El resultado no coincide con los saldos del mayor y los cierres: diferencia S/ {ctx['diferencia_resultado']:,.2f}. Revise la clasificación de cuentas y asientos.")
@@ -170,6 +177,17 @@ def get_reporte_context():
         if inventario and any(m.cuenta.tipo == 'patrimonio' for m in movs) and re.search(r'ajuste.*inventario|costo de ventas', a.descripcion, re.I):
             ctx['notas_consistencia'].append(
                 f'Asiento {a.numero}: el ajuste de inventario afecta directamente al patrimonio. Verifique si corresponde registrar costo de ventas; el cuadre no garantiza que el resultado sea correcto.')
+    from .validacion_contable import auditar_asientos
+    entradas = [{'descripcion': a.descripcion, 'movimientos': [{'codigo': m.cuenta.codigo,
+        'nombre': m.cuenta.nombre, 'tipo_cuenta': m.cuenta.tipo, 'tipo_movimiento': m.tipo, 'monto': str(m.monto)}
+        for m in a.movimientos.all()]} for a in asientos]
+    fuente = '\n'.join(a.fuente_importacion for a in asientos if a.fuente_importacion)
+    ctx['notas_consistencia'].extend(auditar_asientos(entradas, fuente))
+    ctx['notas_consistencia'] = list(dict.fromkeys(ctx['notas_consistencia']))
+    if ctx['notas_consistencia']:
+        ctx['nota_resultado'] = 'Resultado provisional: ' + ' '.join(ctx['notas_consistencia']) + ' ' + ctx['nota_resultado']
+    if pendientes_flujo:
+        ctx['nota_flujos'] = 'Estado provisional: existen flujos sin clasificación. ' + ctx['nota_flujos']
     return ctx
 
 

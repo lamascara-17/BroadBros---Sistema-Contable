@@ -1,6 +1,7 @@
 import os
 from unittest.mock import patch
 from django.test import TestCase, Client
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from django.core import signing
 import httpx

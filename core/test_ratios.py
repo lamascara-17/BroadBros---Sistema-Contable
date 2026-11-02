@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal as D
 from pathlib import Path
 from django.test import TestCase, SimpleTestCase, Client
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from .models import FinancialRatioPeriod, CuentaContable, AsientoContable
 from .ratios import calculate, comparison, dataset, companies_with_overrides, DEFINITIONS, number
@@ -63,6 +64,8 @@ class RatioCalculationTests(SimpleTestCase):
         self.assertEqual(report['selected']['ebitda'],34120)
         self.assertAlmostEqual(v['current'],D('31573')/D('18514'),places=20)
         self.assertAlmostEqual(v['net_margin'],D('23126')/D('63887'),places=20)
+        self.assertAlmostEqual(v['roe'],D('23126')/((D('81292')+D('67678'))/2),places=20)
+        self.assertTrue(report['selected']['period']['provenance']['net_income']['verified'])
         self.assertEqual(report['dupont']['roe'],'31.05%')
         self.assertTrue(report['dupont']['matches'])
         self.assertFalse(report['selected']['warnings'])
@@ -115,7 +118,7 @@ class RatioScreenTests(TestCase):
         self.assertEqual(len(r.context['rows']),17)
         self.assertContains(r,'value="2025-11-02"')
         self.assertContains(r,'ratio-chart-data')
-        self.assertContains(r,'36.20%')
+        self.assertContains(r,'N/D')
         self.assertContains(self.client.get(reverse('index')),reverse('ratios_financieros'))
         self.assertEqual(FinancialRatioPeriod.objects.count(),0) # GET no escribe.
 

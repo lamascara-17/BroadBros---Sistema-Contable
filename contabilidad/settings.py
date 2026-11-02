@@ -2,6 +2,8 @@
 Configuración de Django para el Sistema Contable.
 """
 import os
+import secrets
+import sys
 import dj_database_url
 from pathlib import Path
 from dotenv import load_dotenv
@@ -14,14 +16,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    'SECRET_KEY',
-    'django-insecure-sistema-contable-dev-key-cambiar-en-produccion'
-)
-
+TESTING = 'test' in sys.argv
+SECRET_KEY = os.getenv('SECRET_KEY') or (secrets.token_urlsafe(48) if TESTING or os.getenv('DEBUG', '').lower() == 'true' else '')
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured('Configure SECRET_KEY en el entorno del servidor.')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,broadbros-sistema-contable.onrender.com').split(',') if h.strip()]
+WORKSPACE_ISOLATION = os.getenv('WORKSPACE_ISOLATION', 'true').lower() == 'true'
+# Las pruebas históricas verifican reglas sin ámbito. Las pruebas de aislamiento
+# habilitan explícitamente el middleware y usan dos clientes independientes.
+if TESTING:
+    WORKSPACE_ISOLATION = False
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = os.getenv('RENDER', '').lower() == 'true'
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if os.getenv('REDIS_URL'):
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': os.environ['REDIS_URL']}}
 
 # Application definition
 INSTALLED_APPS = [
@@ -42,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'core.middleware.WorkspaceMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -58,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.almacenamiento',
             ],
         },
     },
@@ -67,8 +82,8 @@ WSGI_APPLICATION = 'contabilidad.wsgi.application'
 
 # Base de datos SQLite
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    'default': dj_database_url.parse(
+        os.getenv('DATABASE_URL') or f"sqlite:///{os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))}",
         conn_max_age=600
     )
 }
@@ -109,3 +124,17 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 GROQ_VISION_MODEL = os.getenv('GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')
 GROQ_TEXT_MODEL = os.getenv('GROQ_TEXT_MODEL', 'openai/gpt-oss-20b')
 GROQ_REWRITE_MODEL = os.getenv('GROQ_REWRITE_MODEL', GROQ_TEXT_MODEL)
+
+# Perfil académico aprobado para el servicio gratuito existente. Una ruta o
+# conexión explícita conserva el procedimiento de migración manual con respaldo.
+RENDER_EPHEMERAL_SQLITE = (
+    os.getenv('RENDER', '').lower() == 'true'
+    and DATABASES['default']['ENGINE'].endswith('sqlite3')
+    and not os.getenv('SQLITE_PATH') and not os.getenv('DATABASE_URL')
+)
+
+SECURE_SSL_REDIRECT = os.getenv('RENDER', '').lower() == 'true'
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600' if SECURE_SSL_REDIRECT else '0'))
+
+# Las subidas grandes van directamente a temporal; el importador procesa por bloques.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 512 * 1024

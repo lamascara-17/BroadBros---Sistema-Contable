@@ -7,6 +7,7 @@ from unittest.mock import patch
 from decimal import Decimal
 from PIL import Image
 from django.test import TestCase, SimpleTestCase, override_settings
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from openpyxl import load_workbook
@@ -156,7 +157,7 @@ class ImportacionReportesTests(TestCase):
         self.assertIn('3065',texto.replace(',','').replace('.',''))
         r=self.client.post(reverse('reporte_completo'),{'empresa':'=1+1','formato':'excel','accion':'descargar'})
         wb=load_workbook(BytesIO(r.content),data_only=False)
-        self.assertEqual(len(wb.sheetnames),5)
+        self.assertEqual(len(wb.sheetnames),7)
         self.assertEqual(wb.properties.creator,'BROADBROS')
         self.assertEqual(wb['Estado de Resultados']['B15'].value,3065)
         self.assertEqual(wb['Estado de Resultados']['A1'].data_type,'s')

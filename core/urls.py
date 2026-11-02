@@ -1,10 +1,23 @@
 from django.urls import path
+from . import espacio_views
 from . import views
 from .voz import transcribir_voz
 from .audio_respuesta import respuesta_audio
-from .ratio_views import financial_ratios
+from .ratio_views import financial_ratios, ratios_caso
 
 urlpatterns = [
+    path('caso/nuevo/', espacio_views.nuevo_caso, name='nuevo_caso'),
+    path('ratios-caso/', ratios_caso, name='ratios_caso'),
+    path('ingresar/', espacio_views.acceso_libre, name='login'),
+    path('salir/', espacio_views.acceso_libre, name='logout'),
+    path('registro/', espacio_views.acceso_libre, name='registro'),
+    path('casos-anteriores/importar/', espacio_views.importar_respaldo, name='importar_respaldo'),
+    path('casos-anteriores/actual/', espacio_views.descargar_actual, name='descargar_actual'),
+    path('casos-anteriores/', espacio_views.respaldos, name='respaldos'),
+    path('casos-anteriores/<int:pk>/restaurar/', espacio_views.restaurar_respaldo, name='restaurar_respaldo'),
+    path('casos-anteriores/<int:pk>/descargar/', espacio_views.descargar_respaldo, name='descargar_respaldo'),
+    path('reportes/patrimonio/', espacio_views.estado_patrimonio, name='estado_patrimonio'),
+    path('reportes/flujos/', espacio_views.estado_flujos, name='estado_flujos'),
     path('ratios-financieros/', financial_ratios, name='ratios_financieros'),
     path('', views.index, name='index'),
 

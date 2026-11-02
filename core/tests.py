@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -126,7 +127,7 @@ class FrontendFlowTests(TestCase):
         movimientos = mayor.context['datos_cuentas'][0]['movimientos']
         self.assertEqual([m.asiento.numero for m in movimientos], [1, 3])
 
-        eliminado = self.client.get(reverse('eliminar_asiento', args=[56]), follow=True)
+        eliminado = self.client.post(reverse('eliminar_asiento', args=[56]), follow=True)
         self.assertContains(eliminado, 'El Asiento #1 fue eliminado correctamente.')
         registro = self.client.get(reverse('registrar_asiento'))
         self.assertContains(registro, 'Asiento #1</strong> - Compra')

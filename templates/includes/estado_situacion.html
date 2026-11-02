@@ -1,4 +1,4 @@
-{% load contable_tags %}
+{% load contable_tags %}{% for aviso in notas_plan %}<p class="helper-text">Catálogo histórico/didáctico: {{ aviso }} Los registros originales no se han renumerado.</p>{% endfor %}
 {% if nota_resultado %}<p class="helper-text" role="status">{{ nota_resultado }}</p>{% endif %}
 <div class="balance-grid">
     <div class="card"><div class="card-header"><h3>Activo</h3></div><div class="table-container">

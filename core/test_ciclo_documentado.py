@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 from django.test import SimpleTestCase, TestCase
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from pypdf import PdfReader

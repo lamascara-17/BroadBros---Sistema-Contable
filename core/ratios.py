@@ -60,10 +60,14 @@ def number(value):
         raise ValueError('Use un número decimal válido, sin separadores de miles.') from None
 
 
-def calculate(values, tax_rate=D('0.30'), debt_basis='total'):
+def calculate(values, tax_rate=D('0.30'), debt_basis='total', period_days=365, allow_approximations=True):
     v = {k: number(values.get(k)) for k in FIELDS}
+    signed = {'equity','equity_previous','total_equity','operating_income','net_income'}
+    for key, value in v.items():
+        if key not in signed and value is not None and value < 0:
+            v[key] = None
     tax_rate = number(tax_rate)
-    if tax_rate is None or not D('0') <= tax_rate <= D('1'):
+    if tax_rate is not None and not D('0') <= tax_rate <= D('1'):
         raise ValueError('La tasa debe estar entre 0 y 100%.')
     if debt_basis not in ('total', 'current'):
         raise ValueError('Base de deuda inválida.')
@@ -90,6 +94,7 @@ def calculate(values, tax_rate=D('0.30'), debt_basis='total'):
                 result[key] = numerator / denominator
 
     ebitda = add('operating_income', 'da')
+    divide('_inventory_turnover', v['cost_sales'], mean('inventory'))
     divide('current', v['current_assets'], v['current_liabilities'])
     result['working_capital'] = (v['current_assets'] - v['current_liabilities']
                                 if v['current_assets'] is not None and v['current_liabilities'] is not None else None)
@@ -99,25 +104,25 @@ def calculate(values, tax_rate=D('0.30'), debt_basis='total'):
     divide('interest_cover', ebitda, v['interest'])
     divide('debt_cover', add('debt_current', 'debt_noncurrent') if debt_basis == 'total' else v['debt_current'], ebitda)
     credit_sales = v['credit_revenue']
-    if credit_sales is None:
+    if credit_sales is None and allow_approximations:
         credit_sales = v['revenue']
         assumptions.append('Días CxC: ventas totales como aproximación de ventas al crédito, según el Excel del taller.')
     purchases = v['credit_purchases']
-    if purchases is None:
+    if purchases is None and allow_approximations:
         purchases = v['cost_sales']
         assumptions.append('Días CxP: costo de ventas como aproximación de compras al crédito, según el taller; no es una compra observada.')
     for key, base, den in [('inventory_days', 'inventory', v['cost_sales']),
                            ('receivable_days', 'receivables', credit_sales),
                            ('payable_days', 'payables', purchases)]:
         avg = mean(base)
-        divide(key, avg * 365 if avg is not None else None, den)
+        divide(key, avg * period_days if avg is not None and period_days is not None else None, den)
     days = [result[k] for k in ('inventory_days', 'receivable_days', 'payable_days')]
     result['cash_cycle'] = days[0] + days[1] - days[2] if all(x is not None for x in days) else None
     gross = v['revenue'] - v['cost_sales'] if v['revenue'] is not None and v['cost_sales'] is not None else None
     for key, n in [('gross_margin', gross), ('operating_margin', v['operating_income']),
                    ('net_margin', v['net_income']), ('ebitda_margin', ebitda)]:
         divide(key, n, v['revenue'])
-    nopat = v['operating_income'] * (1-tax_rate) if v['operating_income'] is not None else None
+    nopat = v['operating_income'] * (1-tax_rate) if v['operating_income'] is not None and tax_rate is not None else None
     divide('roa', nopat, mean('assets'))
     divide('roe', v['net_income'], mean('equity'))
     divide('_turnover', v['revenue'], mean('assets'))
@@ -231,10 +236,10 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
         solvency = 'Evaluación parcial: solo deuda CP'
     diagnoses = [
         {'title': 'Liquidez', 'status': 'Cobertura corriente' if v['current'] is not None and v['current']>=1 else 'Liquidez ajustada' if v['current'] is not None else 'Datos pendientes',
-         'text': 'El activo corriente cubre '+fmt(v['current'])+' el pasivo corriente. Es una medida estática, no una garantía de pago.'},
+         'text': ('Faltan partidas o un denominador válido para evaluar la liquidez corriente.' if v['current'] is None else 'El activo corriente cubre '+fmt(v['current'])+' el pasivo corriente. Es una medida estática, no una garantía de pago.')},
         {'title': 'Solvencia', 'status': solvency,
          'text': 'Deuda / EBITDA: '+fmt(debt)+'; cobertura de intereses: '+fmt(interest)+'. Referencia orientativa del taller: deuda / EBITDA menor a 3x, sin garantía de pago.'},
-        {'title': 'Rentabilidad', 'status': 'Utilidad positiva' if ni is not None and ni>0 else 'Pérdida contable' if ni is not None and ni<0 else 'Sin utilidad positiva',
+        {'title': 'Rentabilidad', 'status': 'Datos pendientes' if ni is None else 'Utilidad positiva' if ni>0 else 'Pérdida contable' if ni<0 else 'Resultado neto cero',
          'text': 'Margen neto '+fmt(v['net_margin'],'%')+' y ROE '+fmt(v['roe'],'%')+'. Rentabilidad contable del ejercicio, no una recomendación de inversión.'},
     ]
     return {'selected': selected, 'reference': reference, 'previous': previous, 'rows': rows,

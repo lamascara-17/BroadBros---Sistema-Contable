@@ -1,0 +1,290 @@
+[
+  {
+    "fecha": "2009-04-01",
+    "descripcion": "Aporte inicial de capital | Los socios aportan efectivo para iniciar operaciones",
+    "movimientos": [
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "10000"
+      },
+      {
+        "codigo": "5101",
+        "nombre": "Capital Social",
+        "tipo_cuenta": "patrimonio",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "10000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-04-02",
+    "descripcion": "Compra de mercadería y mobiliario | Adquisición de gaseosas y muebles de oficina",
+    "movimientos": [
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "4000"
+      },
+      {
+        "codigo": "2201",
+        "nombre": "Mobiliario y Equipo de Oficina",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "3000"
+      },
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "7000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-05-15",
+    "descripcion": "Venta de mercadería | Venta por S/ 6,000 (50% al contado, 50% a crédito)",
+    "movimientos": [
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "3000"
+      },
+      {
+        "codigo": "1301",
+        "nombre": "Cuentas por Cobrar",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "3000"
+      },
+      {
+        "codigo": "4101",
+        "nombre": "Ventas",
+        "tipo_cuenta": "ingreso",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "6000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-05-30",
+    "descripcion": "Devolución de mercadería | Devolución de compra del 02/04/09 por S/ 500",
+    "movimientos": [
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "500"
+      },
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "500"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-05-31",
+    "descripcion": "Cobro de factura | Cobro de la factura del día 15/05/09",
+    "movimientos": [
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "3000"
+      },
+      {
+        "codigo": "1301",
+        "nombre": "Cuentas por Cobrar",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "3000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-06-30",
+    "descripcion": "Donación recibida | Se recibe una donación de mercadería por S/ 1,000",
+    "movimientos": [
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "1000"
+      },
+      {
+        "codigo": "4901",
+        "nombre": "Ingresos por Donaciones",
+        "tipo_cuenta": "ingreso",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "1000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-07-15",
+    "descripcion": "Compra de mercadería a crédito | Compra de gaseosas al crédito por S/ 2,000",
+    "movimientos": [
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "2000"
+      },
+      {
+        "codigo": "2301",
+        "nombre": "Cuentas por Pagar",
+        "tipo_cuenta": "pasivo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "2000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-07-31",
+    "descripcion": "Venta de mercadería al contado | Venta de gaseosas por S/ 3,000 al contado",
+    "movimientos": [
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "3000"
+      },
+      {
+        "codigo": "4101",
+        "nombre": "Ventas",
+        "tipo_cuenta": "ingreso",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "3000"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-09-05",
+    "descripcion": "Pérdida por incendio | Pérdida de mercadería valorizada en S/ 600 por incendio",
+    "movimientos": [
+      {
+        "codigo": "6901",
+        "nombre": "Pérdidas por Incendio",
+        "tipo_cuenta": "gasto",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "600"
+      },
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "600"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-09-30",
+    "descripcion": "Acreedor por sueldos | Sueldos del personal administrativo pendientes de pago",
+    "movimientos": [
+      {
+        "codigo": "6201",
+        "nombre": "Gastos de Personal",
+        "tipo_cuenta": "gasto",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "1200"
+      },
+      {
+        "codigo": "2401",
+        "nombre": "Sueldos por Pagar",
+        "tipo_cuenta": "pasivo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "1200"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-09-30",
+    "descripcion": "Pago de gastos operativos | Pago de alquiler por S/ 800 y luz y agua por S/ 500",
+    "movimientos": [
+      {
+        "codigo": "6301",
+        "nombre": "Gastos de Alquiler",
+        "tipo_cuenta": "gasto",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "800"
+      },
+      {
+        "codigo": "6302",
+        "nombre": "Gastos de Servicios Básicos",
+        "tipo_cuenta": "gasto",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "500"
+      },
+      {
+        "codigo": "1101",
+        "nombre": "Caja",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "1300"
+      }
+    ]
+  },
+  {
+    "fecha": "2009-09-30",
+    "descripcion": "Ajuste de inventario | Inventario físico final encontrado por S/ 2,500",
+    "movimientos": [
+      {
+        "codigo": "5101",
+        "nombre": "Capital Social",
+        "tipo_cuenta": "patrimonio",
+        "subcategoria": "",
+        "tipo_movimiento": "debe",
+        "monto": "5400"
+      },
+      {
+        "codigo": "2101",
+        "nombre": "Inventario de Mercaderías",
+        "tipo_cuenta": "activo",
+        "subcategoria": "",
+        "tipo_movimiento": "haber",
+        "monto": "5400"
+      }
+    ]
+  }
+]

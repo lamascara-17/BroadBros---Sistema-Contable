@@ -42,4 +42,9 @@ def orientar_revision(datos,borrador,error=''):
         if pendientes:sugerencias.extend(pendientes)
         elif borrador['asientos']:
             sugerencias.append('Hay una propuesta con cuentas e importes revisables. Compara cada operación con el enunciado, incluidos los pagos y cobros parciales, antes de guardar.')
+    if borrador.get('asientos') and not any(a.get('error_validacion') for a in borrador['asientos']):
+        from .validacion_contable import auditar_asientos
+        for nota in auditar_asientos(borrador['asientos'], datos.get('texto_leido', '')):
+            if nota not in pendientes: pendientes.append(nota)
+            if nota not in sugerencias: sugerencias.append(nota)
     return pendientes,list(dict.fromkeys(sugerencias))

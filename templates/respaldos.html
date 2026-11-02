@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block page_title %}Casos anteriores y respaldos{% endblock %}
+{% block content %}
+<p>Tu espacio es privado y funciona sin cuenta. Si borras las cookies o cambias de dispositivo, descarga primero un respaldo JSON para poder continuar el caso. No compartas ese archivo si contiene información privada.</p>
+<div class="card"><div class="card-body">
+<a class="btn btn-primary" href="{% url 'descargar_actual' %}">Descargar caso actual</a>
+<form method="post" enctype="multipart/form-data" action="{% url 'importar_respaldo' %}">
+{% csrf_token %}
+<label for="archivo-respaldo">Continuar desde un respaldo JSON</label>
+<input id="archivo-respaldo" type="file" name="respaldo" accept=".json,application/json" required>
+<p class="helper-text">Hasta 256 MB, 1 000 asientos y 1 000 cuentas. Al importar se respalda el caso actual y se activa el caso del archivo en esta sesión.</p>
+<button class="btn btn-secondary" type="submit">Importar respaldo</button>
+</form>
+</div></div>
+<div class="card"><div class="card-body">
+<form method="get" action="{% url 'respaldos' %}" aria-label="Buscar respaldos por fecha">
+<p class="helper-text">Busca por la fecha en que se guardó el respaldo (hora de Lima). Ambos extremos se incluyen.</p>
+{{ formulario_busqueda.non_field_errors }}
+<div class="form-row">
+{% for campo in formulario_busqueda %}
+<div class="form-group">{{ campo.label_tag }}{{ campo }}{{ campo.errors }}</div>
+{% endfor %}
+</div>
+<button class="btn btn-secondary" type="submit">Buscar</button>
+<a class="btn btn-secondary" href="{% url 'respaldos' %}">Limpiar filtros</a>
+</form>
+<p role="status">{{ pagina.paginator.count }} respaldo{{ pagina.paginator.count|pluralize:"s" }} encontrado{{ pagina.paginator.count|pluralize:"s" }}.</p>
+</div></div>
+{% for r in respaldos %}
+<div class="card"><div class="card-body">
+<strong>{{ r.created_at }}</strong> · {{ r.cantidad_asientos }} asientos
+<a href="{% url 'descargar_respaldo' r.pk %}">Descargar JSON original</a>
+<form method="post" action="{% url 'restaurar_respaldo' r.pk %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Restaurar como caso activo</button></form>
+</div></div>
+{% empty %}<p>No hay respaldos que coincidan con esta búsqueda en tu espacio.</p>{% endfor %}
+{% if pagina.paginator.num_pages > 1 %}
+<nav aria-label="Páginas de respaldos" class="form-actions">
+{% if pagina.has_previous %}
+<a class="btn btn-secondary" href="?{% if filtros_url %}{{ filtros_url }}&amp;{% endif %}pagina=1">Primera</a>
+<a class="btn btn-secondary" href="?{% if filtros_url %}{{ filtros_url }}&amp;{% endif %}pagina={{ pagina.previous_page_number }}">Anterior</a>
+{% endif %}
+<span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+{% if pagina.has_next %}
+<a class="btn btn-secondary" href="?{% if filtros_url %}{{ filtros_url }}&amp;{% endif %}pagina={{ pagina.next_page_number }}">Siguiente</a>
+<a class="btn btn-secondary" href="?{% if filtros_url %}{{ filtros_url }}&amp;{% endif %}pagina={{ pagina.paginator.num_pages }}">Última</a>
+{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

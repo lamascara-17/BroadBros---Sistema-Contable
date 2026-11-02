@@ -1,0 +1,4 @@
+# Solo compatibilidad con instalaciones que ya eligieron PostgreSQL o Redis.
+# No se necesita para el uso académico con SQLite; no crea servicios.
+psycopg2-binary==2.9.13
+redis==6.4.0

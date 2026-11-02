@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from django.core import signing
 from django.test import SimpleTestCase, TestCase, override_settings
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from .importacion_general import validar_asientos, normalizar_borrador, proponer_caso_general
 from .models import AsientoContable, Movimiento

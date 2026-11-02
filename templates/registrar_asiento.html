@@ -23,8 +23,8 @@
                     <input type="date" name="fecha" id="id_fecha" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label for="id_descripcion">Descripción (opcional)</label>
-                    <input type="text" name="descripcion" id="id_descripcion" class="form-control"
+                    <label for="id_descripcion">Descripción (obligatoria)</label>
+                    <input type="text" name="descripcion" id="id_descripcion" class="form-control" required maxlength="2000"
                            placeholder="Ej: Registro de venta al contado...">
                 </div>
             </div>
@@ -94,7 +94,7 @@
                     <td>{{ asiento.movimientos.count }} líneas</td>
                     <td class="text-center">
                         <a href="{% url 'libro_diario' %}?editar={{ asiento.id }}" class="btn btn-secondary btn-sm">Editar</a>
-                        <a href="{% url 'eliminar_asiento' asiento.id %}" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar este asiento permanentemente?');">Eliminar</a>
+                        <form method="post" action="{% url 'eliminar_asiento' asiento.id %}" style="display:inline" onsubmit="return confirm('¿Eliminar este asiento permanentemente?');">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Eliminar</button></form>
                     </td>
                 </tr>
                 {% empty %}

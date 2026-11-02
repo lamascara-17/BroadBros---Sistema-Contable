@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 from django.test import TestCase, override_settings, Client
+from .test_support import AdministrativeTestCase as TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from groq import APIStatusError

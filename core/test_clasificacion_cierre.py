@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
 from django.test import TestCase, SimpleTestCase
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from pypdf import PdfReader
@@ -55,7 +56,7 @@ class PacificoReportesTests(TestCase):
         ctx = contexto_estados()
         self.assertEqual(ctx['fecha_cierre'], date(2026, 12, 31))
         self.assertEqual(ctx['asientos'][-1].fecha, date(2026, 12, 28))
-        self.assertEqual([i['cuenta'].codigo for i in ctx['activo_no_corriente']], ['122'])
+        self.assertEqual([i['cuenta'].codigo for i in ctx['activo_no_corriente']], ['336'])
         self.assertEqual(ctx['total_activo_no_corriente'], Decimal('5000'))
         self.assertEqual(ctx['total_activo_corriente'], Decimal('24500'))
         self.assertEqual(ctx['total_activos'], Decimal('29500'))
@@ -73,10 +74,10 @@ class PacificoReportesTests(TestCase):
         xlsx = self.client.post(reverse('reporte_completo'), {'formato': 'excel'})
         wb = load_workbook(BytesIO(xlsx.content), data_only=True)
         self.assertEqual(wb['Situación Financiera']['A3'].value, 'Al 31/12/2026')
-        self.assertEqual(len(wb.sheetnames), 5)
+        self.assertEqual(len(wb.sheetnames), 7)
 
     def test_cierre_anterior_a_operaciones_no_escribe_y_sin_cierre_usa_ultima_fecha(self):
-        with self.assertRaises(ValueError): guardar_importacion(pacifico(), False, fecha_cierre=date(2026, 12, 1))
+        with self.assertRaises(ValueError): guardar_importacion(pacifico(), fecha_cierre=date(2026, 12, 1))
         self.assertEqual(AsientoContable.objects.count(), 0)
-        guardar_importacion(pacifico(), False)
+        guardar_importacion(pacifico())
         self.assertEqual(contexto_estados()['fecha_cierre'], date(2026, 12, 28))

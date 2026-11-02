@@ -25,7 +25,7 @@
 <div class="image-import">
 <div class="card"><div class="card-body">
 <form method="post" enctype="multipart/form-data" id="image-form">
-<p class="helper-text">Cada caso guardado reemplaza el anterior y crea un nuevo plan de cuentas.</p>
+<p class="helper-text">Cada caso guardado reemplaza el anterior y crea un nuevo plan de cuentas. El caso anterior queda en Casos anteriores.</p>
 {% csrf_token %}
 <input id="imagen-caso" type="file" name="imagen_caso" aria-label="Subir imagen" accept="image/*" hidden>
 <input id="foto-camara" type="file" name="foto_camara" aria-label="Tomar foto" accept="image/*" capture="environment" hidden>
@@ -45,7 +45,10 @@
 </div></div>
 <div class="mobile-access">
 <div id="qrcode-container" aria-label="Código QR para abrir la cámara en el celular"></div>
-<div><strong>Continuar desde el celular</strong><p>Escanea el QR para tomar la foto.</p><a id="camera-link" href="?camara=1">Abrir cámara</a></div>
+<div><strong>Cámara en el celular</strong>
+<p>Escanea el QR para abrir la cámara. La foto y los resultados quedan en la sesión del celular; no se envían a esta computadora ni se vinculan los espacios.</p>
+<a id="camera-link" href="?camara=1">Abrir cámara</a>
+<p>Para continuar el mismo caso en otro dispositivo, descarga su respaldo JSON e impórtalo allí desde <a href="{% url 'respaldos' %}">Casos anteriores y respaldos</a>.</p></div>
 </div>
 </div>
 <dialog id="camera-dialog" class="tax-dialog" aria-labelledby="camera-title">

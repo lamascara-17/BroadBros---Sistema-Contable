@@ -435,12 +435,14 @@
             },
             "net_income": {
               "tag": "ProfitLoss",
-              "end": "2025-11-02",
               "start": "2024-11-04",
+              "end": "2025-11-02",
               "accession": "0001730168-25-000121",
               "filed": "2025-12-18",
               "unit": "USD",
-              "url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/0001730168-25-000121-index.html"
+              "url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/avgo-20251102.htm",
+              "verified": true,
+              "note": "Verificado en el 10-K FY2025: estado de resultados (p. 48), política de utilidad por acción (p. 57) y nota 8 (p. 69). La utilidad de 23.126 millones es el numerador usado para las acciones comunes; no se adopta ProfitLoss genéricamente para otras empresas."
             },
             "interest": {
               "tag": "InterestExpenseNonoperating",

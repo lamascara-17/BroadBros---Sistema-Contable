@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block page_title %}Espera un momento{% endblock %}{% block content %}<p role="alert">Se alcanzó el límite temporal de solicitudes. Espera un minuto y vuelve a intentar. Tu caso guardado se conserva.</p><a class="btn btn-secondary" href="{% url 'cargar_imagen_diario' %}">Volver al formulario</a>{% endblock %}

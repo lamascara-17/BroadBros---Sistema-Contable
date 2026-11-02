@@ -8,6 +8,36 @@ Define tres entidades principales:
 """
 from django.db import models
 from decimal import Decimal
+from django.conf import settings
+import uuid
+from .workspaces import WorkspaceManager, MovimientoManager, workspace_actual
+
+
+class Workspace(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revision_contable = models.PositiveBigIntegerField(default=0)
+    bot_sequence = models.PositiveBigIntegerField(default=0)
+    bot_revision = models.PositiveBigIntegerField(null=True, blank=True)
+    bot_turnos = models.JSONField(default=list)
+
+
+class RespaldoCaso(models.Model):
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    datos = models.JSONField()
+    catalogo = models.JSONField(default=list)
+    numero_asientos = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = WorkspaceManager()
+
+    @property
+    def cantidad_asientos(self):
+        return self.numero_asientos if self.numero_asientos is not None else len(self.datos)
+
+    class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
 
 
 class CuentaContable(models.Model):
@@ -39,7 +69,9 @@ class CuentaContable(models.Model):
         ('pasivo_no_corriente', 'Pasivo no corriente'),
     ]
 
-    codigo = models.CharField(max_length=20, unique=True, verbose_name='Código')
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    objects = WorkspaceManager()
+    codigo = models.CharField(max_length=20, verbose_name='Código')
     nombre = models.CharField(max_length=200, verbose_name='Nombre')
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, verbose_name='Tipo')
     subcategoria = models.CharField(
@@ -51,7 +83,10 @@ class CuentaContable(models.Model):
     )
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         ordering = ['codigo']
+        constraints = [models.UniqueConstraint(fields=['workspace', 'codigo'], name='cuenta_workspace_codigo')]
         verbose_name = 'Cuenta Contable'
         verbose_name_plural = 'Cuentas Contables'
 
@@ -69,6 +104,9 @@ class AsientoContable(models.Model):
     Cabecera de un asiento contable.
     Agrupa uno o más movimientos que deben estar balanceados (Debe == Haber).
     """
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    objects = WorkspaceManager()
+    fuente_importacion = models.TextField(blank=True, default='')
     fecha = models.DateField(verbose_name='Fecha')
     fecha_cierre_ejercicio = models.DateField(null=True, blank=True, verbose_name='Fecha de cierre del ejercicio')
     CLASE_CHOICES=[('operacion','Operación o ajuste'),('apertura','Saldo de apertura'),('cierre','Cierre de resultados')]
@@ -80,6 +118,8 @@ class AsientoContable(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         ordering = ['fecha', 'id'] 
         verbose_name = 'Asiento Contable'
         verbose_name_plural = 'Asientos Contables'
@@ -119,6 +159,8 @@ class Movimiento(models.Model):
         ('haber', 'Haber'),
     ]
 
+    objects = MovimientoManager()
+
     asiento = models.ForeignKey(
         AsientoContable,
         on_delete=models.CASCADE,
@@ -135,6 +177,8 @@ class Movimiento(models.Model):
     monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Monto')
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         verbose_name = 'Movimiento'
         verbose_name_plural = 'Movimientos'
 
@@ -145,6 +189,8 @@ class Movimiento(models.Model):
 
 class FinancialRatioPeriod(models.Model):
     """Datos externos independientes del ejercicio contable activo."""
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    objects = WorkspaceManager()
     ticker = models.CharField(max_length=12)
     year = models.PositiveIntegerField()
     name = models.CharField(max_length=120)
@@ -158,4 +204,21 @@ class FinancialRatioPeriod(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['ticker', 'year'], name='ratio_company_year_unique')]
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
+        constraints = [models.UniqueConstraint(fields=['workspace', 'ticker', 'year'], name='ratio_company_year_unique')]
+
+
+class RespaldoFragmento(models.Model):
+    """JSON portable por bloques; evita materializar respaldos grandes en RAM."""
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    respaldo = models.ForeignKey(RespaldoCaso, on_delete=models.CASCADE, related_name='fragmentos')
+    indice = models.PositiveIntegerField()
+    contenido = models.BinaryField()
+    objects = WorkspaceManager()
+
+    class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
+        ordering = ['indice']
+        constraints = [models.UniqueConstraint(fields=['respaldo', 'indice'], name='respaldo_fragmento_indice')]
