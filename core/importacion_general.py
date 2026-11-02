@@ -62,6 +62,11 @@ No les asignes códigos de cuentas por cobrar (12). Usa subcategoria
 activo_no_corriente para bienes de uso propio y activo_corriente para efectivo,
 existencias y créditos de corto plazo. Los equipos adquiridos para vender son existencias.
 Los ingresos financieros y ganancias por medición van en otros ingresos, no en ventas.
+Las ventas de bienes y servicios del giro usan tipo ingreso, grupo 70 y
+subcategoria vacía (General), nunca otro_ingreso. Las devoluciones sobre ventas
+reducen esas ventas. Los descuentos comerciales concedidos (74) reducen ventas;
+los de pronto pago (675) son financieros. La enajenación de activos de uso (756)
+no es una venta ordinaria: no la recodifiques como 70.
 No dupliques gastos por naturaleza y por destino. No generes asientos analíticos
 9/79 ni saldos intermediarios 80-89 salvo que el ejercicio los solicite.
 Si las letras no tienen importes individuales, la convención declarada es cuotas

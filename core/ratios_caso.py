@@ -2,6 +2,7 @@
 from decimal import Decimal
 from .ratios import calculate, DEFINITIONS, fmt
 from .reporte_utils import contexto_estados, es_efectivo, clase_asiento
+from .clasificacion import rubro_resultados
 
 
 def calcular_caso():
@@ -40,7 +41,7 @@ def calcular_caso():
         for a in ctx['asientos']:
             if clase_asiento(a) != 'operacion': continue
             movimientos = list(a.movimientos.all())
-            if any(m.cuenta.tipo == 'ingreso' and m.cuenta.codigo.startswith('70') for m in movimientos):
+            if any(m.cuenta.tipo == 'ingreso' and rubro_resultados(m.cuenta) == 'ventas' for m in movimientos):
                 hay_ventas = True
                 ventas_credito += sum((m.monto * (1 if m.tipo == 'debe' else -1) for m in movimientos if m.cuenta.tipo == 'activo' and m.cuenta.codigo.startswith('12')), Decimal('0'))
             if any(m.cuenta.codigo.startswith('20') and m.tipo == 'debe' for m in movimientos):

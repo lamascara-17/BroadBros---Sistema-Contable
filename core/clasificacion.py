@@ -3,10 +3,42 @@ import re
 import unicodedata
 
 
+def nombre_normalizado(nombre):
+    return ''.join(c for c in unicodedata.normalize('NFKD', str(nombre).lower())
+                   if not unicodedata.combining(c))
+
+
+def ingreso_no_ordinario(nombre):
+    """No confundir la venta de un activo de uso con ventas del giro."""
+    return bool(re.search(
+        r'donacion|intereses|financier|dividend|otros ingresos|enajenacion|'
+        r'activos? (?:fijos?|inmovilizados?)|(?:ganancia|utilidad|perdida) por venta|'
+        r'comision|corretaje|pronto pago', nombre_normalizado(nombre)))
+
+
+def venta_ordinaria(nombre):
+    n = nombre_normalizado(nombre)
+    if ingreso_no_ordinario(n) or re.search(r'descuento|rebaja|bonificacion', n):
+        return False
+    return bool(re.search(r'\bventas?\b|ingresos? (?:por|de) (?:servicios|actividades ordinarias)|'
+                          r'prestacion de servicios|servicios prestados|consultoria', n))
+
+
 def rubro_resultados(cuenta):
-    """Respeta la clasificación explícita y los nombres de catálogos históricos."""
+    """Las ventas identificadas no se convierten en otros ingresos por una etiqueta.
+
+    Lee catálogos históricos sin cambiar sus cuentas ni sus movimientos.
+    Las devoluciones y descuentos comerciales conservan su saldo con signo.
+    """
     sub = cuenta.subcategoria
+    nombre = nombre_normalizado(cuenta.nombre)
+    try:
+        grupo = int(cuenta.codigo[:2])
+    except ValueError:
+        grupo = 0
     if cuenta.tipo == 'ingreso':
+        if not ingreso_no_ordinario(nombre) and (grupo in (70, 74) or venta_ordinaria(nombre)):
+            return 'ventas'
         if sub == 'otro_ingreso':
             return 'otros_ingresos'
     else:
@@ -15,16 +47,9 @@ def rubro_resultados(cuenta):
                       'impuesto_ganancias': 'impuesto_ganancias'}
         if sub in explicitos:
             return explicitos[sub]
-    nombre = ''.join(c for c in unicodedata.normalize('NFKD', cuenta.nombre.lower())
-                     if not unicodedata.combining(c))
-    try:
-        grupo = int(cuenta.codigo[:2])
-    except ValueError:
-        grupo = 0
     # Los códigos antiguos (por ejemplo 4901 y 6901) no siguen el PCGE.
     if cuenta.tipo == 'ingreso':
-        otros = re.search(r'donacion|ingresos? financieros?|intereses|otros ingresos', nombre)
-        return 'otros_ingresos' if otros or grupo in (73, 75, 76, 77) else 'ventas'
+        return 'otros_ingresos' if ingreso_no_ordinario(nombre) or grupo in (71, 72, 73, 75, 76, 77, 78) else 'ventas'
     if re.search(r'impuesto.*(?:ganancia|renta)', nombre):
         return 'impuesto_ganancias'
     if re.search(r'incendio|siniestro', nombre):

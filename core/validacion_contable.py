@@ -18,7 +18,8 @@ def grupo_esperado(nombre, tipo):
         if re.search(r'depreciacion acumulada|amortizacion acumulada', n): return '39'
         if re.search(r'equipo|maquinaria|mobiliario', n) and not re.search(r'para.*venta|por cobrar|anticipo', n): return '33'
     if tipo == 'patrimonio' and re.fullmatch(r'capital(?: social)?', n.strip()): return '50'
-    if tipo == 'ingreso' and re.search(r'\bventas\b|ingresos? por servicios|consultoria', n): return '70'
+    from .clasificacion import venta_ordinaria
+    if tipo == 'ingreso' and venta_ordinaria(n): return '70'
     if tipo == 'gasto' and re.search(r'costo.*ventas', n): return '69'
     return None
 
@@ -40,6 +41,8 @@ def validar_cuenta(codigo, nombre, tipo):
 def preparar_pcge(asientos):
     """Solo borradores nuevos: corrige familias reconocibles, no libros históricos."""
     from copy import deepcopy
+    from .clasificacion import rubro_resultados
+    from types import SimpleNamespace
     salida = deepcopy(asientos)
     elegidos = {}
     ocupados = {str(m.get('codigo')): (texto(m.get('nombre', '')), m.get('tipo_cuenta'))
@@ -48,6 +51,13 @@ def preparar_pcge(asientos):
         for m in a.get('movimientos', []):
             codigo = str(m.get('codigo', ''))
             nombre, tipo = m.get('nombre', ''), m.get('tipo_cuenta', '')
+            # Solo el borrador nuevo: no perpetuar una etiqueta de IA que
+            # convierte ventas identificables en otros ingresos.
+            sub = m.get('subcategoria', '')
+            if tipo == 'ingreso' and texto(sub).strip().replace(' ', '_') == 'otro_ingreso':
+                cuenta = SimpleNamespace(codigo=codigo, nombre=nombre, tipo=tipo, subcategoria=sub)
+                if rubro_resultados(cuenta) == 'ventas':
+                    m['subcategoria'] = ''
             grupo = grupo_esperado(nombre, tipo)
             if grupo and not codigo.startswith(grupo):
                 clave = (texto(nombre), tipo)

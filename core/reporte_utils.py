@@ -144,6 +144,12 @@ def get_reporte_context():
             for c in cuentas if c.pk in totales)
         else ''
     )
+    if not ctx['total_ventas'] and ctx['total_costo_ventas']:
+        ctx['nota_resultado'] = (
+            'Hay costo de ventas registrado, pero las ventas netas son cero. '
+            'Revise las ventas, devoluciones y la clasificación de ingresos en el Libro Mayor; '
+            'el sistema no agrega ventas que no estén registradas.'
+        )
     pendientes_importacion = [a.observaciones_importacion for a in asientos if a.observaciones_importacion]
     if pendientes_importacion:
         ctx['nota_resultado'] = 'Registro parcial del ejercicio. Datos pendientes: ' + ' / '.join(dict.fromkeys(pendientes_importacion))
