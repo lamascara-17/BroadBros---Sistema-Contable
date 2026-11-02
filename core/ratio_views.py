@@ -129,3 +129,18 @@ def financial_ratios(request):
         return HttpResponse('\ufeff'+stream.getvalue(),content_type='text/csv; charset=utf-8',
             headers={'Content-Disposition':f'attachment; filename="Ratios_{ticker}_{year}.csv"'})
     return render(request,'ratios_financieros.html',context)
+
+
+def ratios_caso(request):
+    from .ratios_caso import calcular_caso
+    reporte = calcular_caso()
+    if request.GET.get('descargar') == 'csv':
+        stream = StringIO()
+        writer = csv.writer(stream)
+        writer.writerow(['BROADBROS', 'Caso activo', 'Moneda PEN', 'Sin aproximaciones académicas'])
+        writer.writerow(['Indicador', 'Fórmula', 'Valor', 'Dato pendiente'])
+        for r in reporte['filas']:
+            writer.writerow([safe_csv(r[k]) for k in ('nombre', 'formula', 'valor', 'motivo')])
+        return HttpResponse('\ufeff'+stream.getvalue(), content_type='text/csv; charset=utf-8',
+                            headers={'Content-Disposition': 'attachment; filename=Ratios_caso_BROADBROS.csv'})
+    return render(request, 'ratios_caso.html', reporte)

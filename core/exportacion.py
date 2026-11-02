@@ -142,6 +142,17 @@ def exportar_excel_contable(empresa='BroadBros'):
     for dato in ctx['bal_comp_datos']:
         fila(ws, [dato['cuenta'].codigo, dato['cuenta'].nombre, dato['total_debe'], dato['total_haber'], dato['saldo_deudor'], dato['saldo_acreedor']])
     fila(ws, [None, 'TOTALES', ctx['gran_total_debe'], ctx['gran_total_haber'], ctx['gran_saldo_deudor'], ctx['gran_saldo_acreedor']], 'total')
+    ws = hoja('Cambios en el Patrimonio', ['Concepto', 'Inicial documentado', 'Otros movimientos', 'Resultado', 'Saldo final'], [58, 22, 22, 22, 22])
+    nota(ws, ctx['nota_patrimonio'])
+    for r in ctx['filas_patrimonio']:
+        fila(ws, [r['nombre'], r['inicial'] if ctx['apertura_documentada'] else 'N/D', r['variacion'], r['resultado'], r['final']])
+    t = ctx['totales_patrimonio']
+    fila(ws, ['TOTAL PATRIMONIO', t['inicial'] if ctx['apertura_documentada'] else 'N/D', t['variacion'], t['resultado'], t['final']], 'total')
+    ws = hoja('Flujos de Efectivo', ['Concepto', 'Importe (S/)'], [85, 25])
+    nota(ws, ctx['nota_flujos'])
+    for r in ctx['filas_flujos']:
+        fila(ws, [r[0], r[1] if r[1] is not None else 'N/D'], r[2])
+    for aviso in ctx['pendientes_flujo']: nota(ws, aviso)
     for ws in wb:
         ws.print_area = f'A1:{get_column_letter(ws.max_column)}{ws.max_row}'
     stream = BytesIO()

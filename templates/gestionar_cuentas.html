@@ -87,10 +87,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <a href="{% url 'eliminar_cuenta' cuenta.id %}" class="btn btn-sm btn-danger"
-                                   onclick="return confirm('¿Eliminar la cuenta {{ cuenta }}?');">
-                                    Eliminar
-                                </a>
+                                <form method="post" action="{% url 'eliminar_cuenta' cuenta.id %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este registro?')">Eliminar</button></form>
                             </td>
                         </tr>
                         {% endfor %}

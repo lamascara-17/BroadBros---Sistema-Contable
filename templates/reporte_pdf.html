@@ -70,4 +70,12 @@ th { background-color: #07393c; color: white; text-align: left; font-size: 8pt; 
 {% for row in bal_comp_datos %}<tr><td>{{ row.cuenta.codigo }}</td><td>{{ row.cuenta.nombre }}</td><td class="right">{{ row.total_debe|formato_importe }}</td><td class="right">{{ row.total_haber|formato_importe }}</td><td class="right">{{ row.saldo_deudor|formato_importe }}</td><td class="right">{{ row.saldo_acreedor|formato_importe }}</td></tr>{% endfor %}
 <tr class="total"><td colspan="2">TOTALES</td><td class="right">{{ gran_total_debe|formato_importe }}</td><td class="right">{{ gran_total_haber|formato_importe }}</td><td class="right">{{ gran_saldo_deudor|formato_importe }}</td><td class="right">{{ gran_saldo_acreedor|formato_importe }}</td></tr>
 </tbody></table></div>
+<div class="break"><p class="marca">BROADBROS / PATRIMONIO</p><h1>{{ empresa }}</h1><h2>Estado de Cambios en el Patrimonio</h2>
+<p class="nota">{{ nota_patrimonio }}</p>
+<table repeat="1"><thead><tr><th style="width:40%;">Concepto</th><th style="width:15%;">Inicial documentado</th><th style="width:15%;">Otros movimientos</th><th style="width:15%;">Resultado</th><th style="width:15%;">Saldo final</th></tr></thead><tbody>
+{% for r in filas_patrimonio %}<tr><td>{{ r.nombre }}</td><td class="right">{% if apertura_documentada %}{{ r.inicial|formato_importe }}{% else %}N/D{% endif %}</td><td class="right">{{ r.variacion|formato_importe }}</td><td class="right">{{ r.resultado|formato_importe }}</td><td class="right">{{ r.final|formato_importe }}</td></tr>{% endfor %}
+<tr class="total"><td>TOTAL PATRIMONIO</td><td class="right">{% if apertura_documentada %}{{ totales_patrimonio.inicial|formato_importe }}{% else %}N/D{% endif %}</td><td class="right">{{ totales_patrimonio.variacion|formato_importe }}</td><td class="right">{{ totales_patrimonio.resultado|formato_importe }}</td><td class="right">{{ totales_patrimonio.final|formato_importe }}</td></tr></tbody></table></div>
+<div class="break"><p class="marca">BROADBROS / EFECTIVO</p><h1>{{ empresa }}</h1><h2>Estado de Flujos de Efectivo</h2><p class="nota">{{ nota_flujos }}</p>
+<table repeat="1"><thead><tr><th style="width:75%;">Concepto</th><th style="width:25%;" class="right">Importe</th></tr></thead><tbody>{% for nombre, importe, tipo in filas_flujos %}<tr class="{{ tipo }}"><td>{{ nombre }}</td><td class="right">{% if importe != None %}{{ importe|formato_importe }}{% else %}N/D{% endif %}</td></tr>{% endfor %}</tbody></table>
+{% for aviso in pendientes_flujo %}<p class="nota">{{ aviso }}</p>{% endfor %}</div>
 </body></html>

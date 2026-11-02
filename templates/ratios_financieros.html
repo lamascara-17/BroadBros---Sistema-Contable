@@ -3,7 +3,7 @@
 {% block title %}Ratios financieros · {{ ticker }} — BroadBros{% endblock %}
 {% block page_title %}Análisis financiero{% endblock %}
 {% block page_subtitle %}Tu empresa, su evolución y sus referentes. Los 17 indicadores del taller UNI.{% endblock %}
-{% block content %}
+{% block content %}<p><a class="btn btn-secondary" href="{% url 'ratios_caso' %}">Ver ratios del caso contable activo</a></p>
 <link rel="stylesheet" href="{% static 'css/ratios.css' %}">
 <div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
     <section class="ratio-hero" aria-labelledby="ratio-company">

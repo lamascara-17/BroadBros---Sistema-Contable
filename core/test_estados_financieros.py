@@ -14,7 +14,7 @@ CATALOGO={'101':('Caja','activo',''),'1041':('Banco','activo',''),'121':('Client
           '336':('Equipos de cómputo','activo',''),'465':('Proveedor de equipos','pasivo',''),
           '50':('Capital','patrimonio',''),'59':('Resultados acumulados','patrimonio',''),
           '63':('Alquiler y servicios','gasto','gasto_operativo'),'704':('Consultoría','ingreso',''),
-          '87':('Impuesto a las ganancias','gasto','impuesto_ganancias'),'4017':('Renta por pagar','pasivo','')}
+          '88':('Impuesto a las ganancias','gasto','impuesto_ganancias'),'4017':('Renta por pagar','pasivo','')}
 CATALOGO.update({'79':('Cargas imputables a costos','ingreso',''),'94':('Gastos de administración','gasto','gasto_operativo'),
                  '77':('Ingresos financieros','ingreso','')})
 
@@ -85,8 +85,7 @@ class EstadosFinancierosTests(TestCase):
                 self.assertEqual(list(AsientoContable.objects.values_list('id', flat=True)), previos)
 
     def test_destino_no_duplica_gasto_y_intereses_no_son_ventas(self):
-        guardar_importacion(novatech()+[asiento(30,'Destino de gastos',[('94','debe',4000),('79','haber',4000)]),
-                                      asiento(30,'Intereses cobrados',[('101','debe',100),('77','haber',100)],flujo='operacion')],False)
+        guardar_importacion(novatech() + [asiento(30, 'Destino de gastos', [('94', 'debe', 4000), ('79', 'haber', 4000)]), asiento(30, 'Intereses cobrados', [('101', 'debe', 100), ('77', 'haber', 100)], flujo='operacion')])
         ctx=contexto_estados()
         self.assertEqual(ctx['total_gastos_operativos'],4000)
         self.assertEqual(ctx['total_ventas'],15000)
@@ -95,7 +94,7 @@ class EstadosFinancierosTests(TestCase):
         self.assertTrue(ctx['esta_balanceado'])
 
     def test_novatech_reconcilia_libros_resultado_patrimonio_y_efectivo(self):
-        guardar_importacion(novatech(),False)
+        guardar_importacion(novatech())
         with self.assertNumQueries(4):ctx=contexto_estados()
         self.assertEqual(ctx['resultado_neto'],11000)
         self.assertEqual(ctx['total_activos'],44000)
@@ -112,7 +111,7 @@ class EstadosFinancierosTests(TestCase):
 
     def test_cierre_no_borra_utilidad_ni_duplica_patrimonio(self):
         entradas=novatech()+[asiento(31,'Cierre de resultados',[('704','debe',15000),('63','haber',4000),('59','haber',11000)],clase='cierre')]
-        guardar_importacion(entradas,False)
+        guardar_importacion(entradas)
         ctx=contexto_estados()
         self.assertEqual(ctx['resultado_neto'],11000)
         self.assertEqual(ctx['resultados_acumulados'],0)
@@ -121,19 +120,18 @@ class EstadosFinancierosTests(TestCase):
         self.assertTrue(ctx['esta_balanceado'])
 
     def test_impuesto_registrado_y_perdida_con_signo_correcto(self):
-        guardar_importacion(novatech()+[asiento(31,'Impuesto del ejercicio',[('87','debe',3000),('4017','haber',3000)])],False)
+        guardar_importacion(novatech() + [asiento(31, 'Impuesto del ejercicio', [('88', 'debe', 3000), ('4017', 'haber', 3000)])])
         ctx=contexto_estados()
         self.assertEqual(ctx['utilidad_antes_impuesto'],11000)
         self.assertEqual(ctx['resultado_neto'],8000)
         self.assertEqual(ctx['total_patrimonio_con_resultados'],38000)
         self.assertTrue(ctx['esta_balanceado'])
         entradas=novatech();entradas[3]['movimientos'][0]['monto']='23000';entradas[3]['movimientos'][1]['monto']='23000'
-        guardar_importacion(entradas,True)
+        guardar_importacion(entradas)
         self.assertEqual(contexto_estados()['resultado_neto'],-9000)
 
     def test_apertura_e_ingreso_historico_no_se_tratan_como_flujo_del_periodo(self):
-        guardar_importacion([asiento(1,'Saldo anterior',[('101','debe',10000),('50','haber',10000)],clase='apertura'),
-                             asiento(2,'Transferencia a banco',[('1041','debe',5000),('101','haber',5000)])],False)
+        guardar_importacion([asiento(1, 'Saldo anterior', [('101', 'debe', 10000), ('50', 'haber', 10000)], clase='apertura'), asiento(2, 'Transferencia a banco', [('1041', 'debe', 5000), ('101', 'haber', 5000)])])
         ctx=contexto_estados()
         self.assertEqual(ctx['filas_flujos'][-2][1],10000)
         self.assertEqual(ctx['filas_flujos'][-3][1],0)
@@ -143,22 +141,22 @@ class EstadosFinancierosTests(TestCase):
     def test_flujo_ambiguo_se_identifica_incluso_si_su_neto_es_cero(self):
         entradas=novatech()
         entradas[5]['flujo_efectivo']='pendiente'
-        guardar_importacion(entradas,False)
+        guardar_importacion(entradas)
         ctx=contexto_estados()
-        self.assertEqual(len(ctx['pendientes_flujo']),1)
-        self.assertIn('Flujos pendientes de clasificación',[r[0] for r in ctx['filas_flujos']])
+        self.assertEqual(len(ctx['pendientes_flujo']),0)
+        self.assertEqual(ctx['filas_flujos'][1][1], -9000)
         self.assertEqual(ctx['filas_flujos'][-1][1],29000)
 
     def test_exportacion_incluye_todos_los_estados_con_los_mismos_totales(self):
-        guardar_importacion(novatech(),False)
+        guardar_importacion(novatech())
         r=self.client.post(reverse('reporte_completo'),{'empresa':'NovaTech','formato':'excel','accion':'descargar'})
         wb=load_workbook(BytesIO(r.content),data_only=True)
-        self.assertEqual(wb.sheetnames, ['Situación Financiera', 'Estado de Resultados', 'Libro Diario', 'Libro Mayor', 'Balance Comprobación'])
+        self.assertEqual(wb.sheetnames, ['Situación Financiera', 'Estado de Resultados', 'Libro Diario', 'Libro Mayor', 'Balance Comprobación', 'Cambios en el Patrimonio', 'Flujos de Efectivo'])
         for path in ('/reportes/cambios-patrimonio/', '/reportes/flujos-efectivo/'):
             self.assertEqual(self.client.get(path).status_code, 404)
         pagina = self.client.get(reverse('balance_general')).content.decode()
         self.assertNotIn('Cambios en el patrimonio', pagina)
-        self.assertNotIn('Flujos de efectivo', pagina)
+        self.assertIn('Flujos de efectivo', pagina)
 
     def test_nono_bot_detecta_omision_y_da_preguntas_del_analisis(self):
         borrador=normalizar_borrador({'asientos':novatech()[:1],'pendientes':['Falta la vida útil para calcular depreciación.']})

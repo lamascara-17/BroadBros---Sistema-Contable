@@ -62,9 +62,9 @@ class RatioCalculationTests(SimpleTestCase):
         v = report['selected']['values']
         self.assertEqual(report['selected']['ebitda'],34120)
         self.assertAlmostEqual(v['current'],D('31573')/D('18514'),places=20)
-        self.assertAlmostEqual(v['net_margin'],D('23126')/D('63887'),places=20)
-        self.assertEqual(report['dupont']['roe'],'31.05%')
-        self.assertTrue(report['dupont']['matches'])
+        self.assertIsNone(v['net_margin'])  # ProfitLoss consolidado no demuestra atribución al accionista.
+        self.assertEqual(report['dupont']['roe'],'N/D')
+        self.assertFalse(report['dupont']['matches'])
         self.assertFalse(report['selected']['warnings'])
 
     def test_grupo_transparente_media_y_cambio_de_lider(self):
@@ -72,7 +72,7 @@ class RatioCalculationTests(SimpleTestCase):
         r = comparison(data,leader='AMD')
         self.assertEqual(r['peer_count'],9)
         self.assertEqual(r['reference']['company']['ticker'],'AMD')
-        self.assertEqual(len(r['chart_data']['net_margin']['points']),9)
+        self.assertEqual(len(r['chart_data']['net_margin']['points']),8)
         ebitda_row = next(row for row in r['rows'] if row['key']=='ebitda_margin')
         self.assertEqual(ebitda_row['n'],8)  # Cisco no se sustituye por cero.
         margins = [p['value'] for p in r['chart_data']['net_margin']['points']]
@@ -115,7 +115,7 @@ class RatioScreenTests(TestCase):
         self.assertEqual(len(r.context['rows']),17)
         self.assertContains(r,'value="2025-11-02"')
         self.assertContains(r,'ratio-chart-data')
-        self.assertContains(r,'36.20%')
+        self.assertContains(r,'N/D')
         self.assertContains(self.client.get(reverse('index')),reverse('ratios_financieros'))
         self.assertEqual(FinancialRatioPeriod.objects.count(),0) # GET no escribe.
 

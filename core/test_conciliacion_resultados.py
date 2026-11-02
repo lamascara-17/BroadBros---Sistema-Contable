@@ -31,7 +31,15 @@ class ConciliacionResultadosTests(TestCase):
                 {'codigo': '6901', 'nombre': 'Pérdidas por Incendio', 'tipo_cuenta': 'gasto', 'tipo_movimiento': 'debe', 'monto': '600'},
                 {'codigo': '2101', 'nombre': 'Inventario de mercaderías', 'tipo_cuenta': 'activo', 'tipo_movimiento': 'haber', 'monto': '600'}]},
         ])
-        guardar_importacion(entradas, False)
+        # Simular libros históricos sin pasar por una nueva importación PCGE.
+        from .models import AsientoContable
+        for entrada in entradas:
+            a = AsientoContable.objects.create(fecha=entrada['fecha'], descripcion=entrada['descripcion'],
+                clase=entrada.get('clase', 'operacion'), flujo_efectivo=entrada.get('flujo_efectivo', 'pendiente'))
+            for m in entrada['movimientos']:
+                c, _ = CuentaContable.objects.get_or_create(codigo=m['codigo'], defaults={
+                    'nombre': m['nombre'], 'tipo': m['tipo_cuenta'], 'subcategoria': m.get('subcategoria','')})
+                Movimiento.objects.create(asiento=a, cuenta=c, tipo=m['tipo_movimiento'], monto=m['monto'])
 
     def test_catalogo_historico_no_confunde_donacion_y_siniestro_con_ventas_y_costo(self):
         self.importar_historico()
@@ -51,7 +59,7 @@ class ConciliacionResultadosTests(TestCase):
             ('704', 'debe', 15000), ('63', 'haber', 4000), ('59', 'haber', 11000)], clase='cierre')]]
         for entradas in casos:
             with self.subTest(cierre=len(entradas) == 8):
-                guardar_importacion(entradas, False)
+                guardar_importacion(entradas)
                 ctx = contexto_estados()
                 neto_mayor = sum((d['total_haber'] - d['total_debe'] for d in ctx['mayor_datos']
                                  if d['cuenta'].tipo in ('ingreso', 'gasto')), Decimal('0'))
@@ -74,7 +82,7 @@ class ConciliacionResultadosTests(TestCase):
         self.assertEqual(ctx['resultado_neto'], 11400)
 
     def test_auxiliar_sin_contrapartida_de_destino_no_pasa_conciliacion(self):
-        guardar_importacion(novatech(), False)
+        guardar_importacion(novatech())
         cuenta = CuentaContable.objects.get(codigo='63')
         cuenta.codigo = '9401'
         cuenta.save()
@@ -105,7 +113,7 @@ class ConciliacionResultadosTests(TestCase):
         filas = {r[0]: r[1] for r in libro['Estado de Resultados'].iter_rows(values_only=True) if r[0]}
         for concepto, monto, _ in ctx['filas_er']:
             self.assertEqual(Decimal(str(filas[concepto])), monto)
-        self.assertEqual(len(libro.sheetnames), 5)
+        self.assertEqual(len(libro.sheetnames), 7)
         pdf = self.client.post(reverse('reporte_completo'), {'formato': 'pdf'})
         texto = '\n'.join(p.extract_text() for p in PdfReader(BytesIO(pdf.content)).pages)
         for importe in ('15,000.00', '1,000.00', '-600.00', '11,400.00'):

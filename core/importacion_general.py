@@ -161,8 +161,9 @@ def serializar_asientos(asientos):
 def normalizar_borrador(datos):
     if not isinstance(datos, dict) or not isinstance(datos.get('asientos'), list) or len(datos['asientos']) > 100:
         raise ValueError('La propuesta no contiene una lista válida de asientos.')
+    from .validacion_contable import preparar_pcge
     borrador = []
-    for item in datos['asientos']:
+    for item in preparar_pcge(datos['asientos']):
         if not isinstance(item, dict) or not isinstance(item.get('movimientos'), list) or len(item['movimientos']) > 40:
             raise ValueError('La propuesta contiene movimientos inválidos.')
         a = {k:str(item.get(k) or '')[:2000] for k in ('fecha','descripcion','fuente')}

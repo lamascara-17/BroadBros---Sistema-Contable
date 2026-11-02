@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% load contable_tags %}
+{% block page_title %}Estado de Cambios en el Patrimonio{% endblock %}
+{% block content %}<p>{{ nota_patrimonio }}</p>{% for n in notas_consistencia %}<p role="alert">{{ n }}</p>{% endfor %}
+<div class="table-container"><table><thead><tr><th>Concepto</th><th>Inicial documentado</th><th>Otros movimientos</th><th>Resultado</th><th>Saldo final</th></tr></thead><tbody>
+{% for r in filas_patrimonio %}<tr><td>{{ r.nombre }}</td><td>{% if apertura_documentada %}{{ r.inicial|formato_moneda }}{% else %}N/D{% endif %}</td><td>{{ r.variacion|formato_moneda }}</td><td>{{ r.resultado|formato_moneda }}</td><td>{{ r.final|formato_moneda }}</td></tr>{% endfor %}
+<tr><th>Total</th><td>{% if apertura_documentada %}{{ totales_patrimonio.inicial|formato_moneda }}{% else %}N/D{% endif %}</td><td>{{ totales_patrimonio.variacion|formato_moneda }}</td><td>{{ totales_patrimonio.resultado|formato_moneda }}</td><td>{{ totales_patrimonio.final|formato_moneda }}</td></tr></tbody></table></div>{% endblock %}

@@ -288,7 +288,7 @@
             "revenue": "63887",
             "cost_sales": "20593",
             "operating_income": "25484",
-            "net_income": "23126",
+            "net_income": null,
             "interest": "3210",
             "da": "8636",
             "inventory_previous": "1760",
@@ -440,7 +440,9 @@
               "accession": "0001730168-25-000121",
               "filed": "2025-12-18",
               "unit": "USD",
-              "url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/0001730168-25-000121-index.html"
+              "url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/0001730168-25-000121-index.html",
+              "excluded_value": "23126",
+              "note": "ProfitLoss consolidado no demuestra utilidad atribuible al accionista. Dato excluido de ROE/DuPont hasta verificar la atribución."
             },
             "interest": {
               "tag": "InterestExpenseNonoperating",

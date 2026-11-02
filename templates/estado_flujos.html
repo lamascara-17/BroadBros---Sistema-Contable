@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% load contable_tags %}
+{% block page_title %}Estado de Flujos de Efectivo{% endblock %}
+{% block content %}<p>{{ nota_flujos }}</p>{% for n in pendientes_flujo %}<p role="alert">{{ n }}</p>{% endfor %}
+<div class="table-container"><table><thead><tr><th>Concepto</th><th>Importe</th></tr></thead><tbody>{% for nombre, saldo, tipo in filas_flujos %}<tr><td>{{ nombre }}</td><td>{% if saldo != None %}{{ saldo|formato_moneda }}{% else %}N/D{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}

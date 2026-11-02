@@ -21,6 +21,7 @@ from groq import Groq
 from django.conf import settings
 import groq
 from django.db import transaction
+from django.views.decorators.http import require_POST
 from .models import CuentaContable, AsientoContable, Movimiento
 from .reporte_utils import contexto_estados
 
@@ -78,7 +79,9 @@ RESPUESTA_FUERA_ALCANCE = (
 def consulta_contable(client, mensaje):
     """Clasifica el alcance antes de consultar datos o generar una explicación."""
     clasificacion = client.chat.completions.create(
-        model='openai/gpt-oss-20b',
+        model=settings.GROQ_TEXT_MODEL,
+        max_completion_tokens=192,
+        **({'reasoning_effort': 'low'} if settings.GROQ_TEXT_MODEL.startswith('openai/gpt-oss') else {}),
         messages=[
             {'role': 'system', 'content': '''Clasifica la consulta, sin responderla.
 Devuelve únicamente JSON: {"permitida": true} o {"permitida": false}.
@@ -169,6 +172,12 @@ def gestionar_cuentas(request):
             errors.append('El nombre es obligatorio.')
         if tipo not in dict(CuentaContable.TIPO_CHOICES):
             errors.append('El tipo de cuenta no es válido.')
+        try:
+            from .validacion_contable import validar_cuenta
+            validar_cuenta(codigo, nombre, tipo)
+            if subcategoria not in dict(CuentaContable.SUBCATEGORIA_CHOICES): raise ValueError('Subcategoría inválida.')
+        except ValueError as exc:
+            errors.append(str(exc))
         if CuentaContable.objects.filter(codigo=codigo).exists():
             errors.append(f'Ya existe una cuenta con el código "{codigo}".')
 
@@ -191,6 +200,7 @@ def gestionar_cuentas(request):
     return render(request, 'gestionar_cuentas.html', context)
 
 
+@require_POST
 def eliminar_cuenta(request, cuenta_id):
     cuenta = get_object_or_404(CuentaContable, id=cuenta_id)
     if cuenta.movimientos.exists():
@@ -206,157 +216,85 @@ def eliminar_cuenta(request, cuenta_id):
 
 # ─── REGISTRO MANUAL DE ASIENTOS ───────────────────────────────────────────────
 
-def registrar_asiento(request):
-    cuentas = CuentaContable.objects.all()
-
-    if not cuentas.exists():
-        messages.warning(
-            request,
-            'Debe crear al menos una cuenta contable antes de registrar asientos.'
-        )
-        return redirect('gestionar_cuentas')
-
-    if request.method == 'POST':
-        fecha = request.POST.get('fecha', '').strip()
-        descripcion = request.POST.get('descripcion', '').strip()
-        num_movimientos = int(request.POST.get('num_movimientos', 0))
-
-        errors = []
-        clase=request.POST.get('clase','operacion');flujo=request.POST.get('flujo_efectivo','pendiente')
-        if clase not in dict(AsientoContable.CLASE_CHOICES) or flujo not in dict(AsientoContable.FLUJO_CHOICES):errors.append('Revise la clase del asiento y el flujo de efectivo.')
-        if not fecha:
-            errors.append('La fecha es obligatoria.')
-
-        if num_movimientos < 2:
-            errors.append('Debe registrar al menos 2 movimientos por asiento.')
-
-        movimientos_data = []
-        for i in range(num_movimientos):
-            cuenta_id = request.POST.get(f'cuenta_{i}', '').strip()
-            tipo = request.POST.get(f'tipo_{i}', '').strip()
-            monto_str = request.POST.get(f'monto_{i}', '').strip()
-
-            if not cuenta_id or not tipo or not monto_str:
-                errors.append(f'Línea {i+1}: Todos los campos son obligatorios.')
-                continue
-
-            try:
-                monto = Decimal(monto_str)
-                if monto <= 0:
-                    errors.append(f'Línea {i+1}: El monto debe ser mayor a 0.')
-                    continue
-            except (InvalidOperation, ValueError):
-                errors.append(f'Línea {i+1}: El monto ingresado no es válido.')
-                continue
-
-            if tipo not in ('debe', 'haber'):
-                errors.append(f'Línea {i+1}: El tipo debe ser Debe o Haber.')
-                continue
-
-            try:
-                cuenta = CuentaContable.objects.get(id=int(cuenta_id))
-            except (CuentaContable.DoesNotExist, ValueError):
-                errors.append(f'Línea {i+1}: La cuenta seleccionada no existe.')
-                continue
-
-            movimientos_data.append({
-                'cuenta': cuenta,
-                'tipo': tipo,
-                'monto': monto,
-            })
-
-        if not errors and len(movimientos_data) >= 2:
-            total_debe = sum(m['monto'] for m in movimientos_data if m['tipo'] == 'debe')
-            total_haber = sum(m['monto'] for m in movimientos_data if m['tipo'] == 'haber')
-
-            if total_debe != total_haber:
-                errors.append(
-                    f'El asiento no está balanceado. '
-                    f'Debe: S/ {total_debe:,.2f} ≠ Haber: S/ {total_haber:,.2f}'
-                )
-        elif not errors:
-            errors.append('Debe registrar al menos 2 movimientos válidos.')
-
-        if clase=='cierre' and any(m['cuenta'].tipo in ('activo','pasivo') for m in movimientos_data):
-            errors.append('Un cierre de resultados no debe mover activos ni pasivos.')
-
-        if errors:
-            for error in errors:
-                messages.error(request, error)
-        else:
-            asiento = AsientoContable.objects.create(
-                fecha=fecha,
-                descripcion=descripcion,
-                clase=clase,flujo_efectivo=flujo,
-            )
-            for m in movimientos_data:
-                Movimiento.objects.create(
-                    asiento=asiento,
-                    cuenta=m['cuenta'],
-                    tipo=m['tipo'],
-                    monto=m['monto'],
-                )
-            
-            hora_real = timezone.localtime(timezone.now()).strftime("%d/%m/%Y a las %H:%M")
-            messages.success(request, f'Asiento registrado exitosamente el {hora_real}.')
-            return redirect('libro_diario')
-
-    asientos_registrados = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')
-
-    context = {
-        'cuentas': cuentas,
-        'asientos_registrados': asientos_registrados,
-    }
-    return render(request, 'registrar_asiento.html', context)
-
-
-def editar_asiento(request, asiento_id):
-    asiento = get_object_or_404(AsientoContable, id=asiento_id)
-    if request.method != 'POST':
-        return redirect('libro_diario')
-
-    # Validar todas las líneas antes de reemplazar los movimientos existentes.
-    from datetime import date
+def datos_asiento_manual(request, asiento_actual=None):
+    from .importacion_general import validar_asientos
+    from .validacion_contable import validar_cuenta
     try:
-        fecha = date.fromisoformat(request.POST.get('fecha', ''))
-        clase=request.POST.get('clase',asiento.clase);flujo=request.POST.get('flujo_efectivo',asiento.flujo_efectivo)
-        if clase not in dict(AsientoContable.CLASE_CHOICES) or flujo not in dict(AsientoContable.FLUJO_CHOICES):raise ValueError('Clasificación inválida.')
-        num_movs = int(request.POST.get('num_movimientos', 0))
-        if num_movs < 2:
-            raise ValueError('Debe registrar al menos 2 movimientos por asiento.')
-        movimientos = []
-        for i in range(num_movs):
+        cantidad = int(request.POST.get('num_movimientos', '0'))
+    except (ValueError, TypeError):
+        raise ValueError('Cantidad de movimientos inválida.') from None
+    if not 2 <= cantidad <= 40:
+        raise ValueError('El asiento necesita entre 2 y 40 movimientos.')
+    lineas, cuentas = [], {}
+    for i in range(cantidad):
+        try:
             cuenta = CuentaContable.objects.get(pk=int(request.POST.get(f'cuenta_{i}', '')))
-            tipo = request.POST.get(f'tipo_{i}', '')
-            monto = Decimal(request.POST.get(f'monto_{i}', ''))
-            if tipo not in ('debe', 'haber') or not monto.is_finite() or monto <= 0:
-                raise ValueError('Cada movimiento debe tener una cuenta, tipo y monto válidos.')
-            if monto != monto.quantize(Decimal('0.01')) or monto >= Decimal('10000000000'):
-                raise ValueError('Los montos deben tener como máximo dos decimales y 10 dígitos enteros.')
-            movimientos.append({'cuenta': cuenta, 'tipo': tipo, 'monto': monto})
-        debe = sum(m['monto'] for m in movimientos if m['tipo'] == 'debe')
-        haber = sum(m['monto'] for m in movimientos if m['tipo'] == 'haber')
-        if debe != haber:
-            raise ValueError('El asiento no está balanceado. Los totales de Debe y Haber deben coincidir.')
-        if clase=='cierre' and any(m['cuenta'].tipo in ('activo','pasivo') for m in movimientos):
-            raise ValueError('Un cierre de resultados no debe mover activos ni pasivos.')
-    except (ValueError, InvalidOperation, CuentaContable.DoesNotExist):
-        messages.error(request, 'No se guardaron los cambios. Revise la fecha, las cuentas y el cuadre del asiento.')
-        return redirect('libro_diario')
+        except (ValueError, TypeError, CuentaContable.DoesNotExist):
+            raise ValueError(f'Línea {i+1}: la cuenta no existe en este espacio de trabajo.') from None
+        validar_cuenta(cuenta.codigo, cuenta.nombre, cuenta.tipo)
+        cuentas[cuenta.codigo] = cuenta
+        lineas.append({'codigo': cuenta.codigo, 'nombre': cuenta.nombre, 'tipo_cuenta': cuenta.tipo,
+                       'subcategoria': cuenta.subcategoria, 'tipo_movimiento': request.POST.get(f'tipo_{i}'),
+                       'monto': request.POST.get(f'monto_{i}')})
+    datos = validar_asientos([{'fecha': request.POST.get('fecha'),
+            'descripcion': request.POST.get('descripcion', '').strip(),
+            'clase': request.POST.get('clase', 'operacion'),
+            'flujo_efectivo': request.POST.get('flujo_efectivo', 'pendiente'), 'movimientos': lineas}])[0]
+    from .validacion_contable import auditar_asientos
+    qs = AsientoContable.objects.prefetch_related('movimientos__cuenta')
+    if asiento_actual is not None: qs = qs.exclude(pk=asiento_actual.pk)
+    entradas = [{'fecha': str(a.fecha), 'descripcion': a.descripcion, 'movimientos': [
+        {'codigo': m.cuenta.codigo, 'nombre': m.cuenta.nombre, 'tipo_cuenta': m.cuenta.tipo,
+         'tipo_movimiento': m.tipo, 'monto': str(m.monto)} for m in a.movimientos.all()]} for a in qs]
+    entradas.append(datos)
+    entradas.sort(key=lambda a: str(a['fecha']))
+    alertas = auditar_asientos(entradas)
+    if alertas: raise ValueError(' '.join(alertas))
+    return datos, cuentas
 
-    # La cabecera y el detalle se actualizan juntos o se conserva el asiento anterior.
+
+def escribir_asiento(datos, cuentas, asiento=None):
     with transaction.atomic():
-        asiento.fecha = fecha
-        asiento.clase=clase;asiento.flujo_efectivo=flujo
-        asiento.descripcion = request.POST.get('descripcion', '').strip()
+        if asiento is None: asiento = AsientoContable()
+        for campo in ('fecha', 'descripcion', 'clase', 'flujo_efectivo'):
+            setattr(asiento, campo, datos[campo])
         asiento.save()
         asiento.movimientos.all().delete()
-        Movimiento.objects.bulk_create([Movimiento(asiento=asiento, **m) for m in movimientos])
-    ahora = timezone.localtime(timezone.now()).strftime("%d/%m/%Y a las %H:%M")
-    messages.success(request, f"Asiento actualizado exitosamente el {ahora}.")
+        Movimiento.objects.bulk_create([Movimiento(asiento=asiento, cuenta=cuentas[m['codigo']],
+                                       tipo=m['tipo_movimiento'], monto=m['monto']) for m in datos['movimientos']])
+    return asiento
+
+
+def registrar_asiento(request):
+    cuentas = CuentaContable.objects.all()
+    if not cuentas.exists():
+        messages.warning(request, 'Debe crear cuentas antes de registrar asientos.')
+        return redirect('gestionar_cuentas')
+    if request.method == 'POST':
+        try:
+            datos, catalogo = datos_asiento_manual(request)
+            escribir_asiento(datos, catalogo)
+            messages.success(request, 'Asiento registrado correctamente.')
+            return redirect('libro_diario')
+        except (ValueError, ArithmeticError) as exc:
+            messages.error(request, str(exc))
+    return render(request, 'registrar_asiento.html', {'cuentas': cuentas,
+        'asientos_registrados': AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')})
+
+
+@require_POST
+def editar_asiento(request, asiento_id):
+    asiento = get_object_or_404(AsientoContable, pk=asiento_id)
+    try:
+        datos, catalogo = datos_asiento_manual(request, asiento)
+        escribir_asiento(datos, catalogo, asiento)
+        messages.success(request, 'Asiento actualizado correctamente.')
+    except (ValueError, ArithmeticError) as exc:
+        messages.error(request, str(exc))
     return redirect('libro_diario')
 
 
+@require_POST
 def eliminar_asiento(request, asiento_id):
     asiento = get_object_or_404(AsientoContable, id=asiento_id)
     asiento_num = numeros_asientos()[asiento.id]
@@ -424,13 +362,22 @@ def recurso_pdf(uri, rel):
     return uri
 
 
+from .errores import exportacion_segura
+
+
+@exportacion_segura
 def reporte_completo(request):
     """
     Permite descargar directamente el reporte en PDF, en Excel (.xlsx)
     o enviarlo al correo opcionalmente sin bloquearse por fallos SMTP.
     """
     if request.method == 'POST':
-        empresa = request.POST.get('empresa', 'BroadBros').strip() or 'BroadBros'
+        empresa = ' '.join(request.POST.get('empresa', 'BroadBros').split()) or 'BroadBros'
+        if len(empresa) > 200:
+            messages.error(request, 'La razón social admite hasta 200 caracteres.')
+            return redirect('reporte_completo')
+        from django.utils.text import slugify
+        archivo_empresa = slugify(empresa)[:100] or 'BROADBROS'
         formato = request.POST.get('formato', 'pdf')
         correo = request.POST.get('correo', '').strip()
 
@@ -441,7 +388,7 @@ def reporte_completo(request):
                 excel_data,
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
-            response['Content-Disposition'] = f'attachment; filename="Reporte_Contable_{empresa}.xlsx"'
+            response['Content-Disposition'] = f'attachment; filename="Reporte_Contable_{archivo_empresa}.xlsx"'
             return response
 
         # ── 2. Generación de PDF en memoria ──
@@ -477,14 +424,17 @@ def reporte_completo(request):
                 messages.success(request, '¡Reporte enviado con éxito!')
                 return redirect('reporte_completo')
             except Exception as e:
-                messages.error(request, f'No se pudo enviar el correo: {str(e)}. Te recomendamos descargarlo directamente.')
+                response = HttpResponse(pdf_data, content_type='application/pdf')
+                response['Content-Disposition'] = 'attachment; filename=Reporte_BROADBROS.pdf'
+                response['X-Report-Email-Status'] = 'failed'
+                return response
                 return redirect('reporte_completo')
             finally:
                 pdf_file.close()
 
         # ── 4. Descarga directa en PDF por defecto ──
         response = HttpResponse(pdf_data, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Reporte_Contable_{empresa}.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="Reporte_Contable_{archivo_empresa}.pdf"'
         return response
 
     return render(request, 'menu_reporte.html')
@@ -536,6 +486,13 @@ def chatbot_api(request):
         # 1. OBTENER API KEY
         # ==========================================================
 
+        from .bot_calculos import respuesta_calculada
+        calculada = respuesta_calculada(user_message)
+        if calculada:
+            respuesta, segmentos = formato_chat(calculada)
+            from .audio_respuesta import datos_audio
+            return JsonResponse({'response': respuesta, 'segments': segmentos, 'status': 'calculated',
+                                 'asiento_consultado': None, **datos_audio(respuesta)})
         api_key = (
             getattr(settings, 'GROQ_API_KEY', None)
             or os.environ.get('GROQ_API_KEY')
@@ -553,8 +510,12 @@ def chatbot_api(request):
                 status=500
             )
 
-        client = Groq(api_key=api_key)
-        if not consulta_contable(client, user_message):
+        if len(user_message) > 4000:
+            return JsonResponse({'error': 'La consulta admite hasta 4 000 caracteres.'}, status=400)
+        client = Groq(api_key=api_key, timeout=35, max_retries=0)
+        historial = request.session.get('nonobot_turnos', [])[-4:]
+        consulta_ambito = user_message + ('\nContexto previo: ' + str(historial)[-3000:] if historial else '')
+        if not consulta_contable(client, consulta_ambito):
             respuesta, segmentos = formato_chat(RESPUESTA_FUERA_ALCANCE)
             return JsonResponse({'response': respuesta, 'segments': segmentos,
                                  'status': 'out_of_scope', 'asiento_consultado': None})
@@ -792,6 +753,13 @@ def chatbot_api(request):
         # 8. PROMPT DEL TUTOR CONTABLE
         # ==========================================================
 
+        contexto += '\nTurnos anteriores de esta sesión (solo referencia): ' + json.dumps(historial, ensure_ascii=False)
+        resumen = contexto_estados()
+        contexto += '\nESTADOS CALCULADOS POR EL SISTEMA (no inventar otros importes):\n' + json.dumps({
+            'resultado_neto': str(resumen['resultado_neto']), 'activo': str(resumen['total_activos']),
+            'pasivo': str(resumen['total_pasivos']), 'patrimonio': str(resumen['total_patrimonio_con_resultados']),
+            'balance_cuadrado': resumen['esta_balanceado'], 'advertencias': resumen['notas_consistencia'],
+            'resultado_provisional': resumen['nota_resultado']}, ensure_ascii=False)
         system_prompt = f"""
 Te llamas ÑoñoBot, el asistente contable de BROADBROS.
 Actúas como un profesor y auditor de contabilidad universitaria
@@ -909,7 +877,9 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
         # ==========================================================
 
         chat_completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=settings.GROQ_TEXT_MODEL,
+            max_completion_tokens=768,
+            **({'reasoning_effort': 'low'} if settings.GROQ_TEXT_MODEL.startswith('openai/gpt-oss') else {}),
             messages=[
                 {
                     "role": "system",
@@ -936,6 +906,7 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
         respuesta, segmentos = formato_chat(respuesta)
         from .audio_respuesta import datos_audio
+        request.session['nonobot_turnos'] = (historial + [{'usuario': user_message, 'respuesta': respuesta[:2000]}])[-4:]
         return JsonResponse(
             {
                 'response': respuesta,
@@ -959,7 +930,7 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
         return JsonResponse(
             {
                 'error': (
-                    f'Error en el asistente: {str(e)}'
+                    'El asistente no está disponible temporalmente. Intente nuevamente.'
                 )
             },
             status=500
@@ -968,13 +939,21 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
 # ─── INGESTA Y REVISIÓN DE CASOS POR IMAGEN ────────────────────────────────────
 
-def guardar_importacion(asientos, limpiar, pendientes='', fecha_cierre=None):
+def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente=''):
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
-    asientos = validar_asientos(serializar_asientos(asientos))
+    from .validacion_contable import preparar_pcge, validar_cuenta
+    asientos = validar_asientos(preparar_pcge(serializar_asientos(asientos)))
+    for a in asientos:
+        for m in a['movimientos']: validar_cuenta(m['codigo'], m['nombre'], m['tipo_cuenta'])
     if fecha_cierre and fecha_cierre < max(a['fecha'] for a in asientos):
         raise ValueError('La fecha de cierre es anterior a una operación del ejercicio.')
+    from .validacion_contable import auditar_asientos
+    alertas = auditar_asientos(asientos, fuente)
+    if alertas: raise ValueError(' '.join(alertas))
     with transaction.atomic():
+        from .respaldos import crear_respaldo
+        crear_respaldo()
         AsientoContable.objects.all().delete()
         CuentaContable.objects.all().delete()
         cuentas = {}
@@ -987,6 +966,7 @@ def guardar_importacion(asientos, limpiar, pendientes='', fecha_cierre=None):
         for numero,item in enumerate(asientos):
             asiento=AsientoContable.objects.create(fecha=item['fecha'],descripcion=item['descripcion'],
                 clase=item['clase'],flujo_efectivo=item['flujo_efectivo'],
+                fuente_importacion=fuente if numero==len(asientos)-1 else '',
                 observaciones_importacion=pendientes if numero==len(asientos)-1 else '',
                 fecha_cierre_ejercicio=fecha_cierre if numero==len(asientos)-1 else None)
             Movimiento.objects.bulk_create([Movimiento(asiento=asiento,cuenta=cuentas[m['codigo']],
@@ -1033,7 +1013,7 @@ def finalizar_propuesta(request, payload, revisar=False):
     try:
         asientos = validar_asientos(borrador['asientos'])
         from .clasificacion import fecha_cierre_del_caso
-        cantidad = guardar_importacion(asientos, payload['limpiar'], fecha_cierre=fecha_cierre_del_caso(payload['datos']))
+        cantidad = guardar_importacion(asientos, fecha_cierre=fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''))
     except ValueError as exc:
         return mostrar_revision(request, payload, str(exc))
     except Exception:
@@ -1204,7 +1184,7 @@ def revisar_importacion(request):
         if pendientes and request.POST.get('aceptar_parcial') != 'on':
             raise ValueError('La propuesta omite operaciones o ajustes. Complete el análisis o confirme expresamente el guardado parcial.')
         from .clasificacion import fecha_cierre_del_caso
-        cantidad=guardar_importacion(asientos,limpiar,'; '.join(map(str,pendientes)), fecha_cierre_del_caso(payload['datos']))
+        cantidad=guardar_importacion(asientos, '; '.join(map(str, pendientes)), fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''))
         messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))
         return redirect('libro_diario')
     except ValueError as exc:return mostrar_revision(request,payload,str(exc))

@@ -1,10 +1,21 @@
 from django.urls import path
+from django.contrib.auth import views as auth_views
+from . import espacio_views
 from . import views
 from .voz import transcribir_voz
 from .audio_respuesta import respuesta_audio
-from .ratio_views import financial_ratios
+from .ratio_views import financial_ratios, ratios_caso
 
 urlpatterns = [
+    path('ratios-caso/', ratios_caso, name='ratios_caso'),
+    path('ingresar/', auth_views.LoginView.as_view(), name='login'),
+    path('salir/', auth_views.LogoutView.as_view(), name='logout'),
+    path('registro/', espacio_views.registrar_usuario, name='registro'),
+    path('casos-anteriores/', espacio_views.respaldos, name='respaldos'),
+    path('casos-anteriores/<int:pk>/restaurar/', espacio_views.restaurar_respaldo, name='restaurar_respaldo'),
+    path('casos-anteriores/<int:pk>/descargar/', espacio_views.descargar_respaldo, name='descargar_respaldo'),
+    path('reportes/patrimonio/', espacio_views.estado_patrimonio, name='estado_patrimonio'),
+    path('reportes/flujos/', espacio_views.estado_flujos, name='estado_flujos'),
     path('ratios-financieros/', financial_ratios, name='ratios_financieros'),
     path('', views.index, name='index'),
 

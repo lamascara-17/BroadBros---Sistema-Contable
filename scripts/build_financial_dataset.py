@@ -37,7 +37,7 @@ TAGS = {
     'revenue': ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet'],
     'cost_sales': ['CostOfRevenue', 'CostOfGoodsAndServicesSold'],
     'operating_income': ['OperatingIncomeLoss'],
-    'net_income': ['NetIncomeLoss', 'ProfitLoss'],
+    'net_income': ['NetIncomeLoss'],
     'interest': ['InterestExpenseNonoperating', 'InterestExpense'],
     'da': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization'],
 }
@@ -85,6 +85,8 @@ def build(cache):
 
             def take(key, tags, day=end, flow=False):
                 vals = candidates(tags, day, flow)
+                if flow:
+                    vals = [(tag, v) for tag, v in vals if v.get('start') == anchor['start']]
                 if not vals:
                     values[key] = None
                     return

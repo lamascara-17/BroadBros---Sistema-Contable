@@ -23,11 +23,7 @@
                 <button type="button" class="btn-edit" data-clase="{{ asiento.clase }}" data-flujo="{{ asiento.flujo_efectivo }}" data-edit-id="{{ asiento.id }}" data-edit-url="{% url 'editar_asiento' asiento.id %}" onclick="abrirModalEditar({{ asiento.id }}, {{ forloop.counter }}, '{{ asiento.fecha|date:'Y-m-d' }}', '{{ asiento.descripcion|escapejs }}')">
                     Editar
                 </button>
-                <a href="{% url 'eliminar_asiento' asiento.id %}"
-                   class="btn-delete"
-                   onclick="return confirm('¿Estás seguro de eliminar el Asiento #{{ forloop.counter }}?');">
-                   Eliminar
-                </a>
+                <form method="post" action="{% url 'eliminar_asiento' asiento.id %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este registro?')">Eliminar</button></form>
             </div>
         </div>
 
