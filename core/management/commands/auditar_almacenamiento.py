@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Exists, OuterRef, Sum, TextField
 from django.db.models.functions import Cast, Length
 from django.utils import timezone
-from core.models import Workspace, CuentaContable, AsientoContable, Movimiento, RespaldoCaso, FinancialRatioPeriod
+from core.models import Workspace, CuentaContable, AsientoContable, Movimiento, RespaldoCaso, FinancialRatioPeriod, RespaldoFragmento
 from core.workspaces import acceso_administrativo
 
 
@@ -35,7 +35,7 @@ class Command(BaseCommand):
                 valor = sesion.get_decoded().get('workspace_id')
                 try: enlazados.add(UUID(str(valor)))
                 except (ValueError, TypeError, AttributeError): pass
-        modelos = (CuentaContable, AsientoContable, RespaldoCaso, FinancialRatioPeriod)
+        modelos = (CuentaContable, AsientoContable, RespaldoCaso, FinancialRatioPeriod, RespaldoFragmento)
         candidatos = Workspace.objects.none()
         if escaneo_completo:
             candidatos = Workspace.objects.filter(owner__isnull=True,
@@ -50,6 +50,7 @@ class Command(BaseCommand):
             'workspaces_anonimos':Workspace.objects.filter(owner__isnull=True).count(),
             'registros':{modelo.__name__:modelo.objects.count() for modelo in (*modelos, Movimiento)},
             'caracteres_json_respaldos':caracteres,
+            'bytes_fragmentos_respaldos':RespaldoFragmento.objects.aggregate(total=Sum(Length('contenido')))['total'] or 0,
             'sesiones_vigentes':numero_vivas,
             'sesiones_expiradas':Session.objects.filter(expire_date__lte=ahora).count(),
             'escaneo_sesiones_completo':escaneo_completo,

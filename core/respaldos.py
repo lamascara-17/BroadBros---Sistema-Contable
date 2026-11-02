@@ -22,34 +22,14 @@ def serializar_caso():
 
 
 def crear_respaldo():
-    contenido = serializar_caso()
-    if not contenido['asientos'] and not contenido['cuentas']: return None
-    return RespaldoCaso.objects.create(datos=contenido['asientos'], catalogo=contenido['cuentas'])
+    from .respaldo_stream import crear_copia_actual
+    return crear_copia_actual()
 
 
 def restaurar(respaldo, session=None):
-    from .importacion_general import validar_asientos
-    # Se validan estructura y partida doble, sin renumerar el catálogo histórico.
-    for inicio in range(0, len(respaldo.datos), 100):
-        validar_asientos(respaldo.datos[inicio:inicio+100])
-    with transaction.atomic():
-        crear_respaldo()
-        AsientoContable.objects.all().delete()
-        CuentaContable.objects.all().delete()
-        cuentas = {r['codigo']: CuentaContable.objects.create(**r) for r in respaldo.catalogo}
-        for r in respaldo.datos:
-            a = AsientoContable.objects.create(fecha=r['fecha'], descripcion=r['descripcion'], clase=r['clase'],
-                flujo_efectivo=r['flujo_efectivo'], fecha_cierre_ejercicio=r.get('fecha_cierre'),
-                fuente_importacion=r.get('fuente',''), observaciones_importacion=r.get('observaciones',''))
-            movimientos = []
-            for m in r['movimientos']:
-                if m['codigo'] not in cuentas:
-                    cuentas[m['codigo']] = CuentaContable.objects.create(codigo=m['codigo'], nombre=m['nombre'], tipo=m['tipo_cuenta'], subcategoria=m.get('subcategoria',''))
-                movimientos.append(Movimiento(asiento=a, cuenta=cuentas[m['codigo']], tipo=m['tipo_movimiento'], monto=m['monto']))
-            Movimiento.objects.bulk_create(movimientos, batch_size=500)
-
-        from .contexto_bot import limpiar_tras_guardado
-        limpiar_tras_guardado(session)
+    from .respaldo_stream import archivo_historico, restaurar_archivo
+    with archivo_historico(respaldo) as archivo:
+        restaurar_archivo(archivo, session=session)
 
 
 def validar_respaldo(contenido):

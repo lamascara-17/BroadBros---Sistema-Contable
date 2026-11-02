@@ -130,3 +130,6 @@ if os.getenv('RENDER', '').lower() == 'true' and DATABASES['default']['ENGINE'].
 
 SECURE_SSL_REDIRECT = os.getenv('RENDER', '').lower() == 'true'
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600' if SECURE_SSL_REDIRECT else '0'))
+
+# Las subidas grandes van directamente a temporal; el importador procesa por bloques.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 512 * 1024

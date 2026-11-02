@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from core.workspaces import acceso_administrativo
-from core.models import Workspace, CuentaContable, AsientoContable, FinancialRatioPeriod, RespaldoCaso
+from core.models import Workspace, CuentaContable, AsientoContable, FinancialRatioPeriod, RespaldoCaso, RespaldoFragmento
 
 
 class Command(BaseCommand):
@@ -26,7 +26,7 @@ class Command(BaseCommand):
         else:
             try: user = get_user_model().objects.get(username=options['usuario'])
             except get_user_model().DoesNotExist: raise CommandError('El usuario no existe.') from None
-        modelos = (CuentaContable, AsientoContable, FinancialRatioPeriod, RespaldoCaso)
+        modelos = (CuentaContable, AsientoContable, FinancialRatioPeriod, RespaldoCaso, RespaldoFragmento)
         for modelo in modelos:
             self.stdout.write(f'{modelo.__name__}: {modelo.objects.filter(workspace__isnull=True).count()} registros sin propietario')
         if not options['confirmar']:
