@@ -108,6 +108,19 @@ class PreparacionRenderTests(Visitantes, TransactionTestCase):
                 escribir_asiento({}, {})
         self.assertEqual(AsientoContable.objects.count(),7)
 
+    def test_jsonb_no_cambia_huella_portable_por_orden_de_claves(self):
+        from .respaldos import serializar_caso
+        from .respaldo_stream import archivo_historico, archivo_actual
+        from .models import RespaldoCaso
+        def invertir(valor):
+            if isinstance(valor, dict):return {k:invertir(v) for k,v in reversed(list(valor.items()))}
+            if isinstance(valor, list):return [invertir(v) for v in valor]
+            return valor
+        contenido = invertir(serializar_caso())
+        respaldo = RespaldoCaso.objects.create(datos=contenido['asientos'],catalogo=contenido['cuentas'])
+        with archivo_historico(respaldo) as historico, archivo_actual() as vigente:
+            self.assertEqual(historico.read(),vigente.read())
+
     def test_parser_rechaza_profundo_campo_gigante_duplicado_y_listas_no_acotadas(self):
         casos = [b'[' * 13 + b'0' + b']' * 13,
             b'{"asientos":[],"cuentas":[],"version":1,"version":1}',

@@ -11,12 +11,26 @@ from .models import AsientoContable, CuentaContable, Movimiento, RespaldoCaso, R
 from .consultas import movimientos_con_cuentas
 
 BLOQUE = 64 * 1024
-ENCODER = json.JSONEncoder(ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+ENCODER = json.JSONEncoder(ensure_ascii=False, separators=(',', ':'), allow_nan=False, sort_keys=True)
 
 
 def escribir_json(archivo, objeto):
     for texto in ENCODER.iterencode(objeto):
         archivo.write(texto.encode('utf-8'))
+
+
+def escribir_caso(archivo, asientos, catalogo):
+    # PostgreSQL JSONB no conserva el orden de claves; el formato portable sí
+    # fija ese orden para obtener una copia reproducible en ambos motores.
+    archivo.write(b'{"formato":"BROADBROS","version":1,"asientos":[')
+    for i, asiento in enumerate(asientos):
+        if i: archivo.write(b',')
+        escribir_json(archivo, asiento)
+    archivo.write(b'],"cuentas":[')
+    for i, cuenta in enumerate(catalogo):
+        if i: archivo.write(b',')
+        escribir_json(archivo, cuenta)
+    archivo.write(b']}')
 
 
 def serializar_asiento(a):
@@ -34,15 +48,9 @@ def archivo_actual():
     firma = firma_caso()
     archivo = TemporaryFile(mode='w+b')
     try:
-        archivo.write(b'{"formato":"BROADBROS","version":1,"asientos":[')
-        for i, asiento in enumerate(AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).iterator(chunk_size=10)):
-            if i: archivo.write(b',')
-            escribir_json(archivo, serializar_asiento(asiento))
-        archivo.write(b'],"cuentas":[')
-        for i, cuenta in enumerate(CuentaContable.objects.values('codigo','nombre','tipo','subcategoria').iterator(chunk_size=100)):
-            if i: archivo.write(b',')
-            escribir_json(archivo, cuenta)
-        archivo.write(b']}')
+        asientos = AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).iterator(chunk_size=10)
+        catalogo = CuentaContable.objects.values('codigo','nombre','tipo','subcategoria').iterator(chunk_size=100)
+        escribir_caso(archivo, (serializar_asiento(a) for a in asientos), catalogo)
         validar_archivo(archivo)
         if firma_caso() != firma:
             raise ValueError('El caso cambió al preparar la copia. Descárgala nuevamente.')
@@ -72,8 +80,7 @@ def archivo_historico(respaldo):
                             raise ValueError('El catálogo histórico contiene clasificaciones contradictorias.')
                         cuentas[c['codigo']] = c
                 catalogo = list(cuentas.values())
-            escribir_json(archivo, {'formato':'BROADBROS', 'version':1,
-                'asientos':respaldo.datos, 'cuentas':catalogo})
+            escribir_caso(archivo, respaldo.datos, catalogo)
         validar_archivo(archivo)
         archivo.seek(0)
         return archivo

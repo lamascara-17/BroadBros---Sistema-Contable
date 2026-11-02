@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='broadbros-benchmark-') as carpeta:
     call_command('migrate',verbosity=0)
     token = actual.set(Workspace.objects.create().pk)
     catalogo = [{'codigo':str(10000000000000000000+i),'nombre':f'{i:04}'+('n'*196),'tipo':'activo','subcategoria':'activo_no_corriente'} for i in range(1000)]
-    def escribir(f,objeto): f.write(json.dumps(objeto,ensure_ascii=False,separators=(',',':')).encode())
+    def escribir(f,objeto): f.write(json.dumps(objeto,ensure_ascii=False,separators=(',',':'),sort_keys=True).encode())
     inicio = time.monotonic()
     rss_inicial = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     try:
