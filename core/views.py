@@ -510,8 +510,13 @@ def chatbot_api(request):
         # ==========================================================
 
         from .bot_calculos import respuesta_calculada
+        from .contexto_bot import firma_caso
+        caso_calculo = firma_caso()
         calculada = respuesta_calculada(user_message)
         if calculada:
+            if firma_caso() != caso_calculo:
+                return JsonResponse({'status': 'error', 'error':
+                    'El caso cambió durante el cálculo. Vuelve a preguntar con los datos actuales.'}, status=409)
             respuesta, segmentos = formato_chat(calculada)
             from .audio_respuesta import datos_audio
             return JsonResponse({'response': respuesta, 'segments': segmentos, 'status': 'calculated',

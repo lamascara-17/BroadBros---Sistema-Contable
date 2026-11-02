@@ -1,7 +1,7 @@
 """Ratios del caso activo: sin ventas/créditos ni saldos iniciales supuestos."""
 from decimal import Decimal
 from .ratios import calculate, DEFINITIONS, fmt
-from .reporte_utils import contexto_estados, es_efectivo
+from .reporte_utils import contexto_estados, es_efectivo, clase_asiento
 
 
 def calcular_caso():
@@ -22,7 +22,7 @@ def calcular_caso():
     elif not ctx['nota_resultado']:
         valores.update(revenue=ctx['total_ventas'], cost_sales=ctx['total_costo_ventas'],
                        operating_income=ctx['utilidad_operativa'], net_income=ctx['resultado_neto'])
-    aperturas = [a for a in ctx['asientos'] if a.clase == 'apertura']
+    aperturas = [a for a in ctx['asientos'] if clase_asiento(a) == 'apertura']
     movs = [m for a in aperturas for m in a.movimientos.all()]
     if movs:
         def inicial(criterio, deudor=True):
@@ -38,7 +38,7 @@ def calcular_caso():
         ventas_credito, compras_credito = Decimal('0'), Decimal('0')
         hay_ventas, hay_compras = False, False
         for a in ctx['asientos']:
-            if a.clase != 'operacion': continue
+            if clase_asiento(a) != 'operacion': continue
             movimientos = list(a.movimientos.all())
             if any(m.cuenta.tipo == 'ingreso' and m.cuenta.codigo.startswith('70') for m in movimientos):
                 hay_ventas = True
@@ -50,8 +50,8 @@ def calcular_caso():
         if hay_compras: valores['credit_purchases'] = compras_credito
         import re
         # Los cierres cancelan saldos de gasto, pero no el gasto del periodo.
-        gastos = [m for a in ctx['asientos'] if a.clase == 'operacion'
-                  for m in a.movimientos.all() if m.cuenta.tipo == 'gasto']
+        gastos = [m for a in ctx['asientos'] if clase_asiento(a) == 'operacion'
+                  for m in a.movimientos.all() if m.cuenta.tipo == 'gasto' and not m.cuenta.codigo.startswith(('9', '79'))]
         def gasto_periodo(patron):
             seleccion = [m for m in gastos if re.search(patron, m.cuenta.nombre, re.I)]
             return sum((m.monto * (1 if m.tipo == 'debe' else -1) for m in seleccion), Decimal('0')) if seleccion else None

@@ -61,7 +61,7 @@ def archivo_actual():
         raise
 
 
-def archivo_historico(respaldo):
+def archivo_historico(respaldo, validar=True):
     archivo = TemporaryFile(mode='w+b')
     try:
         if respaldo.fragmentos.exists():
@@ -81,7 +81,8 @@ def archivo_historico(respaldo):
                         cuentas[c['codigo']] = c
                 catalogo = list(cuentas.values())
             escribir_caso(archivo, respaldo.datos, catalogo)
-        validar_archivo(archivo)
+        if validar:
+            validar_archivo(archivo)
         archivo.seek(0)
         return archivo
     except BaseException:
@@ -213,19 +214,47 @@ def validar_archivo(archivo):
         raise ValueError('JSON de respaldo inválido. El caso actual se conserva.') from None
 
 
+def archivos_iguales(primero, segundo):
+    """Comparación exacta con RAM acotada; no cambia los cursores del llamador."""
+    try:
+        primero.seek(0)
+        segundo.seek(0)
+        while True:
+            bloque = primero.read(BLOQUE)
+            if bloque != segundo.read(BLOQUE): return False
+            if not bloque: return True
+    finally:
+        primero.seek(0)
+        segundo.seek(0)
+
+
 def guardar_archivo(archivo):
+    from .contexto_bot import bloquear_caso
+    from .workspaces import workspace_actual
     cantidad, catalogo = validar_archivo(archivo)
-    archivo.seek(0, 2)
-    longitud = archivo.tell()
-    archivo.seek(0)
-    # Compatibilidad de las copias pequeñas existentes. Las grandes no pasan por JSONField.
-    if longitud <= 512 * 1024:
-        contenido = json.load(archivo)
-        return RespaldoCaso.objects.create(datos=contenido['asientos'], catalogo=catalogo, numero_asientos=cantidad)
-    respaldo = RespaldoCaso.objects.create(datos=[], catalogo=catalogo, numero_asientos=cantidad)
-    for i in range((longitud + BLOQUE - 1) // BLOQUE):
-        RespaldoFragmento.objects.create(respaldo=respaldo, indice=i, contenido=archivo.read(BLOQUE))
-    return respaldo
+    with transaction.atomic():
+        bloquear_caso()
+        anterior = RespaldoCaso.objects.filter(workspace_id=workspace_actual()).only('pk').order_by('-created_at', '-pk').first()
+        if anterior is not None:
+            try:
+                # El entrante ya se validó: igualdad exacta implica que la copia
+                # previa es válida. No hace falta parsearla otra vez ni escanear
+                # todo el historial. Una copia distinta nunca se elimina.
+                with archivo_historico(anterior, validar=False) as existente:
+                    if archivos_iguales(archivo, existente): return anterior
+            except (ValueError, ArithmeticError, TypeError, KeyError, AttributeError):
+                pass  # Conservar históricos incompatibles; crear la copia válida.
+        archivo.seek(0, 2)
+        longitud = archivo.tell()
+        archivo.seek(0)
+        # Compatibilidad de copias pequeñas; las grandes permanecen en bloques.
+        if longitud <= 512 * 1024:
+            contenido = json.load(archivo)
+            return RespaldoCaso.objects.create(datos=contenido['asientos'], catalogo=catalogo, numero_asientos=cantidad)
+        respaldo = RespaldoCaso.objects.create(datos=[], catalogo=catalogo, numero_asientos=cantidad)
+        for i in range((longitud + BLOQUE - 1) // BLOQUE):
+            RespaldoFragmento.objects.create(respaldo=respaldo, indice=i, contenido=archivo.read(BLOQUE))
+        return respaldo
 
 
 def crear_copia_actual():

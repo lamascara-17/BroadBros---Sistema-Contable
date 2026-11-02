@@ -108,8 +108,8 @@ def importar_respaldo(request):
                 temporal.write(bloque)
             validar_archivo(temporal)
             with transaction.atomic():
-                guardar_archivo(temporal)
                 restaurar_archivo(temporal, session=request.session)
+                guardar_archivo(temporal)
         messages.success(request,'Respaldo importado en esta sesión. El caso anterior se conserva en Casos anteriores.')
     except (ValueError, ArithmeticError) as exc:
         messages.error(request,str(exc))
