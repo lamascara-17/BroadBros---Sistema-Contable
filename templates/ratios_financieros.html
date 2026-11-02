@@ -24,7 +24,7 @@
         <details class="ratio-options"><summary>Supuestos de cálculo</summary><div>
             <label>Tasa para ROA (%)<input name="tasa" type="number" min="0" max="100" step="0.01" value="{{ tax_rate }}"></label>
             <label>Deuda financiera<select name="deuda"><option value="total" {% if debt_basis == 'total' %}selected{% endif %}>CP + LP · fórmula del PPT</option><option value="current" {% if debt_basis == 'current' %}selected{% endif %}>Solo CP · variante del curso</option></select></label>
-            <p>ROA usa la tasa de referencia del taller (30%), no la tasa efectiva de cada compañía. EBITDA = utilidad operativa + D&A; no es EBITDA ajustado. La deuda financiera excluye otros pasivos no financieros.</p>
+            <p>ROA usa la tasa académica seleccionada ({{ tax_rate }}%), no la tasa efectiva de cada compañía. EBITDA = utilidad operativa + D&A; no es EBITDA ajustado. La deuda financiera excluye otros pasivos no financieros.</p>
         </div></details>
     </form>
 
@@ -73,7 +73,7 @@
             <p class="ratio-warning">Al guardar se reemplazan los datos de ratios de este ticker y año. Se identifican como datos ingresados por el usuario. Para una empresa nueva, usa otro ticker y completa sus partidas; un campo vacío significa dato desconocido.</p>
             <div class="ratio-input-grid ratio-meta-grid">{% for field in metadata_fields %}<label>{{ field.label }}{{ field }}{{ field.errors }}</label>{% endfor %}</div>
             <div class="ratio-input-grid">{% for row in input_rows %}<label>{{ row.label }} <small>Millones de {{ period.currency }}</small>{{ row.field }}{{ row.field.errors }}{% if row.source %}<a href="{{ row.source }}" target="_blank" rel="noopener noreferrer">Fuente SEC{% if row.end %} · {{ row.end }}{% endif %} ↗</a>{% endif %}{% if row.tag %}<small class="ratio-source-tag">{{ row.tag }}</small>{% endif %}{% if row.note %}<small>{{ row.note }}</small>{% endif %}</label>{% endfor %}</div>
-            <div class="ratio-form-actions"><button type="submit" class="btn btn-primary">Guardar datos y recalcular</button><button type="button" id="ratio-new-company" class="btn btn-secondary">Preparar empresa nueva</button><span>No se modifican los asientos ni los cinco reportes existentes.</span></div>
+            <div class="ratio-form-actions"><button type="submit" class="btn btn-primary">Guardar datos y recalcular</button><button type="button" id="ratio-new-company" class="btn btn-secondary">Preparar empresa nueva</button><span>No se modifican los asientos ni los libros y estados financieros.</span></div>
         </form>
     </details>
 </div>

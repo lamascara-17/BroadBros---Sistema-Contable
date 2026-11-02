@@ -45,6 +45,19 @@ FLOWS = {'revenue', 'cost_sales', 'operating_income', 'net_income', 'interest', 
 CUTOFF = '2026-11-01'
 
 
+def apply_verified_inputs(ticker, period):
+    """Excepciones revisadas en el informe completo, acotadas a empresa/periodo/moneda."""
+    path = Path(__file__).resolve().parents[1] / 'core/data/verified_financial_inputs.json'
+    for item in json.loads(path.read_text()):
+        if item['provenance']['filed'] > CUTOFF:
+            continue
+        if ticker != item['ticker'] or any(period[k] != item[k] for k in ('year','start','end','currency')):
+            continue
+        period['values'][item['field']] = item['value']
+        period['provenance'][item['field']] = item['provenance'].copy()
+    return period
+
+
 def build(cache):
     companies = []
     for ticker, (name, cik, industry) in COMPANIES.items():
@@ -138,8 +151,8 @@ def build(cache):
                 provenance['liabilities'] = {'url': provenance['assets']['url'], 'note': 'Activo total menos patrimonio consolidado total (incluye no controladoras).'}
             values = {k: v for k, v in values.items() if not k.startswith('_')}
             provenance = {k: v for k, v in provenance.items() if not k.startswith('_')}
-            periods.append({'year': year, 'start': anchor['start'], 'end': end, 'previous_end': previous,
-                'currency': unit, 'values': values, 'provenance': provenance, 'notes': notes})
+            periods.append(apply_verified_inputs(ticker, {'year': year, 'start': anchor['start'], 'end': end, 'previous_end': previous,
+                'currency': unit, 'values': values, 'provenance': provenance, 'notes': notes}))
             print(ticker, year, end, 'missing:', [k for k,v in values.items() if v is None])
         companies.append({'ticker': ticker, 'name': name, 'cik': cik, 'industry': industry,
                           'source_url': f'https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010}.json', 'periods': periods})

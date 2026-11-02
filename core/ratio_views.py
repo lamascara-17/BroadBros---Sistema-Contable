@@ -126,6 +126,14 @@ def financial_ratios(request):
             for p in c['periods']:
                 if p['year']==year:
                     writer.writerow([safe_csv(c['ticker']),p['start'],p['end'],p['currency'],safe_csv(c.get('source_url',''))])
+        writer.writerow(['Método y supuestos'])
+        for note in report['selected']['assumptions']:
+            writer.writerow(['Supuesto', safe_csv(note)])
+        writer.writerow(['ROA', 'Tasa académica de referencia; no es la tasa efectiva de la compañía.'])
+        writer.writerow(['EBITDA', 'Utilidad operativa + D&A; no es EBITDA ajustado.'])
+        net_source = period['provenance'].get('net_income', {})
+        if net_source.get('verified'):
+            writer.writerow(['Verificación de utilidad', safe_csv(net_source['url']), safe_csv(net_source['note'])])
         return HttpResponse('\ufeff'+stream.getvalue(),content_type='text/csv; charset=utf-8',
             headers={'Content-Disposition':f'attachment; filename="Ratios_{ticker}_{year}.csv"'})
     return render(request,'ratios_financieros.html',context)

@@ -236,10 +236,10 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
         solvency = 'Evaluación parcial: solo deuda CP'
     diagnoses = [
         {'title': 'Liquidez', 'status': 'Cobertura corriente' if v['current'] is not None and v['current']>=1 else 'Liquidez ajustada' if v['current'] is not None else 'Datos pendientes',
-         'text': 'El activo corriente cubre '+fmt(v['current'])+' el pasivo corriente. Es una medida estática, no una garantía de pago.'},
+         'text': ('Faltan partidas o un denominador válido para evaluar la liquidez corriente.' if v['current'] is None else 'El activo corriente cubre '+fmt(v['current'])+' el pasivo corriente. Es una medida estática, no una garantía de pago.')},
         {'title': 'Solvencia', 'status': solvency,
          'text': 'Deuda / EBITDA: '+fmt(debt)+'; cobertura de intereses: '+fmt(interest)+'. Referencia orientativa del taller: deuda / EBITDA menor a 3x, sin garantía de pago.'},
-        {'title': 'Rentabilidad', 'status': 'Utilidad positiva' if ni is not None and ni>0 else 'Pérdida contable' if ni is not None and ni<0 else 'Sin utilidad positiva',
+        {'title': 'Rentabilidad', 'status': 'Datos pendientes' if ni is None else 'Utilidad positiva' if ni>0 else 'Pérdida contable' if ni<0 else 'Resultado neto cero',
          'text': 'Margen neto '+fmt(v['net_margin'],'%')+' y ROE '+fmt(v['roe'],'%')+'. Rentabilidad contable del ejercicio, no una recomendación de inversión.'},
     ]
     return {'selected': selected, 'reference': reference, 'previous': previous, 'rows': rows,
