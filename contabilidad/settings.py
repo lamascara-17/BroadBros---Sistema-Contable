@@ -81,8 +81,8 @@ WSGI_APPLICATION = 'contabilidad.wsgi.application'
 
 # Base de datos SQLite
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))}",
+    'default': dj_database_url.parse(
+        os.getenv('DATABASE_URL') or f"sqlite:///{os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))}",
         conn_max_age=600
     )
 }

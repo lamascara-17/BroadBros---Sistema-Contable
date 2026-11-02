@@ -6,7 +6,7 @@ from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import patch
 from django.db import close_old_connections, transaction
-from django.test import TransactionTestCase, override_settings
+from django.test import TransactionTestCase, SimpleTestCase, override_settings
 from django.urls import reverse
 from .contexto_bot import firma_caso, conversacion_caso, guardar_conversacion
 from .models import Workspace, AsientoContable, Movimiento, CuentaContable
@@ -142,3 +142,16 @@ class PreparacionRenderTests(Visitantes, TransactionTestCase):
         for clave in ('interest_cover','ebitda_margin','net_margin'):
             self.assertEqual(despues['values'][clave],antes['values'][clave])
         self.assertEqual(despues['ebitda'],11000)
+
+
+class ConfiguracionEntornoTests(SimpleTestCase):
+    def test_database_url_vacia_utiliza_sqlite_configurada(self):
+        import os
+        import subprocess
+        import sys
+        entorno = os.environ.copy()
+        entorno.update(DATABASE_URL='', SQLITE_PATH='/tmp/broadbros-config-only.sqlite3',
+            SECRET_KEY='solo-comprobacion-sin-conexion-a-bd', DJANGO_SETTINGS_MODULE='contabilidad.settings', RENDER='false')
+        salida = subprocess.check_output([sys.executable, '-c',
+            'from django.conf import settings; print(settings.DATABASES["default"]["ENGINE"])'],env=entorno,text=True)
+        self.assertEqual(salida.strip(), 'django.db.backends.sqlite3')
