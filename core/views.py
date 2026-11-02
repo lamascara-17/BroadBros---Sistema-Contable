@@ -504,6 +504,10 @@ def chatbot_api(request):
             status=400
         )
 
+    if request.POST.get('context') == 'ratios_externos':
+        from .ratio_views import ratio_laboratorio
+        return ratio_laboratorio(request, chat=True)
+
     try:
         # ==========================================================
         # 1. OBTENER API KEY

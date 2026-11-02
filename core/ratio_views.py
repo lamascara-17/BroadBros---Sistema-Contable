@@ -6,7 +6,8 @@ from urllib.parse import urlencode
 from django import forms
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from .models import FinancialRatioPeriod
@@ -113,6 +114,11 @@ def financial_ratios(request):
         'categories':['Liquidez','Solvencia','Gestión','Rentabilidad'],
         'peer_periods':[{'company':c,'period':p} for c in companies for p in c['periods'] if p['year']==year],
         'ebitda':fmt(report['selected']['ebitda'],'money')}
+    from .ratio_lab import explanations, version, simulate
+    config = {'empresa':ticker,'lider':leader,'year':year,'tasa':str(tax),'deuda':basis,'grupo':group}
+    context['ratio_lab_context'] = {**config, 'version':version(companies, config)}
+    context['ratio_explanations'] = explanations(report, tax/100, basis)
+    context['ratio_scenario_initial'] = simulate(report, {'ventas':Decimal(0),'costos':Decimal(0),'deuda':Decimal(0)}, tax/100, basis)
     if request.GET.get('descargar') == 'csv':
         stream = StringIO()
         writer = csv.writer(stream)
@@ -139,6 +145,50 @@ def financial_ratios(request):
         return HttpResponse('\ufeff'+stream.getvalue(),content_type='text/csv; charset=utf-8',
             headers={'Content-Disposition':f'attachment; filename="Ratios_{ticker}_{year}.csv"'})
     return render(request,'ratios_financieros.html',context)
+
+
+@require_POST
+def ratio_laboratorio(request, chat=False):
+    """Escenarios/explicaciones calculados en servidor, sin guardar partidas."""
+    from .ratio_lab import version, explanations, changes, simulate, tutor
+    from .views import formato_chat
+    from .audio_respuesta import datos_audio
+    try:
+        _, companies = companies_with_overrides()
+        available = {c['ticker'] for c in companies}
+        ticker = request.POST.get('empresa','AVGO')
+        leader = request.POST.get('lider','NVDA')
+        year = int(request.POST.get('year','2025'))
+        tax = Decimal(request.POST.get('tasa','30'))
+        basis = request.POST.get('deuda_base','total')
+        group = request.POST.get('grupo','all')
+        if ticker not in available or leader not in available or not 2000<=year<=2100 or not tax.is_finite() or not 0<=tax<=100 or basis not in ('total','current') or group not in ('all','chips','equipment'):
+            raise ValueError('Revisa la empresa, el período y los supuestos seleccionados.')
+        config = {'empresa':ticker,'lider':leader,'year':year,'tasa':str(tax),'deuda':basis,'grupo':group}
+        stamp = version(companies,config)
+        if request.POST.get('version') != stamp:
+            return JsonResponse({'error':'Los datos o supuestos cambiaron. Recarga el análisis antes de consultar o simular.'},status=409)
+        report = comparison(companies,ticker,leader,year,tax/100,basis,group)
+        action = 'ask' if chat else request.POST.get('action','simulate')
+        if action=='simulate':
+            response = {**simulate(report,changes(request.POST),tax/100,basis),'version':stamp}
+        elif action=='ask':
+            message=request.POST.get('message','').strip()
+            if not message or len(message)>4000:raise ValueError('Escribe una consulta de hasta 4 000 caracteres.')
+            from .validacion_contable import texto
+            scenario=simulate(report,changes(request.POST),tax/100,basis) if any(x in texto(message) for x in ('simulacion','simulado','escenario')) else None
+            answer,metric=tutor(report,explanations(report,tax/100,basis),message,request.POST.get('metric',''),scenario)
+            answer,segments=formato_chat(answer)
+            response={'response':answer,'segments':segments,'status':'calculated','metric':metric,'version':stamp,**datos_audio(answer)}
+        else:raise ValueError('Acción no reconocida.')
+        _, current = companies_with_overrides()
+        if version(current,config)!=stamp:
+            return JsonResponse({'error':'Los datos cambiaron durante la consulta. Recarga el análisis.'},status=409)
+        result=JsonResponse(response)
+        result['Cache-Control']='no-store'
+        return result
+    except (ValueError, ArithmeticError) as exc:
+        return JsonResponse({'error':str(exc) or 'Revisa los parámetros del análisis.'},status=400)
 
 
 def ratios_caso(request):

@@ -3,7 +3,7 @@ from . import espacio_views
 from . import views
 from .voz import transcribir_voz
 from .audio_respuesta import respuesta_audio
-from .ratio_views import financial_ratios, ratios_caso
+from .ratio_views import financial_ratios, ratios_caso, ratio_laboratorio
 
 urlpatterns = [
     path('caso/nuevo/', espacio_views.nuevo_caso, name='nuevo_caso'),
@@ -19,6 +19,7 @@ urlpatterns = [
     path('reportes/patrimonio/', espacio_views.estado_patrimonio, name='estado_patrimonio'),
     path('reportes/flujos/', espacio_views.estado_flujos, name='estado_flujos'),
     path('ratios-financieros/', financial_ratios, name='ratios_financieros'),
+    path('ratios-financieros/laboratorio/', ratio_laboratorio, name='ratio_laboratorio'),
     path('', views.index, name='index'),
 
     # Vista de captura por imagen

@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from .workspaces import actual, acceso_administrativo
 
-AI_PATHS = {'/chatbot/': 12, '/chatbot/voz/': 6, '/chatbot/audio/': 6,
+AI_PATHS = {'/chatbot/': 12, '/chatbot/voz/': 6, '/chatbot/audio/': 6, '/ratios-financieros/laboratorio/': 36,
             '/cargar-texto/': 6, '/cargar-imagen/': 6, '/cargar-imagen/revisar/': 6}
 
 

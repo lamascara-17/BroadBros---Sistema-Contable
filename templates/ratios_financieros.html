@@ -6,6 +6,8 @@
 {% block content %}<p><a class="btn btn-secondary" href="{% url 'ratios_caso' %}">Ver ratios del caso contable activo</a></p>
 <link rel="stylesheet" href="{% static 'css/ratios.css' %}">
 <div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
+    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><button type="button" class="btn btn-secondary btn-sm" id="ratio-print">Imprimir / PDF</button></div></div>
+    <p class="ratio-presentation-note" hidden>Modo exposición · {{ company.name }} ({{ ticker }}), FY{{ year }}. Datos externos al {{ as_of }}; grupo académico, no índice oficial del sector.</p>
     <section class="ratio-hero" aria-labelledby="ratio-company">
         <div class="ratio-hero-main"><span class="ratio-eyebrow">ANÁLISIS COMPARATIVO / FY{{ year }}</span>
             <h2 id="ratio-company">{{ company.name }} <span>{{ ticker }}</span></h2>
@@ -41,11 +43,27 @@
         <div class="ratio-tabs" role="group" aria-label="Filtrar indicadores"><button type="button" class="is-active" data-category="all" aria-pressed="true">Todos <span>17</span></button>{% for category in categories %}<button type="button" data-category="{{ category }}" aria-pressed="false">{{ category }}</button>{% endfor %}</div>
         <div class="ratio-table-scroll"><table class="ratio-table"><caption class="sr-only">Comparación de {{ ticker }}, ejercicio anterior, {{ leader }} y grupo académico</caption>
             <thead><tr><th scope="col">Indicador / fórmula</th><th scope="col">FY{{ year|add:'-1' }}<small>{{ ticker }}</small></th><th scope="col" class="ratio-own">FY{{ year }}<small>{{ ticker }}</small></th><th scope="col">Variación<small>vs. año anterior</small></th><th scope="col">{{ leader }}<small>Referente FY{{ year }}</small></th><th scope="col">Promedio<small>Grupo FY{{ year }}</small></th><th scope="col">Lectura comparativa</th></tr></thead>
-            <tbody>{% for r in rows %}<tr data-ratio-category="{{ r.category }}"><th scope="row"><span class="ratio-row-number">{{ r.number|stringformat:'02d' }}</span><span>{{ r.label }} <small class="ratio-unit">{{ r.unit }}</small><small class="ratio-formula">{{ r.formula }}</small>{% if r.reason %}<small class="ratio-missing">{{ r.reason }}</small>{% endif %}</span></th><td>{{ r.previous }}</td><td class="ratio-own"><strong>{{ r.own }}</strong></td><td class="ratio-delta">{{ r.delta }}</td><td>{{ r.leader }}</td><td>{{ r.sector }}<small>n = {{ r.n }}</small></td><td class="ratio-reading"><span class="ratio-status {{ r.tone }}">{{ r.interpretation }}</span></td></tr>{% endfor %}</tbody>
+            <tbody>{% for r in rows %}<tr data-ratio-category="{{ r.category }}"><th scope="row"><span class="ratio-row-number">{{ r.number|stringformat:'02d' }}</span><span><button type="button" class="ratio-explain-trigger" data-explain-key="{{ r.key }}" aria-haspopup="dialog" aria-controls="ratio-explanation">{{ r.label }} <span aria-hidden="true">ⓘ</span><span class="sr-only">: ver cálculo y explicación</span></button><small class="ratio-unit">{{ r.unit }}</small><small class="ratio-formula">{{ r.formula }}</small>{% if r.reason %}<small class="ratio-missing">{{ r.reason }}</small>{% endif %}</span></th><td>{{ r.previous }}</td><td class="ratio-own"><strong>{{ r.own }}</strong></td><td class="ratio-delta">{{ r.delta }}</td><td>{{ r.leader }}</td><td>{{ r.sector }}<small>n = {{ r.n }}</small></td><td class="ratio-reading"><span class="ratio-status {{ r.tone }}">{{ r.interpretation }}</span></td></tr>{% endfor %}</tbody>
         </table></div>
         <p class="ratio-panel-foot">Las variaciones porcentuales se expresan en puntos porcentuales. Capital de trabajo: USD millones; ASML se convierte solo para ese indicador al tipo de cambio de cierre del BCE. Una comparación favorable no garantiza solvencia.</p>
     </section>
 
+    <section class="ratio-panel ratio-simulator" id="ratio-simulator" data-currency="{{ period.currency }}" aria-labelledby="scenario-title" data-url="{% url 'ratio_laboratorio' %}">
+        <header class="ratio-panel-header"><div><span class="ratio-eyebrow">¿QUÉ PASARÍA SI…?</span><h3 id="scenario-title">Explora un escenario</h3><p>Escenario parcial sobre {{ ticker }} FY{{ year }}. La tabla comparativa y su CSV mantienen los datos originales.</p></div><span class="ratio-simulation-tag">SIMULACIÓN · SIN GUARDAR</span></header>
+        <form id="ratio-scenario-form">{% csrf_token %}
+            <div class="ratio-scenario-controls">
+                <label for="lab-ventas">Variación de ventas<output for="lab-ventas" id="lab-ventas-value">0%</output><input type="range" id="lab-ventas" name="ventas" min="-50" max="50" step="0.5" value="0"><small>Mismo porcentaje para ventas al crédito cuando están documentadas.</small></label>
+                <label for="lab-costos">Variación del costo de ventas<output for="lab-costos" id="lab-costos-value">0%</output><input type="range" id="lab-costos" name="costos" min="-50" max="50" step="0.5" value="0"><small>Los demás gastos operativos permanecen constantes.</small></label>
+                <label for="lab-deuda">Variación de deuda financiera<output for="lab-deuda" id="lab-deuda-value">0%</output><input type="range" id="lab-deuda" name="deuda" min="-50" max="50" step="0.5" value="0"><small>CP y LP en igual proporción; intereses constantes. Base: {% if debt_basis == 'current' %}solo CP{% else %}CP + LP{% endif %}.</small></label>
+            </div>
+            <div class="ratio-scenario-actions"><button class="btn btn-primary" type="submit">Calcular escenario</button><button class="btn btn-secondary" type="reset">Restablecer</button><span id="ratio-scenario-status" role="status" aria-live="polite">Sin variaciones: resultados iguales a la base original.</span></div>
+            <noscript><p>Activa JavaScript para simular. Los 17 ratios de la tabla se calculan en el servidor y siguen disponibles.</p></noscript>
+        </form>
+        <div class="ratio-scenario-cards" id="ratio-scenario-cards" aria-busy="false">{% for card in ratio_scenario_initial.cards %}<article><span>{{ card.label }}</span><strong>{{ card.after }}</strong><small>Base: {{ card.before }} · Cambio: {{ card.delta }}</small>{% if card.reason %}<small>{{ card.reason }}</small>{% endif %}</article>{% endfor %}</div>
+        <details class="ratio-scenario-method"><summary>Modelo y límites de la simulación</summary><p>{{ ratio_scenario_initial.assumptions }}</p><p>Se usan los supuestos del análisis aplicado. Pulsa Comparar para aplicar otra empresa, período, tasa o base de deuda antes de simular.</p><p>Los importes desconocidos permanecen N/D. Variar la deuda no representa por sí mismo una operación de financiación completa. No es una proyección de Broadcom ni de sus referentes.</p><dl id="ratio-scenario-inputs"></dl></details>
+        <button class="btn btn-secondary btn-sm" type="button" data-ratio-prompt data-prompt="Explica mi escenario simulado de rentabilidad.">Comentar escenario con ÑoñoBot</button>
+    </section>
+    <section class="ratio-tutor-strip"><div><span class="ratio-eyebrow">ÑoñoBot · EXPLICACIONES COMPROBABLES</span><h3>Prepárate para sustentar</h3><p>Pregunta por fórmulas, comparaciones, DuPont o supuestos. Las respuestas numéricas usan el motor del sistema.</p></div><div><button class="btn btn-secondary" type="button" data-ratio-prompt data-prompt="¿Por qué mi ROE difiere del referente?">¿Por qué cambia el ROE?</button><button class="btn btn-secondary" type="button" data-ratio-prompt data-prompt="Resume el diagnóstico financiero para sustentar.">Ayúdame a exponer</button></div></section>
     <div class="ratio-lower-grid">
         <section class="ratio-panel ratio-chart-panel" aria-labelledby="chart-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">PERSPECTIVA DEL GRUPO</span><h3 id="chart-title">Comparar empresa por empresa</h3></div></header>
             <label class="ratio-chart-picker">Indicador<select id="ratio-chart-select">{% for r in rows %}<option value="{{ r.key }}" {% if r.key == 'net_margin' %}selected{% endif %}>{{ r.label }}</option>{% endfor %}</select></label>
@@ -77,6 +95,9 @@
         </form>
     </details>
 </div>
+<dialog id="ratio-explanation" class="ratio-explanation" aria-labelledby="ratio-explanation-title"><div class="ratio-dialog-header"><span class="ratio-eyebrow">CÁLCULO PASO A PASO · DATOS ORIGINALES</span><button type="button" id="ratio-explanation-close" aria-label="Cerrar explicación">×</button></div><h2 id="ratio-explanation-title"></h2><div id="ratio-explanation-content"></div><button type="button" class="btn btn-primary" id="ratio-explanation-ask" data-ratio-prompt data-prompt="">Preguntar a ÑoñoBot</button></dialog>
+{{ ratio_lab_context|json_script:'ratio-lab-context' }}
+{{ ratio_explanations|json_script:'ratio-explanations-data' }}
 {{ chart_data|json_script:'ratio-chart-data' }}
 {% endblock %}
-{% block extra_js %}<script src="{% static 'js/ratios.js' %}" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'js/ratios.js' %}" defer></script><script src="{% static 'js/ratios-lab.js' %}" defer></script>{% endblock %}

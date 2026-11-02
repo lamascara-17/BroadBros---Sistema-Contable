@@ -37,6 +37,16 @@ jobs:
       - run: python -m pip check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test --noinput
+      - if: matrix.database == 'sqlite'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - if: matrix.database == 'sqlite'
+        run: npm install --prefix "$RUNNER_TEMP/ratio-dom" --no-audit --no-fund jsdom@30.1.3
+      - if: matrix.database == 'sqlite'
+        run: python scripts/verificar_ratios_ui.py
+        env:
+          NODE_PATH: ${{ runner.temp }}/ratio-dom/node_modules
       - run: python -m gunicorn --check-config --config gunicorn.conf.py contabilidad.wsgi:application
       - run: python manage.py check --deploy --fail-level ERROR
         env:

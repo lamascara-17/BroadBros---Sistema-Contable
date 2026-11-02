@@ -158,7 +158,13 @@ class EstadosFinancierosTests(TestCase):
             self.assertEqual(self.client.get(path).status_code, 404)
         pagina = self.client.get(reverse('balance_general')).content.decode()
         self.assertNotIn('Cambios en el patrimonio', pagina)
-        self.assertIn('Flujos de efectivo', pagina)
+        menu = pagina.split('<nav', 1)[1].split('</nav>', 1)[0]
+        # El usuario pidió retirar estos dos accesos del menú, conservando
+        # los cálculos y las hojas de exportación ya verificadas arriba.
+        self.assertNotIn(reverse('estado_flujos'), menu)
+        self.assertNotIn(reverse('estado_patrimonio'), menu)
+        self.assertEqual(self.client.get(reverse('estado_flujos')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('estado_patrimonio')).status_code, 200)
 
     def test_nono_bot_detecta_omision_y_da_preguntas_del_analisis(self):
         borrador=normalizar_borrador({'asientos':novatech()[:1],'pendientes':['Falta la vida útil para calcular depreciación.']})

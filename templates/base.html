@@ -92,9 +92,9 @@
     <aside id="assistant-panel" class="assistant-panel" aria-hidden="true" inert aria-labelledby="assistant-title">
         <div class="assistant-header">
             <div>
-                <span class="eyebrow">Asistente contable</span>
+                <span class="eyebrow">{% if ratio_lab_context %}Tutor financiero · {{ ticker }} FY{{ year }}{% else %}Asistente contable{% endif %}</span>
                 <h2 id="assistant-title">ÑoñoBot</h2>
-                <p>Fundamentación de asientos y dinámica de cuentas.</p>
+                <p>{% if ratio_lab_context %}Explicaciones con los datos y supuestos de este análisis.{% else %}Fundamentación de asientos y dinámica de cuentas.{% endif %}</p>
             </div>
             <button id="assistant-close" class="icon-button" type="button" aria-label="Cerrar ÑoñoBot">×</button>
         </div>
@@ -103,16 +103,23 @@
             <div class="chat-message bot">
                 <div class="chat-avatar nonobot-photo" aria-hidden="true"><img src="{% static 'img/nonobot.jpg' %}" alt=""></div>
                 <div class="chat-bubble">
-                    Soy ÑoñoBot. Puedo ayudarte con contabilidad, finanzas, cálculos, estados financieros y el uso de BROADBROS.
+                    {% if ratio_lab_context %}Soy ÑoñoBot. Aquí puedo explicar los 17 ratios de {{ ticker }}, compararlos con {{ leader }} y el grupo, y comentar simulaciones. Uso cálculos del sistema, sin inventar datos ni causas empresariales. También puedes cambiar al caso contable.{% else %}Soy ÑoñoBot. Puedo ayudarte con contabilidad, finanzas, cálculos, estados financieros y el uso de BROADBROS.{% endif %}
                 </div>
             </div>
             <div class="assistant-suggestions">
+                {% if ratio_lab_context %}
+                <button type="button" data-prompt="¿Por qué mi ROE difiere del referente?">Explicar ROE</button>
+                <button type="button" data-prompt="Resume el diagnóstico financiero para sustentar.">Para sustentar</button>
+                <button type="button" data-prompt="¿Qué supuestos y fuentes usamos?">Datos y supuestos</button>
+                {% else %}
                 <button type="button" data-prompt="¿Cómo justifico un cargo en la cuenta 10?">Cuenta 10</button>
                 <button type="button" data-prompt="Explícame la lógica del debe y haber de un asiento.">Debe y Haber</button>
                 <button type="button" data-prompt="¿Cómo sustento un asiento contable ante el docente?">Sustentar asiento</button>
+                {% endif %}
             </div>
         </div>
 
+        {% if ratio_lab_context %}<label class="nonobot-scope">Consultar sobre<select id="nonobot-scope"><option value="ratios_externos">Análisis externo · {{ ticker }} FY{{ year }}</option><option value="caso">Caso contable activo</option></select></label>{% endif %}
         <div class="audio-options" id="nonobot-audio-options" data-url="{% url 'respuesta_audio' %}" data-csrf="{{ csrf_token }}">
             <label><input id="nonobot-auto-audio" type="checkbox"> Leer respuestas en voz alta</label>
             <span id="nonobot-audio-status" role="status" aria-live="polite"></span>
@@ -225,6 +232,12 @@
         }
 
         let consultaPendiente = false;
+        let ratioLastMetric = '';
+        const ratioScope = document.getElementById('nonobot-scope');
+        ratioScope?.addEventListener('change', () => {
+            ratioLastMetric = '';
+            appendMessage(ratioScope.value === 'caso' ? 'Ámbito: caso contable activo. Las empresas externas se consultan por separado.' : 'Ámbito: análisis financiero externo de esta página. Las simulaciones se identifican expresamente.', 'bot');
+        });
         async function ejecutarConsulta(prefill) {
             if (consultaPendiente) return;
             if (window.NonobotVoice?.listening) return;
@@ -233,6 +246,7 @@
 
             window.NonobotAudio?.stop();
             consultaPendiente = true;
+            if (ratioScope) ratioScope.disabled = true;
             btnEnviar.disabled = true;
             window.NonobotVoice?.setBusy(true);
             document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
@@ -243,16 +257,25 @@
             botBubble.classList.add('loading');
 
             try {
+                const body = new URLSearchParams({message: consulta});
+                if (ratioScope?.value === 'ratios_externos') {
+                    const ratioContext = JSON.parse(document.getElementById('ratio-lab-context').textContent);
+                    for (const [key, value] of Object.entries(ratioContext)) body.set(key === 'deuda' ? 'deuda_base' : key, String(value));
+                    body.set('context', 'ratios_externos');
+                    body.set('metric', ratioLastMetric);
+                    for (const name of ['ventas','costos','deuda']) body.set(name, document.getElementById('lab-'+name)?.value || '0');
+                }
                 const r = await fetch('{% url 'chatbot_api' %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': '{{ csrf_token }}'
                     },
-                    body: 'message=' + encodeURIComponent(consulta)
+                    body: body.toString()
                 });
                 const d = await r.json();
                 if (!r.ok) throw new Error(d.error || 'El asistente no pudo completar la consulta.');
+                if (ratioScope?.value === 'ratios_externos') ratioLastMetric = d.metric || '';
                 botBubble.classList.remove('loading');
                 mostrarRespuesta(botBubble, d);
                 window.NonobotAudio?.attach(botBubble, d);
@@ -261,6 +284,7 @@
                 botBubble.textContent = err.message === 'Failed to fetch' ? 'No se pudo conectar con el asistente. Intenta nuevamente.' : err.message;
             } finally {
                 consultaPendiente = false;
+                if (ratioScope) ratioScope.disabled = false;
                 btnEnviar.disabled = false;
                 window.NonobotVoice?.setBusy(false);
                 document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = false);
@@ -277,8 +301,12 @@
             }
         });
 
-        document.querySelectorAll('[data-prompt]').forEach(button => {
-            button.addEventListener('click', () => ejecutarConsulta(button.dataset.prompt));
+        document.addEventListener('click', event => {
+            const button = event.target.closest('[data-prompt]');
+            if (!button || button.disabled) return;
+            if (ratioScope && button.hasAttribute('data-ratio-prompt')) ratioScope.value = 'ratios_externos';
+            setAssistant(true);
+            ejecutarConsulta(button.dataset.prompt);
         });
     </script>
     <script src="{% static 'js/nonobot-voz.js' %}?v=2" defer></script>
