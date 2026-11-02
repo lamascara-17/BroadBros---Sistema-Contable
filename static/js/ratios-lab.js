@@ -61,6 +61,17 @@
         }
     });
     document.getElementById('ratio-print').addEventListener('click', () => window.print());
+    let printDetails = null;
+    window.addEventListener('beforeprint', () => {
+        if (printDetails) return;
+        printDetails = [...app.querySelectorAll('.ratio-method-details, .ratio-method .ratio-periods')].map(el=>({el,open:el.open}));
+        for (const item of printDetails) item.el.open = true;
+    });
+    window.addEventListener('afterprint', () => {
+        for (const item of printDetails || []) item.el.open = item.open;
+        printDetails = null;
+    });
+
 
     const form = document.getElementById('ratio-scenario-form');
     const panel = document.getElementById('ratio-simulator');

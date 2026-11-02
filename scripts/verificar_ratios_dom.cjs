@@ -19,6 +19,22 @@ const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 const reply=(resolve,data,status=200)=>resolve({ok:status===200,json:async()=>data});
 (async()=>{
  const initial=d.querySelector('#comparativo').textContent;
+ // Gráfico temprano: comparación, evolución y grupo completo comparten los datos de Django.
+ assert.ok(d.querySelector('#ratio-visual').compareDocumentPosition(d.querySelector('#comparativo')) & w.Node.DOCUMENT_POSITION_FOLLOWING);
+ assert.equal(d.querySelectorAll('#ratio-chart .ratio-chart-row').length,3);
+ assert.ok(d.querySelector('#ratio-chart').textContent.includes('36.20%'));
+ d.querySelector('[data-chart-view="all"]').click();assert.equal(d.querySelectorAll('#ratio-chart .ratio-chart-row').length,9);
+ d.querySelector('[data-chart-view="history"]').click();assert.ok(d.querySelector('#ratio-chart svg'));
+ assert.equal(d.querySelectorAll('.ratio-trend-line').length,3);assert.equal(d.querySelectorAll('.ratio-trend-table tbody tr').length,2);
+ assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2024'));assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2025'));
+ const metric=d.querySelector('#ratio-chart-select');metric.value='roe';metric.dispatchEvent(new w.Event('change'));
+ assert.ok(d.querySelector('#ratio-chart').textContent.includes('31.05%'));assert.ok(d.querySelector('#ratio-chart').textContent.includes('119.18%'));
+ d.querySelector('[data-chart-view="benchmark"]').click();assert.equal(d.querySelectorAll('#ratio-chart .ratio-chart-row').length,3);
+ // El detalle queda plegado en pantalla y se abre/restaura al imprimir.
+ const method=d.querySelector('#ratio-method-details');assert.equal(method.open,false);
+ w.dispatchEvent(new w.Event('beforeprint'));assert.equal(method.open,true);assert.equal(d.querySelector('.ratio-periods').open,true);
+ w.dispatchEvent(new w.Event('afterprint'));assert.equal(method.open,false);assert.equal(d.querySelector('.ratio-periods').open,false);
+
  // Los 17 botones abren su explicación y conservan todos los valores originales.
  const triggers=[...d.querySelectorAll('[data-explain-key]')];assert.equal(triggers.length,17);
  for(const button of triggers){button.click();assert.equal(d.querySelector('dialog').open,true);assert.ok(d.querySelector('#ratio-explanation-content').textContent);d.querySelector('#ratio-explanation-close').click();assert.equal(d.querySelector('dialog').open,false);}
@@ -47,6 +63,17 @@ const reply=(resolve,data,status=200)=>resolve({ok:status===200,json:async()=>da
  d.querySelector('#nonobot-scope').value='caso';d.querySelector('#nonobot-scope').dispatchEvent(new w.Event('change'));
  input.value='Dime la utilidad neta';d.querySelector('#tutor-enviar').click();assert.equal(calls[6].params.has('context'),false);assert.equal(calls[6].params.has('empresa'),false);reply(pending[6],{response:'No hay asientos',segments:[{text:'No hay asientos',bold:false}]});await settle();
  assert.ok(d.querySelector('#tutor-microfono'));assert.ok(d.querySelector('#nonobot-audio-options'));assert.equal(d.querySelector('#comparativo').textContent,initial);
- console.log('DOM: 17 explicaciones, exposición/Escape, impresión, escenarios fuera de orden, reset, errores, tabla intacta, ÑoñoBot y separación de ámbitos: OK.');
+ // Ceros y N/D se dibujan sin barras inventadas, SVG inválido ni líneas sobre datos ausentes.
+ const isolated=new JSDOM(readFileSync(join(fixtures,'page.html'),'utf8'),{url:'https://prueba.local/',runScripts:'outside-only'});
+ const iz=isolated.window, zd=iz.document, raw=JSON.parse(zd.querySelector('#ratio-chart-data').textContent);
+ raw.net_margin.benchmarks=[{ticker:'AVGO',kind:'company',value:0,display:'0.00%'},{ticker:'NVDA',kind:'leader',value:null,display:'N/D'},{ticker:'Grupo',kind:'group',value:0,display:'0.00%'}];
+ raw.net_margin.history=[2024,2025].map(year=>({year,n:2,series:[{kind:'company',value:0,display:'0.00%'},{kind:'leader',value:null,display:'N/D'},{kind:'group',value:0,display:'0.00%'}]}));
+ zd.querySelector('#ratio-chart-data').textContent=JSON.stringify(raw);iz.eval(readFileSync(join(root,'static/js/ratios.js'),'utf8'));
+ assert.equal(zd.querySelectorAll('.ratio-chart-bar:not([hidden])').length,0);assert.ok(zd.querySelector('#ratio-chart').textContent.includes('N/D'));
+ zd.querySelector('[data-chart-view="history"]').click();assert.equal(zd.querySelectorAll('.ratio-trend-line.leader').length,0);
+ assert.ok(!zd.querySelector('#ratio-chart svg').outerHTML.includes('NaN'));assert.ok(!zd.querySelector('#ratio-chart svg').outerHTML.includes('Infinity'));
+ for(const label of zd.querySelectorAll('.ratio-trend-label')){assert.ok(Number(label.getAttribute('y'))>=0);}
+ isolated.window.close();
+ console.log('DOM: 3 vistas gráficas, evolución, ceros/N-D, detalle plegado/impresión, 17 explicaciones, exposición, escenarios y ÑoñoBot: OK.');
  dom.window.close();
 })().catch(error=>{console.error(error);dom.window.close();process.exitCode=1;});

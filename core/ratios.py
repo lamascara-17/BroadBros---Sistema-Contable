@@ -176,6 +176,14 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
     previous = evaluated.get((ticker, year-1))
     group_tickers = {'chips': {'AVGO', 'NVDA', 'AMD', 'INTC'}, 'equipment': {'ASML', 'AMAT', 'LRCX', 'KLAC'}}
     peers = [v for (t,y),v in evaluated.items() if y == year and (group == 'all' or t in group_tickers.get(group,set()))]
+    prior_peers = [v for (t,y),v in evaluated.items() if y == year-1 and (group == 'all' or t in group_tickers.get(group,set()))]
+
+    def historical_value(entry, key, unit):
+        if entry is None: return None
+        value = entry['values'][key]
+        if unit != 'money' or value is None or entry['period']['currency'] == 'USD': return value
+        rate = FX.get(entry['period']['year']) if entry['period']['currency'] == 'EUR' else None
+        return value*rate if rate is not None else None
     rows, chart = [], {}
     for i,(key, label, category, unit, formula, direction) in enumerate(DEFINITIONS,1):
         if key == 'debt_cover' and debt_basis == 'current':
@@ -225,7 +233,24 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
                      'tone': tone, 'interpretation': interpretation,
                      'reason': ('Falta una conversión documentada a USD para comparar este importe.' if unit == 'money' and own is not None and comparable is None else selected['reasons'].get(key, 'Faltan partidas para calcularlo.' if own is None else ''))})
         chart[key] = {'label': label, 'unit': 'USD MM' if unit=='money' else unit, 'points': [
-            {**p, 'value': float(p['value'])} for p in points]}
+            {**p, 'value': float(p['value'])} for p in points],
+            'benchmarks': [
+                {'ticker':ticker, 'kind':'company', 'role':'Empresa', 'value':float(comparable) if comparable is not None else None, 'display':fmt(comparable,unit)},
+                {'ticker':leader, 'kind':'leader', 'role':'Referente', 'value':float(lead) if lead is not None else None, 'display':fmt(lead,unit)},
+                {'ticker':'Grupo', 'kind':'group', 'role':f'Promedio · n={len(points)}', 'value':float(sector) if sector is not None else None, 'display':fmt(sector,unit)},
+            ]}
+        historical_reference = evaluated.get((leader,year-1))
+        prior_values = [historical_value(p,key,unit) for p in prior_peers]
+        prior_values = [v for v in prior_values if v is not None]
+        prior_sector = sum(prior_values,D('0'))/len(prior_values) if prior_values else None
+        periods = []
+        if previous is not None or historical_reference is not None or prior_peers:
+            periods.append((year-1,historical_value(previous,key,unit),historical_value(historical_reference,key,unit),prior_sector,len(prior_values)))
+        periods.append((year,comparable,lead,sector,len(points)))
+        chart[key]['history'] = [{'year':y,'n':n,'series':[
+            {'kind':kind,'value':float(value) if value is not None else None,'display':fmt(value,unit)}
+            for kind,value in [('company',own_y),('leader',lead_y),('group',group_y)]]}
+            for y,own_y,lead_y,group_y,n in periods]
     v = selected['values']
     ni = selected['inputs']['net_income']
     debt, interest = v['debt_cover'], v['interest_cover']

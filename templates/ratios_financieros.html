@@ -4,9 +4,9 @@
 {% block page_title %}Análisis financiero{% endblock %}
 {% block page_subtitle %}Tu empresa, su evolución y sus referentes. Los 17 indicadores del taller UNI.{% endblock %}
 {% block content %}<p><a class="btn btn-secondary" href="{% url 'ratios_caso' %}">Ver ratios del caso contable activo</a></p>
-<link rel="stylesheet" href="{% static 'css/ratios.css' %}">
+<link rel="stylesheet" href="{% static 'css/ratios.css' %}?v=visual2">
 <div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
-    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><button type="button" class="btn btn-secondary btn-sm" id="ratio-print">Imprimir / PDF</button></div></div>
+    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-visual" class="btn btn-primary btn-sm">Ver gráficos</a><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><button type="button" class="btn btn-secondary btn-sm" id="ratio-print">Imprimir / PDF</button></div></div>
     <p class="ratio-presentation-note" hidden>Modo exposición · {{ company.name }} ({{ ticker }}), FY{{ year }}. Datos externos al {{ as_of }}; grupo académico, no índice oficial del sector.</p>
     <section class="ratio-hero" aria-labelledby="ratio-company">
         <div class="ratio-hero-main"><span class="ratio-eyebrow">ANÁLISIS COMPARATIVO / FY{{ year }}</span>
@@ -30,12 +30,28 @@
         </div></details>
     </form>
 
-    <div class="ratio-context"><span class="ratio-context-dot" aria-hidden="true"></span><p>Grupo académico de semiconductores, equipos y redes; no es un índice oficial del sector. NVIDIA es el referente inicial por sus mayores ventas FY2025 dentro de la lista; puedes cambiarlo. La lista recibida tiene nueve empresas: <a href="#datos" id="ratio-add-company">añadir la décima</a>.</p></div>
+    <div class="ratio-context"><span class="ratio-context-dot" aria-hidden="true"></span><p>Comparación con un grupo académico, no con un índice oficial del sector. <a href="#datos" id="ratio-add-company">Agregar empresa</a>.</p></div>
     {% for note in selected.warnings %}<p class="ratio-warning" role="alert">{{ note }}</p>{% endfor %}
 
     <section class="ratio-diagnoses" aria-label="Diagnóstico financiero">
         {% for d in diagnoses %}<article class="ratio-diagnosis"><span class="ratio-eyebrow">{{ d.title }}</span><h3>{{ d.status }}</h3><p>{{ d.text }}</p></article>{% endfor %}
     </section>
+
+    <div class="ratio-lower-grid ratio-visual" id="ratio-visual">
+        <section class="ratio-panel ratio-chart-panel" aria-labelledby="chart-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">PERSPECTIVA DEL GRUPO</span><h3 id="chart-title">Comparación visual</h3><p>Elige un indicador y compara sus valores, en la misma unidad.</p></div></header>
+            <div class="ratio-chart-views" role="group" aria-label="Vista del gráfico"><button type="button" class="is-active" data-chart-view="benchmark" aria-pressed="true">Comparación</button><button type="button" data-chart-view="history" aria-pressed="false">Evolución</button><button type="button" data-chart-view="all" aria-pressed="false">Todas las empresas</button></div>
+            <label class="ratio-chart-picker">Indicador<select id="ratio-chart-select">{% for r in rows %}<option value="{{ r.key }}" {% if r.key == 'net_margin' %}selected{% endif %}>{{ r.label }}</option>{% endfor %}</select></label>
+            <div class="ratio-chart-key"><span><i></i>{{ ticker }}</span><span><i class="leader"></i>{{ leader }}</span><span><i class="others"></i><span id="ratio-chart-other-label">Promedio del grupo</span></span></div>
+            <div id="ratio-chart" class="ratio-chart" aria-live="polite"></div><p id="ratio-chart-note" class="ratio-chart-note"></p>
+            <noscript><p>Los valores completos están disponibles en la tabla de indicadores.</p></noscript>
+        </section>
+        <section class="ratio-panel ratio-dupont" aria-labelledby="dupont-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">MÉTODO DUPONT</span><h3 id="dupont-title">De dónde viene el ROE</h3><p>La rentabilidad del accionista, en tres factores.</p></div></header>
+            <div class="ratio-dupont-factor"><span>Margen neto<small>Utilidad neta / ventas</small></span><strong>{{ dupont.margin }}</strong></div>
+            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Eficiencia de activos<small>Ventas / activo promedio</small></span><strong>{{ dupont.turnover }}</strong></div>
+            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Multiplicador del capital<small>Activo promedio / patrimonio promedio</small></span><strong>{{ dupont.multiplier }}</strong></div>
+            <div class="ratio-dupont-result"><span>ROE DuPont</span><strong>{{ dupont.roe }}</strong><small>{% if dupont.matches %}Coincide con utilidad neta / patrimonio promedio.{% else %}No evaluable: revisa denominadores y datos pendientes.{% endif %}</small></div>
+        </section>
+    </div>
 
     <section class="ratio-panel" id="comparativo" aria-labelledby="comparison-title">
         <header class="ratio-panel-header"><div><span class="ratio-eyebrow">LOS 17 INDICADORES</span><h3 id="comparison-title">{{ ticker }} frente a sus referentes</h3><p>Promedio aritmético de los ratios disponibles. <strong>n</strong> indica cuántas empresas participan en cada indicador.</p></div>
@@ -45,7 +61,7 @@
             <thead><tr><th scope="col">Indicador / fórmula</th><th scope="col">FY{{ year|add:'-1' }}<small>{{ ticker }}</small></th><th scope="col" class="ratio-own">FY{{ year }}<small>{{ ticker }}</small></th><th scope="col">Variación<small>vs. año anterior</small></th><th scope="col">{{ leader }}<small>Referente FY{{ year }}</small></th><th scope="col">Promedio<small>Grupo FY{{ year }}</small></th><th scope="col">Lectura comparativa</th></tr></thead>
             <tbody>{% for r in rows %}<tr data-ratio-category="{{ r.category }}"><th scope="row"><span class="ratio-row-number">{{ r.number|stringformat:'02d' }}</span><span><button type="button" class="ratio-explain-trigger" data-explain-key="{{ r.key }}" aria-haspopup="dialog" aria-controls="ratio-explanation">{{ r.label }} <span aria-hidden="true">ⓘ</span><span class="sr-only">: ver cálculo y explicación</span></button><small class="ratio-unit">{{ r.unit }}</small><small class="ratio-formula">{{ r.formula }}</small>{% if r.reason %}<small class="ratio-missing">{{ r.reason }}</small>{% endif %}</span></th><td>{{ r.previous }}</td><td class="ratio-own"><strong>{{ r.own }}</strong></td><td class="ratio-delta">{{ r.delta }}</td><td>{{ r.leader }}</td><td>{{ r.sector }}<small>n = {{ r.n }}</small></td><td class="ratio-reading"><span class="ratio-status {{ r.tone }}">{{ r.interpretation }}</span></td></tr>{% endfor %}</tbody>
         </table></div>
-        <p class="ratio-panel-foot">Las variaciones porcentuales se expresan en puntos porcentuales y se calculan antes de redondear los valores visibles. Capital de trabajo: USD millones; ASML se convierte solo para ese indicador al tipo de cambio de cierre del BCE. Una comparación favorable no garantiza solvencia.</p>
+        <p class="ratio-panel-foot">Cambios en puntos porcentuales (pp), antes de redondear. Capital de trabajo en USD millones. N/D no equivale a cero; una comparación favorable no garantiza solvencia.</p>
     </section>
 
     <section class="ratio-panel ratio-simulator" id="ratio-simulator" data-currency="{{ period.currency }}" aria-labelledby="scenario-title" data-url="{% url 'ratio_laboratorio' %}">
@@ -65,27 +81,12 @@
         <button class="btn btn-secondary btn-sm" type="button" data-ratio-prompt data-prompt="Explica mi escenario simulado de rentabilidad.">Comentar escenario con ÑoñoBot</button>
     </section>
     <section class="ratio-tutor-strip"><div><span class="ratio-eyebrow">ÑoñoBot · EXPLICACIONES COMPROBABLES</span><h3>Prepárate para sustentar</h3><p>Pregunta por fórmulas, comparaciones, DuPont o supuestos. Las respuestas numéricas usan el motor del sistema.</p></div><div><button class="btn btn-secondary" type="button" data-ratio-prompt data-prompt="¿Por qué mi ROE difiere del referente?">¿Por qué cambia el ROE?</button><button class="btn btn-secondary" type="button" data-ratio-prompt data-prompt="Resume el diagnóstico financiero para sustentar.">Ayúdame a exponer</button></div></section>
-    <div class="ratio-lower-grid">
-        <section class="ratio-panel ratio-chart-panel" aria-labelledby="chart-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">PERSPECTIVA DEL GRUPO</span><h3 id="chart-title">Comparar empresa por empresa</h3></div></header>
-            <label class="ratio-chart-picker">Indicador<select id="ratio-chart-select">{% for r in rows %}<option value="{{ r.key }}" {% if r.key == 'net_margin' %}selected{% endif %}>{{ r.label }}</option>{% endfor %}</select></label>
-            <div class="ratio-chart-key"><span><i></i>{{ ticker }}</span><span><i class="leader"></i>{{ leader }}</span><span><i class="others"></i>Otras empresas</span></div>
-            <div id="ratio-chart" class="ratio-chart" aria-live="polite"></div><p id="ratio-chart-note" class="ratio-chart-note"></p>
-            <noscript><p>Los valores completos están disponibles en la tabla de indicadores.</p></noscript>
-        </section>
-        <section class="ratio-panel ratio-dupont" aria-labelledby="dupont-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">MÉTODO DUPONT</span><h3 id="dupont-title">De dónde viene el ROE</h3><p>La rentabilidad del accionista, en tres factores.</p></div></header>
-            <div class="ratio-dupont-factor"><span>Margen neto<small>Utilidad neta / ventas</small></span><strong>{{ dupont.margin }}</strong></div>
-            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Eficiencia de activos<small>Ventas / activo promedio</small></span><strong>{{ dupont.turnover }}</strong></div>
-            <div class="ratio-times" aria-hidden="true">×</div><div class="ratio-dupont-factor"><span>Multiplicador del capital<small>Activo promedio / patrimonio promedio</small></span><strong>{{ dupont.multiplier }}</strong></div>
-            <div class="ratio-dupont-result"><span>ROE DuPont</span><strong>{{ dupont.roe }}</strong><small>{% if dupont.matches %}Coincide con utilidad neta / patrimonio promedio.{% else %}No evaluable: revisa denominadores y datos pendientes.{% endif %}</small></div>
-        </section>
-    </div>
-
-    <section class="ratio-panel ratio-method" aria-labelledby="method-title"><header class="ratio-panel-header"><div><span class="ratio-eyebrow">CÁLCULOS QUE PUEDES SUSTENTAR</span><h3 id="method-title">Método, supuestos y períodos</h3></div></header>
+    <details class="ratio-panel ratio-method ratio-method-details" id="ratio-method-details"><summary><span><strong id="method-title">Fórmulas y fuentes</strong><small>Promedios de dos cierres · 365 días · Tasa ROA: {{ tax_rate }}% · N/D: información insuficiente.</small></span><span aria-hidden="true">⌄</span></summary>
         <div class="ratio-method-grid"><div><h4>Fórmulas del profesor</h4><p>Basadas en S7 Alicorp y el PPT S3/S4 de Análisis de Estados Financieros. Promedios = (saldo inicial + saldo final) / 2. Gestión usa 365 días. EBITDA de {{ ticker }}: <strong>{{ ebitda }} {{ period.currency }} MM</strong>.</p><ul>{% for note in selected.assumptions %}<li>{{ note }}</li>{% endfor %}<li>La prueba ácida del taller suma caja y clientes; no agrega inversiones de corto plazo.</li><li>ROE usa utilidad y patrimonio atribuibles al accionista; endeudamiento usa patrimonio consolidado total.</li></ul></div>
             <div><h4>Cómo leer la comparación</h4><p>Datos anuales FY2024/FY2025, disponibles al {{ as_of }}. Las fechas fiscales difieren: FY2025 de NVIDIA termina en enero, Broadcom en noviembre. Son ejercicios fiscales comparados, no el mismo período calendario ni datos en tiempo real.</p><p>Los datos ausentes y los denominadores cero o negativos no se sustituyen por cero. Las medias excluyen los valores N/D y mantienen pérdidas válidas. La media incluye la empresa analizada si pertenece al grupo.</p><p><a href="{{ fx_source }}" target="_blank" rel="noopener noreferrer">Fuente BCE de conversión EUR/USD ↗</a> · 2024: 1.0389 · 2025: 1.1750. Se convierten saldos monetarios, no los ratios.</p></div></div>
         {% for note in period.notes %}<p class="ratio-warning">{{ note }}</p>{% endfor %}
         <details class="ratio-periods"><summary>Ver empresas, fechas y fuentes</summary><div class="ratio-table-scroll"><table><thead><tr><th>Empresa</th><th>Actividad</th><th>Inicio</th><th>Cierre</th><th>Moneda</th><th>Fuente</th></tr></thead><tbody>{% for item in peer_periods %}<tr><td><strong>{{ item.company.ticker }}</strong><small>{{ item.company.name }}</small></td><td>{{ item.company.industry }}</td><td>{{ item.period.start }}</td><td>{{ item.period.end }}</td><td>{{ item.period.currency }}</td><td>{% if item.period.edited %}Datos manuales{% if item.period.manual_source %} · <a href="{{ item.period.manual_source }}" target="_blank" rel="noopener noreferrer">Fuente ↗</a>{% endif %}{% else %}<a href="{{ item.company.source_url }}" target="_blank" rel="noopener noreferrer">SEC XBRL ↗</a>{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>
-    </section>
+    </details>
 
     <details class="ratio-panel ratio-data" id="datos" {% if form.is_bound %}open{% endif %}><summary><span><span class="ratio-eyebrow">DATOS Y FUENTES</span><strong>Revisar partidas o incorporar otra empresa</strong><small>Datos en millones. Los cambios se guardan separados del libro diario.</small></span><span aria-hidden="true">＋</span></summary>
         <form method="post" id="ratio-input-form">{% csrf_token %}{{ form.non_field_errors }}
@@ -101,4 +102,4 @@
 {{ ratio_explanations|json_script:'ratio-explanations-data' }}
 {{ chart_data|json_script:'ratio-chart-data' }}
 {% endblock %}
-{% block extra_js %}<script src="{% static 'js/ratios.js' %}" defer></script><script src="{% static 'js/ratios-lab.js' %}" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'js/ratios.js' %}?v=visual2" defer></script><script src="{% static 'js/ratios-lab.js' %}?v=visual2" defer></script>{% endblock %}
