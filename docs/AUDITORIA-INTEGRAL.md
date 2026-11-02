@@ -12,13 +12,15 @@ Base de trabajo: `d76c4fa` (incluye el módulo de ratios externos). Producción 
 | Crear y editar aplicaban distintas reglas | Validador común: fecha, 2–40 movimientos, cuentas del espacio, importes finitos positivos, céntimos, límite y cuadre; transacción | Fechas imposibles, NaN, infinitos, negativos, más de dos decimales, cuenta inexistente, cantidad alterada y descuadre |
 | Eliminaciones mediante GET | POST y CSRF; pertenencia comprobada mediante el ámbito de datos | GET devuelve 405, sin CSRF 403, identificador ajeno 404 |
 | Importación recibía una bandera de limpieza ignorada | Se retira el parámetro de la función y la opción de añadir registros. Guardar siempre reemplaza el caso de ese espacio con respaldo recuperable | Restauración conserva códigos/importes y también cuentas sin movimientos |
-| Todos los visitantes compartían libros | Workspace por sesión y vinculación a cuenta de usuario. Managers filtran cuentas, asientos, movimientos, respaldos y modificaciones del comparativo | Dos clientes aislados: lectura, edición, eliminación y exportación sin acceso cruzado |
-| Histórico sin propietario | Migración aditiva con propietario nulo, sin renumerar ni borrar; comando explícito de asignación con simulación por defecto | `asignar_historico --usuario ...`, sin cambios hasta `--confirmar` |
+| Todos los visitantes compartían libros | Workspace anónimo por sesión, sin adopción ni reasignación al iniciar sesión en Django Admin. Managers filtran cuentas, asientos, movimientos, respaldos y modificaciones del comparativo; sin contexto devuelven vacío | Dos clientes aislados: lectura, edición, eliminación y exportación sin acceso cruzado |
+| Consulta sin contexto de espacio | Managers públicos y base devuelven vacío; escrituras mediante manager requieren ámbito. `acceso_administrativo()` es explícito para comandos, fixtures y Django Admin autorizado | Pruebas sin bypass administrativo, contexto restaurado al finalizar cada petición |
+| Portabilidad de casos | Descarga JSON del caso activo e históricos, importación validada y restauración transaccional con respaldo previo | Dos sesiones, pérdida de cookie, más de 100 asientos, catálogo sin movimientos, datos maliciosos y rollback |
+| Histórico sin propietario | Migración aditiva con propietario nulo, sin renumerar ni borrar; comando explícito de asignación con simulación por defecto | `asignar_historico --workspace UUID`, sin cambios hasta `--confirmar`; opción administrativa antigua `--usuario` conservada |
 | Solo cinco estados exportados | Se añaden patrimonio y flujos en pantalla/PDF/XLSX usando los mismos cálculos | Siete hojas y siete secciones; saldos iniciales no documentados N/D |
 | Ratios externos no representaban al caso | Nueva ruta `/ratios-caso/`, con CSV propio, unidades PEN, sin aproximaciones de ventas/compras ni apertura inventada | N/D para promedios, impuestos y desgloses ausentes; comparativo externo preservado |
 | `ProfitLoss` usado como utilidad atribuible al accionista | Para AVGO FY2025 se conserva fuente y valor excluido; utilidad atribuible y ratios dependientes N/D hasta verificar atribución | Dataset y constructor no confunden esa partida consolidada con utilidad atribuible; no se inventó una cifra sustituta |
 | Consultas del bot podían recalcular saldos por IA | Respuestas deterministas de utilidad, balance y controles del caso; contexto financiero y cuatro turnos privados para otras consultas | Mock verifica importes reales, continuidad y ausencia de llamada al proveedor para saldos |
-| Consumo de IA sin control | Cuenta requerida por defecto y cuotas por espacio/endpoint/minuto; Redis opcional para compartir cuota entre workers | 401 sin cuenta, 429 al superar la cuota; texto conservado en errores existentes |
+| Consumo de IA sin control | Acceso libre; cuotas por espacio/endpoint/minuto y por IP; Redis para compartir cuota entre workers | Sin bloqueos de autenticación. 429 JSON para APIs y HTML amigable para formularios |
 | Errores completos SMTP/API | Mensajes externos genéricos; fallo SMTP devuelve PDF descargable con estado `X-Report-Email-Status: failed` | Excepción con dato privado no aparece en respuesta; PDF vuelve a abrirse |
 | DB versionada, secreto conocido y hosts abiertos | SQLite desversionada, SECRET_KEY obligatoria fuera de pruebas/desarrollo, hosts explícitos, cookies/HTTPS en Render | `check --deploy`, migraciones y pruebas de aislamiento |
 | Freeze contenía versiones no reproducibles con el entorno disponible | Dependencias directas UTF-8 compatibles y Python 3.12.14 | Instalación desde requirements y ejecución local |
@@ -42,26 +44,27 @@ El caso B necesita revisar la contrapartida del ajuste de 3 400 según el enunci
 ## Pruebas ejecutadas
 
 - Suite previa sin cambios: 123 pruebas correctas.
-- CI agregada en `.github/workflows/django-tests.yml`; su resultado remoto aún debe observarse después del push.
-- Suite final: **139 pruebas correctas** (Python 3.12.14, Django 5.2, base temporal/en memoria).
+- CI en `.github/workflows/django-tests.yml`; resultado remoto del nuevo commit verificado por separado al terminar.
+- Suite final: **149 pruebas correctas** (Python 3.12.14, Django 5.2, base temporal/en memoria).
 - Casos A–H: reglas, importación de texto/TXT/imagen simulada, impuestos explícitos, faltantes, importes inválidos, 17 indicadores, contexto del bot y voz con servicios simulados.
-- Clientes HTTP locales de Django: respuestas HTML, POST, CSRF, consultas y descargas. No son una prueba de clics de todos los navegadores.
+- Clientes HTTP anónimos con aislamiento real: módulos, enlaces internos resueltos, formularios POST con CSRF y confirmación, registro/edición/borrado, texto/TXT/imagen y revisión, siete reportes PDF/XLSX, CSV, bot, voz y audio. Dos visitantes no pueden leer, editar, eliminar, descargar o restaurar datos ajenos.
+- Mismo usuario administrativo en dos dispositivos conserva espacios públicos independientes; salir de Django Admin preserva el espacio anónimo anterior. Las fixtures históricas emplean `acceso_administrativo()` explícito; las nuevas pruebas públicas no usan ese bypass. No son pruebas de clics de todos los navegadores.
 - PDF y XLSX generados y reabiertos: sin movimientos (7 páginas/7 hojas), NovaTech seis asientos (9 páginas/7 hojas), caso de 60 asientos (22 páginas/7 hojas).
 - PDF renderizado con Poppler e inspeccionado: situación financiera, patrimonio y flujos. Se corrigió recorte de importes en la tabla nueva de flujos.
 - Generación con razón social con `Ñ`, `&` y otros caracteres. Textos Excel se mantienen como texto, nunca fórmulas. Los nombres de descarga se normalizan.
-- Migraciones 0008 y 0009 aplicadas en SQLite temporal.
+- Migraciones 0008, 0009 y 0010 aplicadas en SQLite temporal.
 - `makemigrations --check --dry-run`: sin cambios pendientes.
 - Dependencias instaladas desde `requirements.txt`; `collectstatic` correcto.
 - `check --deploy` con configuración de producción simulada: sin errores, dos advertencias sobre HSTS de subdominios y preload, mantenidos desactivados porque el proyecto no controla todos los subdominios del dominio compartido.
 
 ## Archivos y organización
 
-- Datos y seguridad: `models.py`, `workspaces.py`, `middleware.py`, migraciones 0008/0009, `espacio_views.py`, `respaldos.py`, comando `asignar_historico`, configuración y formularios de acceso.
+- Datos y seguridad: `models.py`, `workspaces.py`, `middleware.py`, migraciones 0008/0009/0010, `espacio_views.py`, `respaldos.py`, comando `asignar_historico`, configuración, importación y descarga de respaldos.
 - Validación: `validacion_contable.py`, `views.py`, `orientacion.py`, `importacion_general.py`.
 - Informes: `reporte_utils.py`, `exportacion.py`, plantillas PDF/patrimonio/flujos.
 - Ratios: `ratios.py`, `ratios_caso.py`, `ratio_views.py`, dataset/construcción SEC y plantillas.
 - Bot: `bot_calculos.py` y contexto en `views.py`.
-- Pruebas nuevas: `test_auditoria_integral.py`; pruebas anteriores actualizadas solo donde cambió el contrato (POST, siete estados, PCGE nuevo y datos de atribución no verificados).
+- Pruebas nuevas: `test_auditoria_integral.py`, `test_acceso_anonimo.py`; pruebas anteriores actualizadas solo donde cambió el contrato (POST, siete estados, PCGE nuevo y datos de atribución no verificados).
 
 ## Despliegue seguro en Render
 
@@ -71,10 +74,10 @@ No se debe fusionar y desplegar sin preparar la persistencia y la asignación de
 2. Mantener el valor secreto vigente de `SECRET_KEY` en el entorno. No escribirlo en GitHub. Configurar `ALLOWED_HOSTS` con el dominio real.
 3. Mantener la conexión persistente existente mediante `DATABASE_URL`, o configurar `SQLITE_PATH` dentro de un disco persistente de Render. El arranque rechaza Render+SQLite sin esa ruta explícita. No copiar la DB del repositorio encima de producción.
 4. Opcional/recomendado para varios workers: `REDIS_URL`. Sin Redis, la cuota usa caché local y se aplica por proceso; no es una protección global distribuida.
-5. Mantener `WORKSPACE_ISOLATION=true` y `AI_REQUIRE_LOGIN=true`. El inicio requiere registro o ingreso para las funciones de IA. Las sesiones anónimas solo manejan datos de su propio espacio.
+5. Mantener `WORKSPACE_ISOLATION=true`. Toda la aplicación pública funciona sin cuenta, incluso IA, importación y audio. La antigua bandera de autenticación se eliminó. Django Admin mantiene su autenticación propia para tareas administrativas.
 6. Ejecutar migraciones en staging/restauración de la copia de seguridad. Las columnas de workspace dejan el histórico sin propietario y fuera del acceso público.
-7. Crear un usuario destinado al caso histórico. Ejecutar `python manage.py asignar_historico --usuario USUARIO` para revisar cantidades, sin cambios. Solo después del respaldo y de verificar el propietario, ejecutar la variante `--confirmar`. No cambia códigos, nombres ni importes.
-8. Probar ingreso de ese usuario, libros, PDF y restauración de respaldos antes de habilitar el tráfico habitual.
+7. En un espacio anónimo vacío destinado al histórico, el administrador puede obtener su UUID de la sesión y ejecutar `python manage.py asignar_historico --workspace UUID` para simular. Solo después del respaldo y de verificar el destino, ejecutar con `--confirmar`. El comando rechaza destinos con datos y no cambia códigos, nombres ni importes. La opción administrativa `--usuario` es de compatibilidad: no vincula automáticamente el acceso público a ese usuario.
+8. Verificar el espacio anónimo seleccionado, libros, PDF y descarga/importación de respaldos en otra sesión antes de habilitar tráfico. `cargar_prueba` exige `--workspace UUID`, respalda el caso anterior y no modifica otros espacios.
 9. El build ejecuta instalación, `collectstatic` y `migrate`. El servidor puede arrancar con `python -m gunicorn contabilidad.wsgi:application` según la configuración de Render.
 
 La eliminación de `db.sqlite3` del índice Git no borra la copia desplegada ni purga archivos de commits antiguos. La asignación histórica no se ejecuta durante migraciones ni durante el build.
@@ -86,6 +89,8 @@ La eliminación de `db.sqlite3` del índice Git no borra la copia desplegada ni 
 - Las 17 fórmulas se contrastan con la fixture del taller y las pruebas del dataset. No se volvió a descargar y auditar cada partida de todos los filings SEC. La atribución del resultado AVGO FY2025 sigue pendiente; se muestra N/D.
 - El chequeo PCGE implementado cubre familias y correspondencias reconocibles. No equivale a una certificación exhaustiva de todas las divisionarias, políticas contables o casos NIIF.
 - Los controles de omisiones y fuente son deterministas pero no prueban la interpretación semántica completa de cualquier ejercicio. Los campos desconocidos deben seguir en revisión.
-- Una sesión anónima que pierde su cookie pierde el acceso a su espacio: se ofrece registro para conservar acceso entre dispositivos.
+- Una sesión anónima que pierde sus cookies puede perder el acceso a su espacio. Se explica en Casos anteriores: descargar el JSON antes de cambiar de dispositivo o borrar cookies, e importarlo en la sesión nueva. No se exige ni ofrece registro para recuperar casos. El archivo permite acceder a su contenido: debe conservarse en privado. Importación acotada a 2 MB, 1 000 asientos y 1 000 cuentas; validación antes de cualquier escritura y respaldo previo dentro de la transacción.
 - El estado de flujos puede quedar provisional con partidas sin clasificación; el patrimonio muestra N/D de apertura cuando no se documenta. No se rellenan datos para aparentar estados completos.
 - Para un catálogo didáctico/histórico se preservan los registros originales y se muestran advertencias. Las nuevas altas/importaciones se validan como familias PCGE, sin una conversión masiva de historia.
+
+Las cuotas públicas actuales son 12 consultas de chat y 6 solicitudes de voz, audio, importación o revisión por espacio/endpoint/minuto, además de 120 solicitudes de IA por IP/minuto. Se utiliza REMOTE_ADDR, sin confiar en X-Forwarded-For suministrado por visitantes. Si el proxy concentra visitantes en una sola dirección, comparten ese límite de IP; Redis permite compartir contadores entre procesos. CSRF, validación de archivos y claves exclusivamente en el servidor se mantienen.

@@ -26,6 +26,9 @@ class RespaldoCaso(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     objects = WorkspaceManager()
 
+    class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
 
 
 class CuentaContable(models.Model):
@@ -71,6 +74,8 @@ class CuentaContable(models.Model):
     )
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         ordering = ['codigo']
         constraints = [models.UniqueConstraint(fields=['workspace', 'codigo'], name='cuenta_workspace_codigo')]
         verbose_name = 'Cuenta Contable'
@@ -104,6 +109,8 @@ class AsientoContable(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         ordering = ['fecha', 'id'] 
         verbose_name = 'Asiento Contable'
         verbose_name_plural = 'Asientos Contables'
@@ -161,6 +168,8 @@ class Movimiento(models.Model):
     monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Monto')
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         verbose_name = 'Movimiento'
         verbose_name_plural = 'Movimientos'
 
@@ -186,4 +195,6 @@ class FinancialRatioPeriod(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
         constraints = [models.UniqueConstraint(fields=['workspace', 'ticker', 'year'], name='ratio_company_year_unique')]

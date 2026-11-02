@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from pypdf import PdfReader

@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from .models import CuentaContable, AsientoContable, Movimiento
 from .test_estados_financieros import novatech
 from .views import guardar_importacion

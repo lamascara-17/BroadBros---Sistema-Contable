@@ -1,6 +1,7 @@
 from io import BytesIO
 from unittest.mock import patch
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from .views import guardar_importacion

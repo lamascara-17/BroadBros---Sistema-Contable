@@ -23,7 +23,6 @@ if not SECRET_KEY:
     raise ImproperlyConfigured('Configure SECRET_KEY en el entorno del servidor.')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,broadbros-sistema-contable.onrender.com').split(',') if h.strip()]
-AI_REQUIRE_LOGIN = os.getenv('AI_REQUIRE_LOGIN', 'true').lower() == 'true'
 WORKSPACE_ISOLATION = os.getenv('WORKSPACE_ISOLATION', 'true').lower() == 'true'
 # Las pruebas históricas verifican reglas sin ámbito. Las pruebas de aislamiento
 # habilitan explícitamente el middleware y usan dos clientes independientes.
@@ -34,9 +33,6 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = os.getenv('RENDER', '').lower() == 'true'
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-LOGIN_URL = '/ingresar/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
 if os.getenv('REDIS_URL'):
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': os.environ['REDIS_URL']}}
 

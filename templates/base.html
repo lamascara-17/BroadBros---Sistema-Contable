@@ -71,7 +71,7 @@
                         {% endfor %}
                     </div>
                 {% endif %}
-                <div class="helper-text">{% if user.is_authenticated %}Espacio de {{ user.username }} <form method="post" action="{% url 'logout' %}" style="display:inline">{% csrf_token %}<button type="submit">Salir</button></form>{% else %}Espacio privado de esta sesión. <a href="{% url 'login' %}">Ingresar</a> o <a href="{% url 'registro' %}">crear cuenta</a> para conservar el acceso.{% endif %} · <a href="{% url 'respaldos' %}">Casos anteriores</a></div>
+                <div class="helper-text">Espacio privado de esta sesión · <a href="{% url 'respaldos' %}">Casos anteriores y respaldos</a></div>
             {% block content %}{% endblock %}
                 <div class="site-credits"><span>BROADBROS · Sistema contable</span><span>Iconos: Magnific (Freepik)</span></div>
             </section>

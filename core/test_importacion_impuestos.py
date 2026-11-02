@@ -1,6 +1,7 @@
 from unittest.mock import patch
 from django.core import signing
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from .test_ciclo_contable import imagen, caso
 from .test_ciclo_documentado import caso_letras

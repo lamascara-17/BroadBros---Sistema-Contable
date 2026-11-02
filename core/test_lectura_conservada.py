@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 from django.test import TestCase, override_settings
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from .ai_diario import extraer_operaciones
 from .models import AsientoContable

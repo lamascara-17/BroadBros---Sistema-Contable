@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from .test_estados_financieros import novatech
 from .importacion_general import normalizar_borrador, validar_asientos

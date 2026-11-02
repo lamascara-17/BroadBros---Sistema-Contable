@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from .ciclo_contable import generar_asientos
 from .test_ciclo_contable import imagen

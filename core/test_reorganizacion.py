@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 from django.test import TestCase, override_settings
+from .test_support import AdministrativeTestCase as TestCase
 from .importacion_general import organizar_lectura, proponer_caso_general, PropuestaInvalida, normalizar_borrador
 from .test_estados_financieros import novatech
 

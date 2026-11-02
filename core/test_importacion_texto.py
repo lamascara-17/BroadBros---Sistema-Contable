@@ -1,5 +1,6 @@
 from unittest.mock import patch
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from .models import AsientoContable

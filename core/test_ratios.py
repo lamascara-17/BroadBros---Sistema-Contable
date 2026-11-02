@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal as D
 from pathlib import Path
 from django.test import TestCase, SimpleTestCase, Client
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.urls import reverse
 from .models import FinancialRatioPeriod, CuentaContable, AsientoContable
 from .ratios import calculate, comparison, dataset, companies_with_overrides, DEFINITIONS, number

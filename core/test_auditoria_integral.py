@@ -6,6 +6,7 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from unittest.mock import patch
 from django.test import TestCase, Client, override_settings
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from django.core.cache import cache
 from openpyxl import load_workbook
@@ -114,7 +115,7 @@ class AuditoriaContableTests(TestCase):
         self.assertNotIn(b'privado',r.content)
 
 
-@override_settings(WORKSPACE_ISOLATION=True, AI_REQUIRE_LOGIN=False)
+@override_settings(WORKSPACE_ISOLATION=True)
 class AislamientoTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -156,19 +157,24 @@ class AislamientoTests(TestCase):
 
 @override_settings(WORKSPACE_ISOLATION=True)
 class AutenticacionPersistenciaTests(TestCase):
-    def test_ia_exige_cuenta_y_espacio_persiste_entre_sesiones(self):
+    def test_mismo_usuario_en_dos_dispositivos_no_reasigna_espacios(self):
         from django.contrib.auth import get_user_model
-        user=get_user_model().objects.create_user('audit_user',password='ContraseñaSegura123!')
+        user=get_user_model().objects.create_user('audit_user')
         c=Client();c.get(reverse('index'))
-        self.assertEqual(c.post(reverse('chatbot_api'),{'message':'Hola'}).status_code,401)
+        espacio=c.session['workspace_id']
         c.force_login(user);c.get(reverse('index'))
-        token=actual.set(c.session['workspace_id'])
+        self.assertEqual(c.session['workspace_id'],espacio)
+        token=actual.set(espacio)
         try: guardar_importacion(novatech()[:6])
         finally: actual.reset(token)
-        otro=Client();otro.force_login(user)
-        self.assertEqual(len(otro.get(reverse('libro_diario')).context['asientos']),6)
-        otro.post(reverse('logout'))
+        otro=Client();otro.get(reverse('index'));otro_espacio=otro.session['workspace_id']
+        otro.force_login(user)
         self.assertEqual(len(otro.get(reverse('libro_diario')).context['asientos']),0)
+        self.assertEqual(otro.session['workspace_id'],otro_espacio)
+        self.assertNotEqual(espacio,otro_espacio)
+        self.assertEqual(len(c.get(reverse('libro_diario')).context['asientos']),6)
+        c.post(reverse('logout'))
+        self.assertEqual(c.session['workspace_id'],espacio)
 
     def test_respaldos_ajenos_no_se_descargan_ni_restauran(self):
         a,b=Client(),Client();a.get(reverse('index'));b.get(reverse('index'))

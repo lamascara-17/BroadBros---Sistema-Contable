@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.test import TestCase
+from .test_support import AdministrativeTestCase as TestCase
 from django.urls import reverse
 from types import SimpleNamespace
 from unittest.mock import patch

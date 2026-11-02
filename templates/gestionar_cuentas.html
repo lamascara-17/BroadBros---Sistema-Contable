@@ -87,7 +87,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <form method="post" action="{% url 'eliminar_cuenta' cuenta.id %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar este registro?')">Eliminar</button></form>
+                                <form method="post" action="{% url 'eliminar_cuenta' cuenta.id %}" onsubmit="return confirm('¿Eliminar este registro?')">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Eliminar</button></form>
                             </td>
                         </tr>
                         {% endfor %}

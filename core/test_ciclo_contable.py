@@ -7,6 +7,7 @@ from unittest.mock import patch
 from decimal import Decimal
 from PIL import Image
 from django.test import TestCase, SimpleTestCase, override_settings
+from .test_support import AdministrativeTestCase as TestCase, AdministrativeSimpleTestCase as SimpleTestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from openpyxl import load_workbook
