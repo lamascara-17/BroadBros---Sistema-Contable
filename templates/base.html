@@ -48,8 +48,6 @@
                         <a href="{% url 'balance_general' %}" {% if request.resolver_match.url_name == 'balance_general' %}aria-current="page"{% endif %}><strong>Situación financiera</strong><small>Activo, pasivo y patrimonio</small></a>
                     </div>
                 </details>
-                <a class="workspace-link" href="{% url 'estado_patrimonio' %}">Patrimonio</a>
-                <a class="workspace-link" href="{% url 'estado_flujos' %}">Flujos de efectivo</a>
                 <a href="{% url 'reporte_completo' %}" class="workspace-link export-link {% if request.resolver_match.url_name == 'reporte_completo' %}active{% endif %}" {% if request.resolver_match.url_name == 'reporte_completo' %}aria-current="page"{% endif %}>Exportar <span aria-hidden="true">↓</span></a>
                 <a href="{% url 'ratios_financieros' %}" class="workspace-link {% if request.resolver_match.url_name == 'ratios_financieros' %}active{% endif %}" {% if request.resolver_match.url_name == 'ratios_financieros' %}aria-current="page"{% endif %}>Ratios financieros <span aria-hidden="true">↗</span></a>
             </nav>
