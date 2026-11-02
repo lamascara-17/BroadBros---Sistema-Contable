@@ -26,6 +26,7 @@ Por indicación del propietario, esta fase trabaja exclusivamente con GitHub y p
 | El registro manual podía superar los 1.000 asientos/cuentas admitidos por el respaldo. | Límites coherentes en altas manuales e importación y bloqueo transaccional del workspace para las operaciones de alta/reemplazo. Se rechaza antes de reemplazar datos. |
 | Los respaldos anteriores a la introducción del catálogo separado podían tener catálogo vacío. | Reconstrucción consistente desde sus movimientos al preparar el archivo, conservando la copia original. Se rechazan clasificaciones contradictorias. |
 | `build.sh` aplicaba migraciones en cada compilación. | Build instala y recolecta estáticos, sin migrar. Start comprueba migraciones pendientes y arranca Gunicorn; no las aplica. |
+| `DATABASE_URL` presente pero vacía dejaba `DATABASES` sin motor definido. | Se interpreta explícitamente como ausencia de URL y se utiliza SQLite en la ruta configurada; regresión en proceso independiente. |
 | Dependencias resueltas podían variar entre compilaciones. | `requirements-render.txt` fija las 40 dependencias verificadas para Linux/Python 3.12. Build y Actions utilizan ese archivo. |
 
 No se modificó el diseño ni se eliminaron módulos. Continúa el acceso público sin login y el aislamiento por sesión anónima. Las rutas antiguas de registro/login siguen redirigiendo al inicio sin crear cuentas.
@@ -37,14 +38,14 @@ La revisión crece por modificación de fila, no necesariamente una sola vez por
 Entorno aislado Linux/Python 3.12; ninguna prueba escribió en Render ni utilizó su base.
 
 - Base sin modificaciones: **165 pruebas Django correctas**.
-- Con correcciones: **174 pruebas correctas** en 61,53 segundos. Incluyen las 165 existentes y 9 regresiones nuevas.
+- Con correcciones: **175 pruebas correctas** en 61,65 segundos: 165 existentes y 10 regresiones. El PR conserva además las ejecuciones remotas del SHA final.
 - Pruebas adicionales de las mismas rutas: `makemigrations --check --dry-run`, `pip check`, instalación simulada del lock, `git diff --check` y comprobación de configuración de Gunicorn correctas.
 - `collectstatic`: 142 archivos recolectados correctamente.
 - `check --deploy` con configuración productiva ficticia: sin errores y dos advertencias HSTS (`security.W005`, `security.W021`). No se activó inclusión de subdominios ni preload sin comprobar el control del dominio y sus consecuencias. Actions no silencia estas advertencias; utiliza `--fail-level ERROR`.
 - **Compatibilidad real con una copia del SQLite versionado en `main`:** ese archivo estaba solo en migración 0002, aunque el código tenía migraciones posteriores. Se aplicaron 0003–0014 a una copia temporal: se conservaron exactamente las columnas y valores anteriores de 19 cuentas, 12 asientos y 27 movimientos; las huellas SHA-256 de esas filas no cambiaron. `PRAGMA integrity_check` devolvió `ok`. Esto no es una copia de la BD productiva ni sustituye un ensayo sobre ella.
 - **HTTP real con Gunicorn:** alta de cuentas y asiento con CSRF, siete reportes, ambos módulos de ratios, páginas de importación y separación de dos visitantes. Se detuvo y volvió a iniciar el proceso usando la misma SQLite temporal; la sesión y su caso se conservaron. Script: `python scripts/verificar_reinicio.py`.
 - **Recursos:** `python scripts/medir_respaldos.py` generó un JSON de **46.683.060 bytes**, 1.000 asientos y 40.000 movimientos; guardó bloques, restauró y reexportó con SHA-256 idéntico. RSS inicial 45.592 KiB, máximo **71.256 KiB**, 19,23 segundos. Es un proceso de benchmark aislado, no una medición del worker de producción ni una garantía de caber en su plan. Las copias antiguas almacenadas como un único JSONField aún requieren materializar ese campo al leerlas; revisar su tamaño antes de recuperarlas en un plan pequeño.
-- Actions se amplía a **SQLite y PostgreSQL 16**, incluyendo migraciones, aislamiento, concurrencia, exportaciones y producción. El resultado remoto debe comprobarse en el PR de esta rama antes de aprobar una fusión.
+- Actions se amplía a **SQLite y PostgreSQL 16**, incluyendo migraciones, aislamiento, concurrencia, exportaciones y producción. Al ampliar la matriz se detectaron la URL vacía y un doble cierre del streaming en un helper de pruebas que cerraba la conexión PostgreSQL dentro del TestCase; ambos se corrigieron. El resultado remoto del SHA final debe comprobarse en el PR de esta rama antes de aprobar una fusión.
 
 | Función solicitada | Alcance de la comprobación |
 |---|---|

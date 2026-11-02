@@ -23,7 +23,8 @@ from .workspaces import actual, acceso_administrativo
 def consumir(respuesta):
     if respuesta.streaming:
         contenido = b''.join(respuesta.streaming_content)
-        respuesta.close()
+        # El cliente Django cierra la respuesta al agotar streaming_content.
+        # Cerrar dos veces dispara request_finished dentro del atomic del TestCase.
         from django.http import HttpResponse
         copia = HttpResponse(contenido, content_type='application/json')
         copia.json = lambda: json.loads(contenido)
