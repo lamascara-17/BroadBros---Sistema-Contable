@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# No crea bases ni aplica migraciones durante un arranque.
-python manage.py migrate --check
+# El mismo hook de Gunicorn comprueba/prepara la base antes de crear workers.
 exec python -m gunicorn contabilidad.wsgi:application --config gunicorn.conf.py

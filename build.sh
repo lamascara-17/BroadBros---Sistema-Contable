@@ -4,5 +4,5 @@ set -o errexit
 
 pip install -r requirements-render.txt
 python manage.py collectstatic --no-input
-# Las migraciones se ejecutan por separado, solo tras respaldo y aprobación.
+# La base temporal se prepara en el runtime, nunca en el entorno del build.
 python manage.py check

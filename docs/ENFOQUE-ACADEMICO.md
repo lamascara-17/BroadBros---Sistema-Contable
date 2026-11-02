@@ -35,11 +35,21 @@ En el navegador: registrar/importar el ejercicio, revisar los libros y estados, 
 
 ## Qué sigue pendiente y qué no se promete
 
-- **Persistencia del alojamiento.** SQLite conserva los datos si su archivo reside en almacenamiento durable, por ejemplo en la computadora donde se ejecuta Django. La captura del servicio actual confirma Render Free, que no dispone de disco persistente. Esto no se resuelve cambiando el nombre del archivo o una ruta; tampoco demuestra que haga falta cambiar el motor del proyecto. Para una demostración temporal deben descargarse/importarse JSON y aceptarse explícitamente las limitaciones; para conservación automática en ese alojamiento hay que resolver el almacenamiento antes de desplegar. No se activó un modo efímero ni se quitó la protección de arranque. [Limitaciones oficiales de Render](https://render.com/docs/free).
+- **Persistencia del alojamiento.** SQLite conserva los datos si su archivo reside en almacenamiento durable, por ejemplo en la computadora donde se ejecuta Django. El servicio actual es Render Free, sin disco persistente. Se habilita la demostración temporal autorizada cuando `RENDER=true` y no hay `DATABASE_URL` ni `SQLITE_PATH`. Todas las páginas avisan que el ejercicio y las copias internas pueden perderse; el respaldo durable es el JSON descargado fuera del servidor. No se promete persistencia entre despliegues, suspensión o reemplazo de instancia. [Limitaciones oficiales de Render](https://render.com/docs/free).
 - Cámara/micrófono físicos, llamadas reales a Groq/ElevenLabs y SMTP requieren pruebas reales. No se presentan los mocks como prueba del proveedor. La cuenta del proveedor es configuración administrativa, no un login obligatorio para visitantes.
 - Los datos externos siguen siendo versionados y sus ausencias siguen como N/D; no se inventó la décima empresa ni información atribuible de AVGO que no está documentada.
 - Las dos advertencias HSTS conocidas no se silencian ni se corrigen activando preload/subdominios a ciegas.
 
 La recomendación anterior de añadir una base externa queda fuera del enfoque normal del proyecto. No es necesaria para corregir los cálculos ni para usar BROADBROS académicamente con SQLite durable.
 
-No se modificaron `main`, Render, credenciales ni datos de producción. Los informes de auditorías anteriores se conservan como evidencia histórica; este documento define el alcance operativo actual.
+## Arranque en el Render gratuito existente
+
+Se mantienen Build `./build.sh`, Start `gunicorn contabilidad.wsgi:application`, rama `main` y despliegue automático On Commit. `build.sh` es ejecutable y recopila estáticos; no migra la base del build. Gunicorn carga automáticamente `gunicorn.conf.py`. Su hook `on_starting` prepara las tablas **antes** de crear workers o aceptar peticiones, con un worker por defecto.
+
+Solo el perfil temporal anterior aplica automáticamente las migraciones pendientes. Si encuentra una SQLite existente, verifica su integridad y guarda una copia SQLite consistente y privada antes de migrar. Si algo falla se detiene: nunca elimina ni sustituye la base por otra vacía. La copia local de seguridad sigue siendo temporal y no reemplaza el JSON externo. Cuando la base ya está actualizada, no escribe otra copia ni vuelve a migrar.
+
+Una `DATABASE_URL` o `SQLITE_PATH` explícita desactiva esa automatización: el arranque se detiene si faltan migraciones, para mantener el procedimiento de respaldo y aprobación de esa base. No se cambia el motor, no se provisionan discos ni servicios, no se modifican secretos. Las migraciones existentes conservan las filas históricas sin dueño; no se asignan a un visitante nuevo ni se exponen entre sesiones. Para recuperar el ejercicio previo en el espacio anónimo propio se importa su JSON.
+
+Procedimiento de publicación autorizado: conservar el ejercicio previo fuera de Render, comprobar la restauración en SQLite aislada, pasar pruebas/Actions sobre la revisión final y fusionar el PR #6. Comprobar después la misma URL pública y los ratios. Para volver al código anterior, revertir el merge en GitHub tras revisar compatibilidad de esquema; un rollback de código no recupera el archivo efímero de una instancia anterior. El JSON externo permite recuperar el ejercicio en la versión que admita su importación.
+
+Los informes de auditorías anteriores se conservan como evidencia histórica; este documento define el alcance operativo actual.

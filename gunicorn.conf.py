@@ -14,3 +14,10 @@ errorlog = '-'
 capture_output = True
 if workers < 1 or threads < 1 or timeout < 1:
     raise ValueError('Workers, threads y timeout deben ser positivos.')
+
+
+def on_starting(server):
+    # Gunicorn carga este archivo también con el Start Command ya configurado
+    # en Render: gunicorn contabilidad.wsgi:application.
+    from contabilidad.arranque import preparar_base
+    preparar_base()

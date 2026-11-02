@@ -72,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.almacenamiento',
             ],
         },
     },
@@ -124,9 +125,13 @@ GROQ_VISION_MODEL = os.getenv('GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')
 GROQ_TEXT_MODEL = os.getenv('GROQ_TEXT_MODEL', 'openai/gpt-oss-20b')
 GROQ_REWRITE_MODEL = os.getenv('GROQ_REWRITE_MODEL', GROQ_TEXT_MODEL)
 
-if os.getenv('RENDER', '').lower() == 'true' and DATABASES['default']['ENGINE'].endswith('sqlite3') and not os.getenv('SQLITE_PATH'):
-    from django.core.exceptions import ImproperlyConfigured
-    raise ImproperlyConfigured('Render requiere DATABASE_URL o SQLITE_PATH en un disco persistente.')
+# Perfil académico aprobado para el servicio gratuito existente. Una ruta o
+# conexión explícita conserva el procedimiento de migración manual con respaldo.
+RENDER_EPHEMERAL_SQLITE = (
+    os.getenv('RENDER', '').lower() == 'true'
+    and DATABASES['default']['ENGINE'].endswith('sqlite3')
+    and not os.getenv('SQLITE_PATH') and not os.getenv('DATABASE_URL')
+)
 
 SECURE_SSL_REDIRECT = os.getenv('RENDER', '').lower() == 'true'
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600' if SECURE_SSL_REDIRECT else '0'))
