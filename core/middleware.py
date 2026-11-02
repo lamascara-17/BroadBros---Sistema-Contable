@@ -53,6 +53,23 @@ class WorkspaceMiddleware:
         request.session['workspace_id'] = str(workspace.pk)
         token = actual.set(workspace.pk)
         try:
+            recurso = (request.method == 'POST' and request.path.startswith('/casos-anteriores/') and
+                       (request.path.endswith('/importar/') or request.path.endswith('/restaurar/')))
+            descarga = (request.method == 'GET' and request.path.startswith('/casos-anteriores/') and
+                        (request.path.endswith('/actual/') or request.path.endswith('/descargar/')))
+            if recurso or descarga:
+                minuto = int(time()) // 60
+                ip = sha256(request.META.get('REMOTE_ADDR', '').encode()).hexdigest()
+                limite = 12 if recurso else 30
+                saturada = excede_cuota(f'recursos-ip:{ip}:{minuto}', 120)
+                saturada = excede_cuota(f'recursos:{workspace.pk}:{"escritura" if recurso else "lectura"}:{minuto}', limite) or saturada
+                if saturada:
+                    if 'application/json' in request.headers.get('Accept', ''):
+                        response = JsonResponse({'error':'Demasiados respaldos solicitados. Espera un minuto.'}, status=429)
+                    else:
+                        response = render(request, 'limite_solicitudes.html', status=429)
+                    response['Retry-After'] = '60'
+                    return response
             if request.method == 'POST' and request.path in AI_PATHS:
                 minuto = int(time()) // 60
                 # REMOTE_ADDR no confía en cabeceras X-Forwarded-For del visitante.

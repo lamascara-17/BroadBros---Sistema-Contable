@@ -1,9 +1,17 @@
+from .consultas import movimientos_con_cuentas
 from .models import CuentaContable, AsientoContable, Movimiento, RespaldoCaso
 from django.db import transaction
 
+# Cubre el máximo serializado de 1 000 asientos × 40 movimientos, con
+# descripción/fuente/observaciones y Unicode escapado, sin recortar datos.
+MAX_RESPALDO_BYTES = 256 * 1024 * 1024
+MAX_ASIENTOS_RESPALDO = 1000
+MAX_CUENTAS_RESPALDO = 1000
+
+
 
 def serializar_caso():
-    anteriores = list(AsientoContable.objects.prefetch_related('movimientos__cuenta'))
+    anteriores = list(AsientoContable.objects.prefetch_related(movimientos_con_cuentas()))
     catalogo = list(CuentaContable.objects.values('codigo', 'nombre', 'tipo', 'subcategoria'))
     datos = [{'fecha': str(a.fecha), 'descripcion': a.descripcion, 'clase': a.clase,
               'flujo_efectivo': a.flujo_efectivo, 'fecha_cierre': str(a.fecha_cierre_ejercicio) if a.fecha_cierre_ejercicio else None,
@@ -19,7 +27,7 @@ def crear_respaldo():
     return RespaldoCaso.objects.create(datos=contenido['asientos'], catalogo=contenido['cuentas'])
 
 
-def restaurar(respaldo):
+def restaurar(respaldo, session=None):
     from .importacion_general import validar_asientos
     # Se validan estructura y partida doble, sin renumerar el catálogo histórico.
     for inicio in range(0, len(respaldo.datos), 100):
@@ -33,10 +41,15 @@ def restaurar(respaldo):
             a = AsientoContable.objects.create(fecha=r['fecha'], descripcion=r['descripcion'], clase=r['clase'],
                 flujo_efectivo=r['flujo_efectivo'], fecha_cierre_ejercicio=r.get('fecha_cierre'),
                 fuente_importacion=r.get('fuente',''), observaciones_importacion=r.get('observaciones',''))
+            movimientos = []
             for m in r['movimientos']:
                 if m['codigo'] not in cuentas:
                     cuentas[m['codigo']] = CuentaContable.objects.create(codigo=m['codigo'], nombre=m['nombre'], tipo=m['tipo_cuenta'], subcategoria=m.get('subcategoria',''))
-                Movimiento.objects.create(asiento=a, cuenta=cuentas[m['codigo']], tipo=m['tipo_movimiento'], monto=m['monto'])
+                movimientos.append(Movimiento(asiento=a, cuenta=cuentas[m['codigo']], tipo=m['tipo_movimiento'], monto=m['monto']))
+            Movimiento.objects.bulk_create(movimientos, batch_size=500)
+
+        from .contexto_bot import limpiar_tras_guardado
+        limpiar_tras_guardado(session)
 
 
 def validar_respaldo(contenido):
@@ -48,7 +61,7 @@ def validar_respaldo(contenido):
     if type(contenido.get('version', 1)) is not int or contenido.get('version', 1) != 1 or contenido.get('formato', 'BROADBROS') != 'BROADBROS':
         raise ValueError('Versión o formato de respaldo no compatible.')
     entradas, catalogo = contenido.get('asientos'), contenido.get('cuentas')
-    if not isinstance(entradas, list) or not isinstance(catalogo, list) or len(catalogo) > 1000 or len(entradas) > 1000:
+    if not isinstance(entradas, list) or not isinstance(catalogo, list) or len(catalogo) > MAX_CUENTAS_RESPALDO or len(entradas) > MAX_ASIENTOS_RESPALDO:
         raise ValueError('El respaldo admite hasta 1 000 asientos y 1 000 cuentas.')
     cuentas = {}
     permitidos = {'codigo','nombre','tipo','subcategoria'}
@@ -90,3 +103,13 @@ def validar_respaldo(contenido):
                        'clase':asiento['clase'],'flujo_efectivo':asiento['flujo_efectivo'],
                        'fecha_cierre':cierre,'fuente':fuente,'observaciones':obs,'movimientos':asiento['movimientos']})
     return salida, list(cuentas.values())
+
+
+def codificar_respaldo(contenido):
+    """Nunca emitir un archivo que el importador de esta versión rechazaría."""
+    import json
+    validar_respaldo(contenido)
+    contenido = json.dumps(contenido, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    if len(contenido) > MAX_RESPALDO_BYTES:
+        raise ValueError('El respaldo excede los 256 MB admitidos. El caso se conserva íntegro; solicite una copia administrativa de la base.')
+    return contenido

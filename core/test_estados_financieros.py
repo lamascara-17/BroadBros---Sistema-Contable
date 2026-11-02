@@ -96,7 +96,8 @@ class EstadosFinancierosTests(TestCase):
 
     def test_novatech_reconcilia_libros_resultado_patrimonio_y_efectivo(self):
         guardar_importacion(novatech())
-        with self.assertNumQueries(4):ctx=contexto_estados()
+        # JOIN de cuentas y movimientos: tres consultas, sin OR por cada cuenta.
+        with self.assertNumQueries(3):ctx=contexto_estados()
         self.assertEqual(ctx['resultado_neto'],11000)
         self.assertEqual(ctx['total_activos'],44000)
         self.assertEqual(ctx['total_pasivos'],3000)

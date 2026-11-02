@@ -1,4 +1,5 @@
 """Una misma fuente de saldos para pantalla, PDF y Excel."""
+from .consultas import movimientos_con_cuentas
 from decimal import Decimal
 from collections import defaultdict
 import re
@@ -27,7 +28,7 @@ def flujo_asiento(asiento, movimientos, neto):
 
 
 def get_reporte_context():
-    asientos = list(AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id'))
+    asientos = list(AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).order_by('fecha', 'id'))
     cuentas = list(CuentaContable.objects.all())
     totales=defaultdict(lambda:{'debe':CERO,'haber':CERO})
     operativos=defaultdict(lambda:{'debe':CERO,'haber':CERO})

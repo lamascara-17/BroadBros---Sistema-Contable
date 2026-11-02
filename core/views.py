@@ -24,6 +24,7 @@ from django.db import transaction
 from django.views.decorators.http import require_POST
 from .models import CuentaContable, AsientoContable, Movimiento
 from .reporte_utils import contexto_estados
+from .consultas import movimientos_con_cuentas
 
 # Clave de Groq obtenida desde las variables de entorno
 DEFAULT_GROQ_KEY = os.getenv("GROQ_API_KEY")
@@ -241,7 +242,7 @@ def datos_asiento_manual(request, asiento_actual=None):
             'clase': request.POST.get('clase', 'operacion'),
             'flujo_efectivo': request.POST.get('flujo_efectivo', 'pendiente'), 'movimientos': lineas}])[0]
     from .validacion_contable import auditar_asientos
-    qs = AsientoContable.objects.prefetch_related('movimientos__cuenta')
+    qs = AsientoContable.objects.prefetch_related(movimientos_con_cuentas())
     if asiento_actual is not None: qs = qs.exclude(pk=asiento_actual.pk)
     entradas = [{'fecha': str(a.fecha), 'descripcion': a.descripcion, 'movimientos': [
         {'codigo': m.cuenta.codigo, 'nombre': m.cuenta.nombre, 'tipo_cuenta': m.cuenta.tipo,
@@ -279,7 +280,7 @@ def registrar_asiento(request):
         except (ValueError, ArithmeticError) as exc:
             messages.error(request, str(exc))
     return render(request, 'registrar_asiento.html', {'cuentas': cuentas,
-        'asientos_registrados': AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')})
+        'asientos_registrados': AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).order_by('fecha', 'id')})
 
 
 @require_POST
@@ -306,7 +307,7 @@ def eliminar_asiento(request, asiento_id):
 # ─── LIBRO DIARIO ──────────────────────────────────────────────────────────────
 
 def libro_diario(request):
-    asientos = AsientoContable.objects.prefetch_related('movimientos__cuenta').order_by('fecha', 'id')
+    asientos = AsientoContable.objects.prefetch_related(movimientos_con_cuentas()).order_by('fecha', 'id')
     cuentas = CuentaContable.objects.all()
     context = {
         'asientos': asientos,
@@ -513,7 +514,9 @@ def chatbot_api(request):
         if len(user_message) > 4000:
             return JsonResponse({'error': 'La consulta admite hasta 4 000 caracteres.'}, status=400)
         client = Groq(api_key=api_key, timeout=35, max_retries=0)
-        historial = request.session.get('nonobot_turnos', [])[-4:]
+        from .contexto_bot import firma_caso
+        caso_chat = firma_caso()
+        historial = request.session.get('nonobot_turnos', [])[-4:] if request.session.get('nonobot_caso') == caso_chat else []
         consulta_ambito = user_message + ('\nContexto previo: ' + str(historial)[-3000:] if historial else '')
         if not consulta_contable(client, consulta_ambito):
             respuesta, segmentos = formato_chat(RESPUESTA_FUERA_ALCANCE)
@@ -526,7 +529,7 @@ def chatbot_api(request):
 
         asientos = list(
             AsientoContable.objects
-            .prefetch_related('movimientos__cuenta')
+            .prefetch_related(movimientos_con_cuentas())
             .order_by('fecha', 'id')
         )
 
@@ -906,6 +909,7 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
         respuesta, segmentos = formato_chat(respuesta)
         from .audio_respuesta import datos_audio
+        request.session['nonobot_caso'] = caso_chat
         request.session['nonobot_turnos'] = (historial + [{'usuario': user_message, 'respuesta': respuesta[:2000]}])[-4:]
         return JsonResponse(
             {
@@ -939,7 +943,7 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
 # ─── INGESTA Y REVISIÓN DE CASOS POR IMAGEN ────────────────────────────────────
 
-def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente=''):
+def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente='', session=None):
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
     from .validacion_contable import preparar_pcge, validar_cuenta
@@ -971,6 +975,8 @@ def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente=''):
                 fecha_cierre_ejercicio=fecha_cierre if numero==len(asientos)-1 else None)
             Movimiento.objects.bulk_create([Movimiento(asiento=asiento,cuenta=cuentas[m['codigo']],
                 tipo=m['tipo_movimiento'],monto=m['monto']) for m in item['movimientos']])
+        from .contexto_bot import limpiar_tras_guardado
+        limpiar_tras_guardado(session)
     return len(asientos)
 
 
@@ -1013,7 +1019,7 @@ def finalizar_propuesta(request, payload, revisar=False):
     try:
         asientos = validar_asientos(borrador['asientos'])
         from .clasificacion import fecha_cierre_del_caso
-        cantidad = guardar_importacion(asientos, fecha_cierre=fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''))
+        cantidad = guardar_importacion(asientos, fecha_cierre=fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''), session=request.session)
     except ValueError as exc:
         return mostrar_revision(request, payload, str(exc))
     except Exception:
@@ -1184,7 +1190,7 @@ def revisar_importacion(request):
         if pendientes and request.POST.get('aceptar_parcial') != 'on':
             raise ValueError('La propuesta omite operaciones o ajustes. Complete el análisis o confirme expresamente el guardado parcial.')
         from .clasificacion import fecha_cierre_del_caso
-        cantidad=guardar_importacion(asientos, '; '.join(map(str, pendientes)), fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''))
+        cantidad=guardar_importacion(asientos, '; '.join(map(str, pendientes)), fecha_cierre_del_caso(payload['datos']), fuente=payload['datos'].get('texto_leido', ''), session=request.session)
         messages.success(request,f'Se guardaron {cantidad} asientos revisados.' + (' El ejercicio queda marcado como parcial.' if pendientes else ''))
         return redirect('libro_diario')
     except ValueError as exc:return mostrar_revision(request,payload,str(exc))

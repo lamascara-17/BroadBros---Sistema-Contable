@@ -38,7 +38,7 @@ def restaurar_respaldo(request, pk):
     from .respaldos import restaurar
     from django.contrib import messages
     try:
-        restaurar(respaldo)
+        restaurar(respaldo, session=request.session)
         messages.success(request, 'Caso restaurado sin renumerar sus cuentas; revise las advertencias de los estados.')
     except ValueError as exc:
         messages.error(request, str(exc))
@@ -46,10 +46,9 @@ def restaurar_respaldo(request, pk):
 
 
 def descargar_respaldo(request, pk):
-    import json
     respaldo = get_object_or_404(RespaldoCaso, pk=pk)
-    return HttpResponse(json.dumps({'formato':'BROADBROS', 'version':1, 'asientos': respaldo.datos, 'cuentas': respaldo.catalogo}, ensure_ascii=False), content_type='application/json',
-                        headers={'Content-Disposition': f'attachment; filename="BROADBROS_respaldo_{pk}.json"'})
+    return respuesta_respaldo(request, {'formato':'BROADBROS', 'version':1,
+        'asientos': respaldo.datos, 'cuentas': respaldo.catalogo}, f'BROADBROS_respaldo_{pk}.json')
 
 
 def estado_patrimonio(request):
@@ -63,11 +62,21 @@ def estado_flujos(request):
 
 
 
+def respuesta_respaldo(request, contenido, nombre):
+    from .respaldos import codificar_respaldo
+    from django.contrib import messages
+    try:
+        archivo = codificar_respaldo(contenido)
+    except (ValueError, ArithmeticError) as exc:
+        messages.error(request, f'No se generó un archivo incompleto: {exc} Los datos originales se conservan.')
+        return redirect('respaldos')
+    return HttpResponse(archivo, content_type='application/json', headers={
+        'Content-Disposition': f'attachment; filename="{nombre}"', 'Cache-Control':'no-store'})
+
+
 def descargar_actual(request):
-    import json
     from .respaldos import serializar_caso
-    return HttpResponse(json.dumps(serializar_caso(), ensure_ascii=False), content_type='application/json',
-                        headers={'Content-Disposition':'attachment; filename=BROADBROS_caso_actual.json'})
+    return respuesta_respaldo(request, serializar_caso(), 'BROADBROS_caso_actual.json')
 
 
 @require_POST
@@ -75,22 +84,24 @@ def importar_respaldo(request):
     import json
     from django.contrib import messages
     from django.db import transaction
-    from .respaldos import validar_respaldo, restaurar
+    from .respaldos import validar_respaldo, restaurar, MAX_RESPALDO_BYTES
     archivo = request.FILES.get('respaldo')
     try:
-        if not archivo or not archivo.name.lower().endswith('.json') or archivo.size > 2*1024*1024:
-            raise ValueError('Selecciona un respaldo JSON de hasta 2 MB.')
+        if not archivo or not archivo.name.lower().endswith('.json') or archivo.size > MAX_RESPALDO_BYTES:
+            raise ValueError('Selecciona un respaldo JSON de hasta 256 MB.')
         def rechazar_constante(valor):
             raise ValueError('El respaldo contiene un número no finito.')
         try:
-            contenido = json.loads(archivo.read().decode('utf-8-sig'), parse_float=str, parse_constant=rechazar_constante)
+            bruto = archivo.read(MAX_RESPALDO_BYTES + 1)
+            if len(bruto) > MAX_RESPALDO_BYTES:
+                raise ValueError('El respaldo supera los 256 MB.')
+            contenido = json.loads(bruto.decode('utf-8-sig'), parse_float=str, parse_constant=rechazar_constante)
         except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             raise ValueError('No se pudo leer el JSON del respaldo. El caso actual se conserva.') from None
         datos,catalogo = validar_respaldo(contenido)
         with transaction.atomic():
             respaldo=RespaldoCaso.objects.create(datos=datos,catalogo=catalogo)
-            restaurar(respaldo)
-        request.session.pop('nonobot_turnos',None)
+            restaurar(respaldo, session=request.session)
         messages.success(request,'Respaldo importado en esta sesión. El caso anterior se conserva en Casos anteriores.')
     except (ValueError, ArithmeticError) as exc:
         messages.error(request,str(exc))

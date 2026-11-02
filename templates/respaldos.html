@@ -8,7 +8,7 @@
 {% csrf_token %}
 <label for="archivo-respaldo">Continuar desde un respaldo JSON</label>
 <input id="archivo-respaldo" type="file" name="respaldo" accept=".json,application/json" required>
-<p class="helper-text">Hasta 2 MB. Al importar se respalda el caso actual y se activa el caso del archivo en esta sesión.</p>
+<p class="helper-text">Hasta 256 MB, 1 000 asientos y 1 000 cuentas. Al importar se respalda el caso actual y se activa el caso del archivo en esta sesión.</p>
 <button class="btn btn-secondary" type="submit">Importar respaldo</button>
 </form>
 </div></div>
