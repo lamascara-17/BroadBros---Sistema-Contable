@@ -119,6 +119,9 @@ def financial_ratios(request):
     context['ratio_lab_context'] = {**config, 'version':version(companies, config)}
     context['ratio_explanations'] = explanations(report, tax/100, basis)
     context['ratio_scenario_initial'] = simulate(report, {'ventas':Decimal(0),'costos':Decimal(0),'deuda':Decimal(0)}, tax/100, basis)
+    if request.GET.get('descargar') in ('xlsx', 'pdf'):
+        from .ratio_exportacion import comparativo
+        return descargar_ratios(comparativo(context), request.GET['descargar'], f'Ratios_{ticker}_{year}')
     if request.GET.get('descargar') == 'csv':
         stream = StringIO()
         writer = csv.writer(stream)
@@ -194,6 +197,9 @@ def ratio_laboratorio(request, chat=False):
 def ratios_caso(request):
     from .ratios_caso import calcular_caso
     reporte = calcular_caso()
+    if request.GET.get('descargar') in ('xlsx', 'pdf'):
+        from .ratio_exportacion import caso
+        return descargar_ratios(caso(reporte), request.GET['descargar'], 'Ratios_caso_BROADBROS')
     if request.GET.get('descargar') == 'csv':
         stream = StringIO()
         writer = csv.writer(stream)
@@ -204,3 +210,13 @@ def ratios_caso(request):
         return HttpResponse('\ufeff'+stream.getvalue(), content_type='text/csv; charset=utf-8',
                             headers={'Content-Disposition': 'attachment; filename=Ratios_caso_BROADBROS.csv'})
     return render(request, 'ratios_caso.html', reporte)
+
+
+def descargar_ratios(datos, formato, nombre):
+    from .ratio_exportacion import excel, pdf
+    contenido = excel(datos) if formato == 'xlsx' else pdf(datos)
+    tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if formato == 'xlsx' else 'application/pdf'
+    response = HttpResponse(contenido, content_type=tipo)
+    response['Content-Disposition'] = f'attachment; filename="{nombre}.{formato}"'
+    response['Cache-Control'] = 'private, no-store'
+    return response

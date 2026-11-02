@@ -60,7 +60,6 @@
             presentation(false); present.focus();
         }
     });
-    document.getElementById('ratio-print').addEventListener('click', () => window.print());
     let printDetails = null;
     window.addEventListener('beforeprint', () => {
         if (printDetails) return;

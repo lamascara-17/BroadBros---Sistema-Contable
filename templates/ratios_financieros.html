@@ -4,9 +4,9 @@
 {% block page_title %}Análisis financiero{% endblock %}
 {% block page_subtitle %}Tu empresa, su evolución y sus referentes. Los 17 indicadores del taller UNI.{% endblock %}
 {% block content %}<p><a class="btn btn-secondary" href="{% url 'ratios_caso' %}">Ver ratios del caso contable activo</a></p>
-<link rel="stylesheet" href="{% static 'css/ratios.css' %}?v=visual2">
+<link rel="stylesheet" href="{% static 'css/ratios.css' %}?v=exports3">
 <div class="ratio-app" id="ratio-app" data-company="{{ ticker }}" data-leader="{{ leader }}">
-    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-visual" class="btn btn-primary btn-sm">Ver gráficos</a><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><button type="button" class="btn btn-secondary btn-sm" id="ratio-print">Imprimir / PDF</button></div></div>
+    <div class="ratio-toolbar"><span class="ratio-lab-badge">LABORATORIO FINANCIERO</span><div><a href="#ratio-visual" class="btn btn-primary btn-sm">Ver gráficos</a><a href="#ratio-simulator" class="btn btn-secondary btn-sm">Simular escenario</a><button type="button" class="btn btn-secondary btn-sm" id="ratio-present" aria-pressed="false">Modo exposición</button><a class="btn btn-secondary btn-sm" id="ratio-print" href="?{{ export_query }}&amp;descargar=pdf">Descargar PDF</a></div></div>
     <p class="ratio-presentation-note" hidden>Modo exposición · {{ company.name }} ({{ ticker }}), FY{{ year }}. Datos externos al {{ as_of }}; grupo académico, no índice oficial del sector.</p>
     <section class="ratio-hero" aria-labelledby="ratio-company">
         <div class="ratio-hero-main"><span class="ratio-eyebrow">ANÁLISIS COMPARATIVO / FY{{ year }}</span>
@@ -55,7 +55,7 @@
 
     <section class="ratio-panel" id="comparativo" aria-labelledby="comparison-title">
         <header class="ratio-panel-header"><div><span class="ratio-eyebrow">LOS 17 INDICADORES</span><h3 id="comparison-title">{{ ticker }} frente a sus referentes</h3><p>Promedio aritmético de los ratios disponibles. <strong>n</strong> indica cuántas empresas participan en cada indicador.</p></div>
-            <a class="btn btn-secondary btn-sm" href="?{{ export_query }}&amp;descargar=csv">Descargar CSV ↓</a></header>
+            <div class="ratio-export-actions"><a class="btn btn-primary btn-sm" href="?{{ export_query }}&amp;descargar=xlsx">Descargar Excel</a><a class="btn btn-secondary btn-sm" href="?{{ export_query }}&amp;descargar=pdf">PDF</a><a class="btn btn-secondary btn-sm" href="?{{ export_query }}&amp;descargar=csv">CSV</a></div></header>
         <div class="ratio-tabs" role="group" aria-label="Filtrar indicadores"><button type="button" class="is-active" data-category="all" aria-pressed="true">Todos <span>17</span></button>{% for category in categories %}<button type="button" data-category="{{ category }}" aria-pressed="false">{{ category }}</button>{% endfor %}</div>
         <div class="ratio-table-scroll"><table class="ratio-table"><caption class="sr-only">Comparación de {{ ticker }}, ejercicio anterior, {{ leader }} y grupo académico</caption>
             <thead><tr><th scope="col">Indicador / fórmula</th><th scope="col">FY{{ year|add:'-1' }}<small>{{ ticker }}</small></th><th scope="col" class="ratio-own">FY{{ year }}<small>{{ ticker }}</small></th><th scope="col">Variación<small>vs. año anterior</small></th><th scope="col">{{ leader }}<small>Referente FY{{ year }}</small></th><th scope="col">Promedio<small>Grupo FY{{ year }}</small></th><th scope="col">Lectura comparativa</th></tr></thead>
@@ -102,4 +102,4 @@
 {{ ratio_explanations|json_script:'ratio-explanations-data' }}
 {{ chart_data|json_script:'ratio-chart-data' }}
 {% endblock %}
-{% block extra_js %}<script src="{% static 'js/ratios.js' %}?v=visual2" defer></script><script src="{% static 'js/ratios-lab.js' %}?v=visual2" defer></script>{% endblock %}
+{% block extra_js %}<script src="{% static 'js/ratios.js' %}?v=exports3" defer></script><script src="{% static 'js/ratios-lab.js' %}?v=exports3" defer></script>{% endblock %}

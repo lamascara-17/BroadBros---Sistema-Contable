@@ -38,9 +38,9 @@ const reply=(resolve,data,status=200)=>resolve({ok:status===200,json:async()=>da
  // Los 17 botones abren su explicación y conservan todos los valores originales.
  const triggers=[...d.querySelectorAll('[data-explain-key]')];assert.equal(triggers.length,17);
  for(const button of triggers){button.click();assert.equal(d.querySelector('dialog').open,true);assert.ok(d.querySelector('#ratio-explanation-content').textContent);d.querySelector('#ratio-explanation-close').click();assert.equal(d.querySelector('dialog').open,false);}
- // Presentación reversible y salida con Escape; impresión usa el diálogo nativo.
+ // Presentación reversible; PDF descarga un informe del servidor, sin imprimir la página.
  const present=d.querySelector('#ratio-present');present.click();assert.equal(present.getAttribute('aria-pressed'),'true');assert.ok(d.body.classList.contains('ratio-presenting'));
- d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));assert.ok(!d.body.classList.contains('ratio-presenting'));d.querySelector('#ratio-print').click();assert.equal(printed,true);
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape'}));assert.ok(!d.body.classList.contains('ratio-presenting'));assert.equal(new URL(d.querySelector('#ratio-print').href).searchParams.get('descargar'),'pdf');assert.equal(printed,false);
  // Peticiones fuera de orden: la respuesta de 10% no puede sustituir la de 20%.
  const sales=d.querySelector('#lab-ventas'), form=d.querySelector('#ratio-scenario-form');
  sales.value='10';form.dispatchEvent(new w.Event('submit',{cancelable:true}));

@@ -231,6 +231,7 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
                      'previous': fmt(historic,unit), 'sector': fmt(sector,unit), 'n': len(points),
                      'delta': 'N/D' if delta is None else f'{delta*100:+,.2f} pp' if unit=='%' else f'{delta:+,.2f}',
                      'tone': tone, 'interpretation': interpretation,
+                     'numbers': {'previous': historic, 'own': comparable, 'leader': lead, 'sector': sector, 'delta': delta},
                      'reason': ('Falta una conversión documentada a USD para comparar este importe.' if unit == 'money' and own is not None and comparable is None else selected['reasons'].get(key, 'Faltan partidas para calcularlo.' if own is None else ''))})
         chart[key] = {'label': label, 'unit': 'USD MM' if unit=='money' else unit, 'points': [
             {**p, 'value': float(p['value'])} for p in points],
