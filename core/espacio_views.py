@@ -47,8 +47,8 @@ def restaurar_respaldo(request, pk):
 
 def descargar_respaldo(request, pk):
     respaldo = get_object_or_404(RespaldoCaso, pk=pk)
-    return respuesta_respaldo(request, {'formato':'BROADBROS', 'version':1,
-        'asientos': respaldo.datos, 'cuentas': respaldo.catalogo}, f'BROADBROS_respaldo_{pk}.json')
+    from .respaldo_stream import archivo_historico
+    return respuesta_archivo(request, lambda: archivo_historico(respaldo), f'BROADBROS_respaldo_{pk}.json')
 
 
 def estado_patrimonio(request):
@@ -62,46 +62,54 @@ def estado_flujos(request):
 
 
 
-def respuesta_respaldo(request, contenido, nombre):
-    from .respaldos import codificar_respaldo
+def respuesta_archivo(request, preparar, nombre):
+    from django.http import FileResponse
     from django.contrib import messages
     try:
-        archivo = codificar_respaldo(contenido)
+        archivo = preparar()
     except (ValueError, ArithmeticError) as exc:
-        messages.error(request, f'No se generó un archivo incompleto: {exc} Los datos originales se conservan.')
+        messages.error(request, f'No se generó un archivo incompleto o incompatible: {exc} Los datos originales se conservan. Contacta al administrador para una copia completa de la base antes de cualquier cambio.')
         return redirect('respaldos')
-    return HttpResponse(archivo, content_type='application/json', headers={
-        'Content-Disposition': f'attachment; filename="{nombre}"', 'Cache-Control':'no-store'})
+    archivo.seek(0, 2)
+    longitud = archivo.tell()
+    archivo.seek(0)
+    if longitud <= 512 * 1024:
+        try: respuesta = HttpResponse(archivo.read(), content_type='application/json')
+        finally: archivo.close()
+        respuesta['Content-Disposition'] = f'attachment; filename="{nombre}"'
+    else:
+        respuesta = FileResponse(archivo, as_attachment=True, filename=nombre, content_type='application/json')
+    respuesta['Cache-Control'] = 'no-store'
+    return respuesta
 
 
 def descargar_actual(request):
-    from .respaldos import serializar_caso
-    return respuesta_respaldo(request, serializar_caso(), 'BROADBROS_caso_actual.json')
+    from .respaldo_stream import archivo_actual
+    return respuesta_archivo(request, archivo_actual, 'BROADBROS_caso_actual.json')
 
 
 @require_POST
 def importar_respaldo(request):
-    import json
+    from tempfile import TemporaryFile
     from django.contrib import messages
     from django.db import transaction
-    from .respaldos import validar_respaldo, restaurar, MAX_RESPALDO_BYTES
+    from .respaldos import MAX_RESPALDO_BYTES
+    from .respaldo_stream import validar_archivo, guardar_archivo, restaurar_archivo
     archivo = request.FILES.get('respaldo')
     try:
         if not archivo or not archivo.name.lower().endswith('.json') or archivo.size > MAX_RESPALDO_BYTES:
-            raise ValueError('Selecciona un respaldo JSON de hasta 256 MB.')
-        def rechazar_constante(valor):
-            raise ValueError('El respaldo contiene un número no finito.')
-        try:
-            bruto = archivo.read(MAX_RESPALDO_BYTES + 1)
-            if len(bruto) > MAX_RESPALDO_BYTES:
-                raise ValueError('El respaldo supera los 256 MB.')
-            contenido = json.loads(bruto.decode('utf-8-sig'), parse_float=str, parse_constant=rechazar_constante)
-        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
-            raise ValueError('No se pudo leer el JSON del respaldo. El caso actual se conserva.') from None
-        datos,catalogo = validar_respaldo(contenido)
-        with transaction.atomic():
-            respaldo=RespaldoCaso.objects.create(datos=datos,catalogo=catalogo)
-            restaurar(respaldo, session=request.session)
+            raise ValueError('Selecciona un respaldo JSON de hasta 256 MiB.')
+        with TemporaryFile(mode='w+b') as temporal:
+            total = 0
+            for i, bloque in enumerate(archivo.chunks(chunk_size=64 * 1024)):
+                total += len(bloque)
+                if total > MAX_RESPALDO_BYTES: raise ValueError('El respaldo supera los 256 MiB.')
+                if i == 0 and bloque.startswith(b'\xef\xbb\xbf'): bloque = bloque[3:]
+                temporal.write(bloque)
+            validar_archivo(temporal)
+            with transaction.atomic():
+                guardar_archivo(temporal)
+                restaurar_archivo(temporal, session=request.session)
         messages.success(request,'Respaldo importado en esta sesión. El caso anterior se conserva en Casos anteriores.')
     except (ValueError, ArithmeticError) as exc:
         messages.error(request,str(exc))

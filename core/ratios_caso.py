@@ -49,10 +49,14 @@ def calcular_caso():
         if hay_ventas: valores['credit_revenue'] = ventas_credito
         if hay_compras: valores['credit_purchases'] = compras_credito
         import re
-        intereses = [r for r in mayor if r['cuenta'].tipo == 'gasto' and re.search(r'inter[eé]s', r['cuenta'].nombre, re.I)]
-        da = [r for r in mayor if r['cuenta'].tipo == 'gasto' and re.search(r'depreciaci[oó]n|amortizaci[oó]n', r['cuenta'].nombre, re.I)]
-        if intereses: valores['interest'] = sum((r['saldo_final'] for r in intereses), Decimal('0'))
-        if da: valores['da'] = sum((r['saldo_final'] for r in da), Decimal('0'))
+        # Los cierres cancelan saldos de gasto, pero no el gasto del periodo.
+        gastos = [m for a in ctx['asientos'] if a.clase == 'operacion'
+                  for m in a.movimientos.all() if m.cuenta.tipo == 'gasto']
+        def gasto_periodo(patron):
+            seleccion = [m for m in gastos if re.search(patron, m.cuenta.nombre, re.I)]
+            return sum((m.monto * (1 if m.tipo == 'debe' else -1) for m in seleccion), Decimal('0')) if seleccion else None
+        valores['interest'] = gasto_periodo(r'inter[eé]s')
+        valores['da'] = gasto_periodo(r'depreciaci[oó]n|amortizaci[oó]n')
     # Los datos no documentados permanecen ausentes.
     resultado = calculate(valores, tax_rate=None, period_days=periodo, allow_approximations=False)
     filas = []

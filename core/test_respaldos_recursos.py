@@ -20,6 +20,18 @@ from .views import guardar_importacion
 from .workspaces import actual, acceso_administrativo
 
 
+def consumir(respuesta):
+    if respuesta.streaming:
+        contenido = b''.join(respuesta.streaming_content)
+        # El cliente Django cierra la respuesta al agotar streaming_content.
+        # Cerrar dos veces dispara request_finished dentro del atomic del TestCase.
+        from django.http import HttpResponse
+        copia = HttpResponse(contenido, content_type='application/json')
+        copia.json = lambda: json.loads(contenido)
+        return copia
+    return respuesta
+
+
 class Visitantes:
     def setUp(self):
         super().setUp(); cache.clear()
@@ -32,7 +44,7 @@ class Visitantes:
         finally:actual.reset(token)
 
     def exportar(self,cliente):
-        return cliente.get(reverse('descargar_actual'))
+        return consumir(cliente.get(reverse('descargar_actual')))
 
     def subir(self,cliente,contenido):
         return cliente.post(reverse('importar_respaldo'),{'respaldo':SimpleUploadedFile('caso.json',contenido,content_type='application/json')})
@@ -61,7 +73,7 @@ class CompatibilidadRespaldosTests(Visitantes,TestCase):
             respaldo=RespaldoCaso.objects.create(datos=contenido['asientos'],catalogo=contenido['cuentas'])
             restaurar(respaldo)
         finally:actual.reset(token)
-        historico=self.a.get(reverse('descargar_respaldo',args=[respaldo.pk]))
+        historico=consumir(self.a.get(reverse('descargar_respaldo',args=[respaldo.pk])))
         self.assertEqual(historico.status_code,200)
         self.assertGreater(len(historico.content),2*1024*1024)
         self.assertLess(len(historico.content),MAX_RESPALDO_BYTES)

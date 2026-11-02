@@ -186,9 +186,14 @@ def gestionar_cuentas(request):
             for error in errors:
                 messages.error(request, error)
         else:
-            CuentaContable.objects.create(
-                codigo=codigo, nombre=nombre, tipo=tipo, subcategoria=subcategoria
-            )
+            from .respaldos import MAX_CUENTAS_RESPALDO
+            from .contexto_bot import bloquear_caso
+            with transaction.atomic():
+                bloquear_caso()
+                if CuentaContable.objects.count() >= MAX_CUENTAS_RESPALDO:
+                    messages.error(request, 'El caso admite hasta 1 000 cuentas. Conserva una copia antes de iniciar otro caso.')
+                    return redirect('gestionar_cuentas')
+                CuentaContable.objects.create(codigo=codigo, nombre=nombre, tipo=tipo, subcategoria=subcategoria)
             messages.success(request, f'Cuenta "{codigo} - {nombre}" creada exitosamente.')
             return redirect('gestionar_cuentas')
 
@@ -256,7 +261,18 @@ def datos_asiento_manual(request, asiento_actual=None):
 
 def escribir_asiento(datos, cuentas, asiento=None):
     with transaction.atomic():
-        if asiento is None: asiento = AsientoContable()
+        from .respaldos import MAX_ASIENTOS_RESPALDO
+        from .contexto_bot import bloquear_caso
+        bloquear_caso()
+        if asiento is None:
+            if AsientoContable.objects.count() >= MAX_ASIENTOS_RESPALDO:
+                raise ValueError('El caso admite hasta 1 000 asientos. Descarga su respaldo antes de iniciar otro caso.')
+            asiento = AsientoContable()
+        if asiento.pk and not AsientoContable.objects.filter(pk=asiento.pk).exists():
+            raise ValueError('El asiento cambió o fue eliminado. Recarga el libro antes de editar.')
+        cierres = AsientoContable.objects.exclude(fecha_cierre_ejercicio=None).values_list('fecha_cierre_ejercicio', flat=True)
+        if any(datos['fecha'] > cierre for cierre in cierres):
+            raise ValueError('La fecha supera el cierre del caso. Conserva un respaldo e inicia el periodo correspondiente.')
         for campo in ('fecha', 'descripcion', 'clase', 'flujo_efectivo'):
             setattr(asiento, campo, datos[campo])
         asiento.save()
@@ -273,8 +289,11 @@ def registrar_asiento(request):
         return redirect('gestionar_cuentas')
     if request.method == 'POST':
         try:
-            datos, catalogo = datos_asiento_manual(request)
-            escribir_asiento(datos, catalogo)
+            from .contexto_bot import bloquear_caso
+            with transaction.atomic():
+                bloquear_caso()
+                datos, catalogo = datos_asiento_manual(request)
+                escribir_asiento(datos, catalogo)
             messages.success(request, 'Asiento registrado correctamente.')
             return redirect('libro_diario')
         except (ValueError, ArithmeticError) as exc:
@@ -287,8 +306,11 @@ def registrar_asiento(request):
 def editar_asiento(request, asiento_id):
     asiento = get_object_or_404(AsientoContable, pk=asiento_id)
     try:
-        datos, catalogo = datos_asiento_manual(request, asiento)
-        escribir_asiento(datos, catalogo, asiento)
+        from .contexto_bot import bloquear_caso
+        with transaction.atomic():
+            bloquear_caso()
+            datos, catalogo = datos_asiento_manual(request, asiento)
+            escribir_asiento(datos, catalogo, asiento)
         messages.success(request, 'Asiento actualizado correctamente.')
     except (ValueError, ArithmeticError) as exc:
         messages.error(request, str(exc))
@@ -516,7 +538,8 @@ def chatbot_api(request):
         client = Groq(api_key=api_key, timeout=35, max_retries=0)
         from .contexto_bot import firma_caso
         caso_chat = firma_caso()
-        historial = request.session.get('nonobot_turnos', [])[-4:] if request.session.get('nonobot_caso') == caso_chat else []
+        from .contexto_bot import conversacion_caso, guardar_conversacion
+        historial, secuencia_chat = conversacion_caso(request.session, caso_chat)
         consulta_ambito = user_message + ('\nContexto previo: ' + str(historial)[-3000:] if historial else '')
         if not consulta_contable(client, consulta_ambito):
             respuesta, segmentos = formato_chat(RESPUESTA_FUERA_ALCANCE)
@@ -909,8 +932,12 @@ una tasa, obligación o fecha que no puedas verificar; pide país, período y r�
 
         respuesta, segmentos = formato_chat(respuesta)
         from .audio_respuesta import datos_audio
+        turnos = (historial + [{'usuario': user_message, 'respuesta': respuesta[:2000]}])[-4:]
+        if not guardar_conversacion(caso_chat, secuencia_chat, turnos):
+            return JsonResponse({'status': 'error', 'error':
+                'El caso o la conversación cambió durante la consulta. Vuelve a preguntar con los datos actuales.'}, status=409)
         request.session['nonobot_caso'] = caso_chat
-        request.session['nonobot_turnos'] = (historial + [{'usuario': user_message, 'respuesta': respuesta[:2000]}])[-4:]
+        request.session['nonobot_turnos'] = turnos
         return JsonResponse(
             {
                 'response': respuesta,
@@ -950,6 +977,11 @@ def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente='', s
     asientos = validar_asientos(preparar_pcge(serializar_asientos(asientos)))
     for a in asientos:
         for m in a['movimientos']: validar_cuenta(m['codigo'], m['nombre'], m['tipo_cuenta'])
+    from .respaldos import MAX_CUENTAS_RESPALDO
+    if len({m['codigo'] for a in asientos for m in a['movimientos']}) > MAX_CUENTAS_RESPALDO:
+        raise ValueError('El caso admite hasta 1 000 cuentas distintas.')
+    if not isinstance(fuente, str) or len(fuente) > 20000 or not isinstance(pendientes, str) or len(pendientes) > 10000:
+        raise ValueError('La fuente admite 20 000 caracteres y las observaciones 10 000. Reduce el texto antes de guardar; el caso anterior se conserva.')
     if fecha_cierre and fecha_cierre < max(a['fecha'] for a in asientos):
         raise ValueError('La fecha de cierre es anterior a una operación del ejercicio.')
     from .validacion_contable import auditar_asientos
@@ -957,6 +989,8 @@ def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente='', s
     if alertas: raise ValueError(' '.join(alertas))
     with transaction.atomic():
         from .respaldos import crear_respaldo
+        from .contexto_bot import bloquear_caso
+        bloquear_caso()
         crear_respaldo()
         AsientoContable.objects.all().delete()
         CuentaContable.objects.all().delete()

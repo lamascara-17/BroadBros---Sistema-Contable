@@ -28,7 +28,7 @@
 </div></div>
 {% for r in respaldos %}
 <div class="card"><div class="card-body">
-<strong>{{ r.created_at }}</strong> · {{ r.datos|length }} asientos
+<strong>{{ r.created_at }}</strong> · {{ r.cantidad_asientos }} asientos
 <a href="{% url 'descargar_respaldo' r.pk %}">Descargar JSON original</a>
 <form method="post" action="{% url 'restaurar_respaldo' r.pk %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Restaurar como caso activo</button></form>
 </div></div>

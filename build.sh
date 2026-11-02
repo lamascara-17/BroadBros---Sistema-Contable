@@ -2,6 +2,7 @@
 # exit on error
 set -o errexit
 
-pip install -r requirements.txt
+pip install -r requirements-render.txt
 python manage.py collectstatic --no-input
-python manage.py migrate
+# Las migraciones se ejecutan por separado, solo tras respaldo y aprobación.
+python manage.py check

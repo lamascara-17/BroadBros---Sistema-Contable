@@ -17,14 +17,23 @@ class Workspace(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+    revision_contable = models.PositiveBigIntegerField(default=0)
+    bot_sequence = models.PositiveBigIntegerField(default=0)
+    bot_revision = models.PositiveBigIntegerField(null=True, blank=True)
+    bot_turnos = models.JSONField(default=list)
 
 
 class RespaldoCaso(models.Model):
     workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
     datos = models.JSONField()
     catalogo = models.JSONField(default=list)
+    numero_asientos = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     objects = WorkspaceManager()
+
+    @property
+    def cantidad_asientos(self):
+        return self.numero_asientos if self.numero_asientos is not None else len(self.datos)
 
     class Meta:
         base_manager_name = 'objects'
@@ -198,3 +207,18 @@ class FinancialRatioPeriod(models.Model):
         base_manager_name = 'objects'
         default_manager_name = 'objects'
         constraints = [models.UniqueConstraint(fields=['workspace', 'ticker', 'year'], name='ratio_company_year_unique')]
+
+
+class RespaldoFragmento(models.Model):
+    """JSON portable por bloques; evita materializar respaldos grandes en RAM."""
+    workspace = models.ForeignKey(Workspace, null=True, on_delete=models.PROTECT, default=workspace_actual)
+    respaldo = models.ForeignKey(RespaldoCaso, on_delete=models.CASCADE, related_name='fragmentos')
+    indice = models.PositiveIntegerField()
+    contenido = models.BinaryField()
+    objects = WorkspaceManager()
+
+    class Meta:
+        base_manager_name = 'objects'
+        default_manager_name = 'objects'
+        ordering = ['indice']
+        constraints = [models.UniqueConstraint(fields=['respaldo', 'indice'], name='respaldo_fragmento_indice')]

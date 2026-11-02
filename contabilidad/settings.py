@@ -81,8 +81,8 @@ WSGI_APPLICATION = 'contabilidad.wsgi.application'
 
 # Base de datos SQLite
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))}",
+    'default': dj_database_url.parse(
+        os.getenv('DATABASE_URL') or f"sqlite:///{os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))}",
         conn_max_age=600
     )
 }
@@ -130,3 +130,6 @@ if os.getenv('RENDER', '').lower() == 'true' and DATABASES['default']['ENGINE'].
 
 SECURE_SSL_REDIRECT = os.getenv('RENDER', '').lower() == 'true'
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '3600' if SECURE_SSL_REDIRECT else '0'))
+
+# Las subidas grandes van directamente a temporal; el importador procesa por bloques.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 512 * 1024
