@@ -101,3 +101,20 @@ class PantallaVerificadaTests(TestCase):
         self.assertIn('25%',filas[1])
         roa=next(f for f in pantalla.context['rows'] if f['key']=='roa')
         self.assertEqual(filas[18][3],roa['own'])
+
+    def test_csv_de_datos_manuales_no_atribuye_sus_cifras_a_sec(self):
+        ruta=reverse('ratios_financieros')
+        periodo=deepcopy(dataset()['companies'][0]['periods'][-1])
+        fuente='https://example.org/estado-verificado-por-el-usuario'
+        payload={**periodo['values'],'ticker':'AVGO','name':'Broadcom','industry':'Chips',
+            'year':2025,'currency':'USD','period_start':periodo['start'],'period_end':periodo['end'],
+            'previous_end':periodo['previous_end'],'source_url':fuente}
+        r=self.client.post(ruta,payload,follow=True)
+        self.assertEqual(r.status_code,200)
+        self.assertContains(r,'Datos guardados')
+        csv_response=self.client.get(ruta,{'descargar':'csv'})
+        filas=list(csv.reader(StringIO(csv_response.content.decode('utf-8-sig'))))
+        inicio=filas.index(['Fuentes y cierres'])
+        linea=next(f for f in filas[inicio+1:] if f and f[0]=='AVGO')
+        self.assertEqual(linea[4],fuente)
+        self.assertEqual(linea[5],'Datos ingresados por el usuario')

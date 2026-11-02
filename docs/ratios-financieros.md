@@ -86,7 +86,9 @@ La pantalla distingue utilidad desconocida, cero, pérdida y ganancia. No
 concluye ausencia de utilidad a partir de un dato faltante. Si la liquidez no es
 calculable tampoco afirma una cobertura numérica. El texto del ROA muestra la
 tasa realmente seleccionada; CSV conserva tasa, supuestos y advertencias de
-aproximación, además de los 17 valores mostrados.
+aproximación, además de los 17 valores mostrados. Los datos manuales exportan
+su fuente ingresada y su condición de manuales; no se atribuyen a SEC por heredar
+el ticker de una compañía ya incluida.
 
 El grupo sigue teniendo las nueve empresas identificadas. No se incorpora una
 décima inventada. Los indicadores no calculables de otras empresas permanecen

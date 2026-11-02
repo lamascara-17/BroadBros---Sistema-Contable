@@ -125,7 +125,9 @@ def financial_ratios(request):
         for c in companies:
             for p in c['periods']:
                 if p['year']==year:
-                    writer.writerow([safe_csv(c['ticker']),p['start'],p['end'],p['currency'],safe_csv(c.get('source_url',''))])
+                    fuente = p.get('manual_source', '') if p.get('edited') else c.get('source_url', '')
+                    origen = 'Datos ingresados por el usuario' if p.get('edited') else 'Datos publicados'
+                    writer.writerow([safe_csv(c['ticker']),p['start'],p['end'],p['currency'],safe_csv(fuente),origen])
         writer.writerow(['Método y supuestos'])
         for note in report['selected']['assumptions']:
             writer.writerow(['Supuesto', safe_csv(note)])
