@@ -60,7 +60,8 @@ def preparar_pcge(asientos, fuente=''):
     from .models import CuentaContable
     subcategorias_validas=dict(CuentaContable.SUBCATEGORIA_CHOICES)
     salida = deepcopy(asientos)
-    from .contexto_importacion import inventario_generico,familia_del_inventario,INVENTARIOS
+    from .contexto_importacion import inventario_generico,familia_del_inventario,INVENTARIOS,normalizar_operaciones_documentadas
+    normalizar_operaciones_documentadas(salida,fuente)
     inventarios_validos={}
     for a in salida:
         for m in a.get('movimientos',[]):
@@ -129,9 +130,9 @@ def preparar_pcge(asientos, fuente=''):
                 if tipo=='activo' and grupo in ('33','39'):m['subcategoria']='activo_no_corriente'
                 if tipo=='gasto' and grupo in ('62','63','68'):m['subcategoria']='gasto_operativo'
                 if tipo=='gasto' and grupo=='69':m['subcategoria']='costo_ventas'
-            if not grupo and tipo == 'pasivo' and not codigo.startswith(('42','43','46','47')):
+            if not grupo and tipo == 'pasivo':
                 origen = origenes.get((codigo,texto(nombre),tipo),set())
-                if len(origen) == 1: grupo = next(iter(origen))
+                if len(origen) == 1 and (not codigo.startswith(('42','43','46','47')) or origen=={'46'} and not codigo.startswith(('43','47'))): grupo = next(iter(origen))
             if grupo and not codigo.startswith(grupo):
                 clave = (codigo, texto(nombre), tipo)
                 if clave not in elegidos:
@@ -207,6 +208,17 @@ def auditar_asientos(asientos, fuente=''):
                 alertas.append(f'Asiento {i}: el ajuste corresponde al cierre {cierre.isoformat()}, pero tiene fecha {a["fecha"]}. Corrija la fecha antes de guardar.')
     for i,a in enumerate(asientos,1):
         glosa=texto(a.get('descripcion',''))
+        caja=[m for m in a['movimientos'] if m['tipo_cuenta']=='activo' and
+              (str(m['codigo']).startswith('10') or re.search(r'\bcaja\b|\bbanco|efectivo',texto(m['nombre'])))]
+        deuda=[m for m in a['movimientos'] if m['tipo_cuenta']=='pasivo']
+        clientes=[m for m in a['movimientos'] if m['tipo_cuenta']=='activo' and str(m['codigo']).startswith(('12','13'))]
+        especial=re.search(r'reembolso|devoluc|reversion|anulacion|compra|adquisicion',glosa)
+        if not especial and caja and deuda and re.search(r'pago|cancelacion|abono',glosa) and re.search(r'proveedor|deuda|prestamo',glosa):
+            if any(m['tipo_movimiento']=='debe' for m in caja) or any(m['tipo_movimiento']=='haber' for m in deuda):
+                alertas.append(f'Asiento {i}: el pago de una deuda debe reducir efectivo (Haber) y reducir el pasivo (Debe); revise el pago invertido aunque el asiento cuadre.')
+        if not especial and caja and clientes and re.search(r'cobro|cobranza',glosa):
+            if any(m['tipo_movimiento']=='haber' for m in caja) or any(m['tipo_movimiento']=='debe' for m in clientes):
+                alertas.append(f'Asiento {i}: el cobro debe aumentar efectivo (Debe) y reducir cuentas por cobrar (Haber); revise el cobro invertido aunque el asiento cuadre.')
         if (re.search(r'servicios?',glosa) and not re.search(r'personal|planilla|sueld|remuneracion',glosa) and
                 any(m['tipo_cuenta']=='gasto' and grupo_esperado(m['nombre'],'gasto')=='62' for m in a['movimientos'])):
             alertas.append(f'Asiento {i}: una operación descrita como servicios usa gastos de personal; revise el gasto de servicios del grupo 63 y no reutilice la cuenta de planilla.')

@@ -128,3 +128,14 @@ las aclaraciones del usuario. Así el modelo puede corregir problemas concretos,
 en lugar de repetir el mismo análisis; un diagnóstico no confirma por sí solo un
 año ni otro supuesto. Si persisten errores, la propuesta sigue en revisión y el
 caso anterior se conserva.
+
+Una comprobación real adicional de NovaTech produjo un pago equilibrado pero
+invertido (aumentaba caja y deuda) y confundió servicios básicos con alquiler.
+El backend corrige el sentido de pagos/cobros simples únicamente cuando un
+fragmento literal del enunciado identifica la operación y un importe único que
+coincide con ambas líneas. Conserva cifras y fechas, comunica la normalización
+para revisión y no aplica esa inferencia a anticipos, devoluciones, divisas ni
+pagos con varios importes. También identifica gastos por concepto e importe
+explícitos y reconoce proveedores de equipos del grupo 46 aun cuando el modelo
+proponga el grupo 42. Las operaciones dudosas siguen pendientes; un pago o cobro
+invertido también se detecta por auditoría, aunque Debe y Haber cuadren.

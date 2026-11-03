@@ -203,6 +203,7 @@ def normalizar_borrador(datos, fuente='', aclaraciones=''):
         if not isinstance(item, dict) or not isinstance(item.get('movimientos'), list) or len(item['movimientos']) > 40:
             raise ValueError('La propuesta contiene movimientos inválidos.')
         a = {k:str(item.get(k) or '')[:2000] for k in ('fecha','descripcion','fuente')}
+        notas_backend.extend(item.get('_correcciones_backend',[]))
         a.update(clase=item.get('clase','operacion'),flujo_efectivo=item.get('flujo_efectivo','pendiente'))
         if not a['fecha'] and cierre and es_ajuste_de_cierre(item):
             a['fecha']=cierre.isoformat()
@@ -234,8 +235,8 @@ def normalizar_borrador(datos, fuente='', aclaraciones=''):
         if not isinstance(valores, list) or len(valores) > 100: raise ValueError('Las notas de revisión no son válidas.')
         from .notas_importacion import normalizar_notas
         notas[k] = normalizar_notas(valores)
-    notas['supuestos'].extend(n for n in notas_backend if n.startswith('Fecha del ajuste'))
-    notas['pendientes'].extend(n for n in notas_backend if not n.startswith('Fecha del ajuste'))
+    notas['supuestos'].extend(n for n in notas_backend if n.startswith(('Fecha del ajuste','Normalización del asiento')))
+    notas['pendientes'].extend(n for n in notas_backend if not n.startswith(('Fecha del ajuste','Normalización del asiento')))
     notas={k:normalizar_notas(v) for k,v in notas.items()}
     if not borrador and not notas['pendientes']:
         notas['pendientes'] = ['No hay información suficiente para proponer asientos. Complete los datos del ejercicio.']
