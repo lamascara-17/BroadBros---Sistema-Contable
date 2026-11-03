@@ -215,8 +215,9 @@ def auditar_asientos(asientos, fuente=''):
             except ValueError:inicio=None
             if inicio and inicio.day==1 and (inicio.year,inicio.month)==(cierre.year,cierre.month):
                 mensual=(Decimal(str(m['monto']))*importe_escrito(tasas[0])/100/12).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
+                anual=(Decimal(str(m['monto']))*importe_escrito(tasas[0])/100).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
                 registrada=sum((Decimal(str(m['monto'])) for a in asientos for m in a['movimientos'] if m['tipo_cuenta']=='gasto' and 'depreciacion' in texto(m['nombre']) and m['tipo_movimiento']=='debe'),Decimal('0'))
-                if registrada and registrada!=mensual:
+                if registrada and registrada==anual and anual!=mensual:
                     alertas.append(f'La tasa de depreciación es anual y el período identificado es un mes; con prorrateo mensual sobre el activo registrado la cuota sería S/ {mensual:,.2f}, pero se propuso S/ {registrada:,.2f}; confirme el criterio temporal y corrija el ajuste antes de guardar.')
     tiene_inventario = any(m['tipo_cuenta'] == 'activo' and
                            (str(m['codigo']).startswith(('20','21','22','23','24','25','26','28')) or

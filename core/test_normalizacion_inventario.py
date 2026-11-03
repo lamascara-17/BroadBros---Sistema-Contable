@@ -104,6 +104,14 @@ class NormalizacionInventarioTests(TestCase):
         self.assertFalse(any('833.33' in n for n in notas))
         self.assertEqual(b['asientos'][6]['movimientos'][0]['monto'],'10000')
 
+    def test_cuota_diaria_no_se_rechaza_por_no_coincidir_con_prorrateo_mensual(self):
+        from .validacion_contable import auditar_asientos
+        p=propuesta('201')
+        for m in p['asientos'][6]['movimientos']:m['monto']='849.32'
+        fuente=TEXTO+' El cálculo de depreciación se realiza por días con base 365.'
+        b=normalizar_borrador(p,fuente=fuente)
+        self.assertFalse(any('cuota sería' in n for n in auditar_asientos(b['asientos'],fuente)))
+
     @override_settings(GROQ_API_KEY='solo-prueba')
     def test_groq_411_y_310_se_normalizan_antes_de_la_decision_de_guardado(self):
         for codigo in ('411','310'):

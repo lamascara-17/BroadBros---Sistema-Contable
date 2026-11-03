@@ -117,8 +117,9 @@ una depreciación anual de 10.000 abonada directamente al vehículo para un mes.
 Se reconoce el nombre «Gastos de Personal» (62), se señalan servicios mal asignados
 y abonos de depreciación al costo del activo en lugar del grupo 39. Si hay un único
 activo del grupo 33 incorporado el día 1 del mismo mes y una tasa anual explícita,
-sin residual ni método especial, se compara la propuesta con la cuota mensual;
-no se cambia su importe para cuadrarlo. Se solicita corregir o confirmar el criterio.
+sin residual ni método especial, se detecta si se tomó la cuota anual completa
+para ese mes; se muestra el prorrateo mensual como referencia, sin imponerlo a
+otras cuotas que pueden usar un criterio diario ni cambiar importes para cuadrar.
 Con datos ambiguos no se inventa una cuota. Los controles aritméticos no se ocultan
 por la presencia de un código inválido cuando los importes sí son legibles.
 
