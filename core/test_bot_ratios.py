@@ -66,6 +66,7 @@ class BotRatiosTests(AdministrativeTestCase):
         self.assertNotIn('Fórmula:',respuesta_ratios_caso('liquidez corriente'))
         self.assertIn('Fórmula:',respuesta_ratios_caso('cómo se calcula la liquidez corriente'))
         self.assertIsNone(respuesta_ratios_caso('margen neto de Broadcom'))
+        self.assertIsNone(respuesta_ratios_caso('¿Qué es la liquidez?'))
 
     def test_sugerencias_del_caso_y_resumen_corto(self):
         page=self.client.get(reverse('ratios_caso'))

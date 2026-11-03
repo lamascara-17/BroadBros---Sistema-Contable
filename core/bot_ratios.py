@@ -34,6 +34,9 @@ def quiere_detalle(mensaje):
 
 def respuesta_ratios_caso(mensaje):
     n=texto(mensaje)
+    # Una definición general conserva la conversación teórica existente;
+    # no convertirla en una consulta de saldos del ejercicio.
+    if re.search(r'que (?:es|significa)|definicion',n) and not re.search(r'\bmi\b|\bcaso\b|\bratio',n):return None
     # Las empresas externas se consultan desde su propio ámbito, nunca con los libros.
     if re.search(r'\b(avgo|broadcom|nvda|nvidia|amd|asml|intel|csco|amat|lrcx|kla)\b',n):return None
     key=indicador_consultado(mensaje)
