@@ -29,6 +29,7 @@ def grupo_esperado(nombre, tipo):
     if tipo == 'gasto' and re.search(r'costo.*ventas', n): return '69'
     if tipo == 'gasto' and re.search(r'depreciacion|amortizacion', n): return '68'
     if tipo == 'gasto' and re.search(r'\bplanilla\b|sueldos?|salarios?|remuneracion|gastos? de personal', n): return '62'
+    if tipo == 'gasto' and not re.search(r'financier|interes',n) and re.search(r'\balquiler(?:es)?\b|servicios? (?:basicos|de terceros)|gastos? (?:de|por) servicios', n): return '63'
     return None
 
 
@@ -119,7 +120,7 @@ def preparar_pcge(asientos, fuente=''):
                         continue
             if tipo=='activo' and grupo in INVENTARIOS:m['subcategoria']='activo_corriente'
             if tipo=='activo' and grupo in ('33','39'):m['subcategoria']='activo_no_corriente'
-            if tipo=='gasto' and grupo in ('62','68'):m['subcategoria']='gasto_operativo'
+            if tipo=='gasto' and grupo in ('62','63','68'):m['subcategoria']='gasto_operativo'
             if tipo=='gasto' and grupo=='69':m['subcategoria']='costo_ventas'
             if not grupo and tipo == 'pasivo' and not codigo.startswith(('42','43','46','47')):
                 origen = origenes.get((codigo,texto(nombre),tipo),set())
@@ -128,7 +129,7 @@ def preparar_pcge(asientos, fuente=''):
                 clave = (codigo, texto(nombre), tipo)
                 if clave not in elegidos:
                     base = {'10': '101', '20': '201', '21':'211','22':'221','23':'231','24':'241','25':'251','26':'261','33': '336', '39': '39',
-                            '42': '421', '46': '4654', '47': '477', '50': '501', '62':'62','68':'68','70': '70', '69': '69'}[grupo]
+                            '42': '421', '46': '4654', '47': '477', '50': '501', '62':'62','63':'635' if re.search(r'alquiler',texto(nombre)) else '63','68':'68','70': '70', '69': '69'}[grupo]
                     # Sin documento no se puede decidir 4211/4212. No mezclar
                     # proveedores ni inventar una subdivision para evitar el choque.
                     if grupo in ('42','47') and base in ocupados:

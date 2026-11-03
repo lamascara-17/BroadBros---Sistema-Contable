@@ -97,7 +97,7 @@ Las subcategorías restantes son costo_ventas, gasto_operativo, gasto_financiero
 otro_ingreso, otro_gasto, impuesto_ganancias, activo_corriente,
 activo_no_corriente, pasivo_corriente y pasivo_no_corriente.
 Los gastos de personal/planilla corresponden al grupo 62; los servicios de
-terceros al 63; la depreciación al 68 contra depreciación acumulada 39, manteniendo
+terceros y alquileres al 63 (alquileres: 635); la depreciación al 68 contra depreciación acumulada 39, manteniendo
 el costo del vehículo en 33. No reutilices una cuenta de personal para servicios.
 Una tasa de depreciación ANUAL no es el gasto de un solo mes. Si el caso permite
 un mes completo, declara el prorrateo mensual (tasa anual / 12); si no, pide el

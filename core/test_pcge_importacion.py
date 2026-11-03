@@ -146,6 +146,17 @@ class PCGEImportacionTests(TestCase):
         self.assertTrue(b['asientos'][3]['error_validacion'])
         self.assertEqual(AsientoContable.objects.count(),0)
 
+    def test_alquiler_62_de_la_prueba_real_se_separa_de_servicios_63(self):
+        p=novatech()
+        p[3]['movimientos'][0].update(codigo='62',nombre='Alquileres')
+        p[6]['movimientos'][0]['nombre']='Servicios de terceros'
+        b=normalizar_borrador({'asientos':p})
+        self.assertEqual(b['asientos'][3]['movimientos'][0]['codigo'],'635')
+        self.assertEqual(b['asientos'][6]['movimientos'][0]['codigo'],'63')
+        self.assertTrue(all(not a['error_validacion'] for a in b['asientos']))
+        guardar_importacion(b['asientos'])
+        self.assertEqual(contexto_estados()['resultado_neto'],11000)
+
     def test_aclarar_el_ano_conserva_la_revision_voluntaria_sin_autoguardado(self):
         b=normalizar_borrador({'asientos':proveedor_221()})
         with patch('core.importacion_general.proponer_caso_general',side_effect=[deepcopy(b),deepcopy(b)]):
