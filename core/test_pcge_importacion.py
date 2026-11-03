@@ -113,6 +113,12 @@ class PCGEImportacionTests(TestCase):
             guardar_importacion(entradas,fuente=TEXTO)
         self.assertEqual(AsientoContable.objects.count(),0)
 
+    def test_una_consultora_si_puede_tener_suministros_explicitamente_descritos(self):
+        a=deepcopy(novatech()[-1])
+        a['movimientos'][0].update(codigo='251',nombre='Suministros',tipo_cuenta='activo',subcategoria='activo_corriente')
+        fuente='Una consultora de soporte compra suministros para el almacén por S/ 1,000 al contado.'
+        self.assertEqual(auditar_asientos([a],fuente),[])
+
     def test_caso_original_pide_aclarar_2026_2025_sin_guardar_ni_cambiar_fechas(self):
         b=normalizar_borrador({'asientos':proveedor_221()})
         with patch('core.importacion_general.proponer_caso_general',return_value=b):

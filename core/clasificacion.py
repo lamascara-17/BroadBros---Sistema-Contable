@@ -76,21 +76,24 @@ def activo_no_corriente(codigo, nombre, subcategoria=''):
     except ValueError:return False
 
 
-def fecha_cierre_del_caso(datos):
+def fecha_cierre_del_caso(datos, solo_periodo_unico=False):
     from datetime import date
     from calendar import monthrange
     texto = datos.get('texto_leido', '')
+    cierre_explicito=None
     literal = re.search(r'fecha\s+de\s+cierre\s*[:：]?\s*(\d{1,2})/(\d{1,2})/(\d{4})\b', texto, re.I)
     if literal:
         d, m, y = map(int, literal.groups())
-        try:return date(y, m, d)
+        try:cierre_explicito=date(y,m,d)
         except ValueError:raise ValueError('La fecha de cierre del ejercicio no es válida.') from None
+        if not solo_periodo_unico:return cierre_explicito
     valor = datos.get('fecha_cierre')
-    if valor:
-        try:return date.fromisoformat(str(valor))
+    if valor and not cierre_explicito:
+        try:cierre_explicito=date.fromisoformat(str(valor))
         except ValueError:raise ValueError('La fecha de cierre del ejercicio no es válida.') from None
+        if not solo_periodo_unico:return cierre_explicito
     n=nombre_normalizado(texto)
-    if re.search(r'(?:al cierre|al final|al termino) del mes',n):
+    if cierre_explicito or re.search(r'(?:al cierre|al final|al termino) del mes',n):
         periodos=set()
         for d,m,y in re.findall(r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b',n):
             try:
@@ -105,5 +108,5 @@ def fecha_cierre_del_caso(datos):
                     f=date.fromisoformat(str(op['fecha']));periodos.add((f.year,f.month))
                 except ValueError:return None
         if len(periodos)==1:
-            y,m=next(iter(periodos));return date(y,m,monthrange(y,m)[1])
+            y,m=next(iter(periodos));return cierre_explicito or date(y,m,monthrange(y,m)[1])
     return None

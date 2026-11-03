@@ -185,7 +185,7 @@ def normalizar_borrador(datos, fuente='', aclaraciones=''):
     from .validacion_contable import preparar_pcge
     from .clasificacion import fecha_cierre_del_caso
     from .contexto_importacion import es_ajuste_de_cierre, inventario_generico, familia_del_inventario
-    cierre=fecha_cierre_del_caso({'texto_leido':fuente})
+    cierre=fecha_cierre_del_caso({'texto_leido':fuente},solo_periodo_unico=True)
     borrador,notas_backend = [],[]
     for numero,item in enumerate(preparar_pcge(datos['asientos'],fuente),1):
         if not isinstance(item, dict) or not isinstance(item.get('movimientos'), list) or len(item['movimientos']) > 40:

@@ -124,6 +124,14 @@ class NormalizacionInventarioTests(TestCase):
         pendientes,_=orientar_revision({'texto_leido':TEXTO},b)
         self.assertTrue(any('Asiento 6' in n and '2026-10-31' in n for n in pendientes))
 
+    def test_cierre_anual_no_reubica_ajustes_mensuales_de_otros_periodos(self):
+        from .validacion_contable import auditar_asientos
+        b=normalizar_borrador(propuesta(),fuente=TEXTO)
+        fuente=TEXTO+'\nFecha de cierre: 31/12/2026.'
+        self.assertEqual(str(fecha_cierre_del_caso({'texto_leido':fuente})),'2026-12-31')
+        self.assertIsNone(fecha_cierre_del_caso({'texto_leido':fuente},solo_periodo_unico=True))
+        self.assertFalse(any('Corrija la fecha' in n for n in auditar_asientos(b['asientos'],fuente)))
+
     def test_propuesta_incorrecta_no_reemplaza_el_caso_activo(self):
         guardar_importacion(novatech())
         ids=list(AsientoContable.objects.values_list('pk',flat=True))

@@ -191,8 +191,8 @@ def auditar_asientos(asientos, fuente=''):
             not re.search(r'depreciacion|amortizacion|vida util|valor residual',n)):
         alertas.append('La propuesta añade depreciación o amortización sin datos que sustenten ese ajuste en el enunciado. Retire el ajuste o complete su base antes de guardar; no se inventan tasas ni importes.')
     from .clasificacion import fecha_cierre_del_caso
-    from .contexto_importacion import es_ajuste_de_cierre
-    cierre=fecha_cierre_del_caso({'texto_leido':fuente})
+    from .contexto_importacion import es_ajuste_de_cierre,familias_inventario
+    cierre=fecha_cierre_del_caso({'texto_leido':fuente},solo_periodo_unico=True)
     if cierre:
         for i,a in enumerate(asientos,1):
             if es_ajuste_de_cierre(a) and a.get('fecha') and str(a['fecha'])!=cierre.isoformat():
@@ -201,7 +201,7 @@ def auditar_asientos(asientos, fuente=''):
                            (str(m['codigo']).startswith(('20','21','22','23','24','25','26','28')) or
                             re.search(r'inventario|mercader|existencia', texto(m['nombre'])))
                            for a in asientos for m in a['movimientos'])
-    if (tiene_inventario and re.search(r'consultor|servicios? de soporte',n) and
+    if (tiene_inventario and re.search(r'consultor|servicios? de soporte',n) and not familias_inventario(n) and
             not re.search(r'mercader|inventari|existenci|productos?|stock|insumos?|materiales|repuestos|bienes para.*venta',n)):
         alertas.append('La propuesta incluye inventarios, pero el enunciado de servicios no describe existencias ni compras de mercaderías. Revise y retire la operación sin sustento; no se puede inventar inventario ni costo de ventas.')
     patrones = [r'inventario\s+(?:fisico\s+)?final[^\d\n]{0,65}([\d][\d.,]*)',
