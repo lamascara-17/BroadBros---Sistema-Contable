@@ -1101,7 +1101,7 @@ def cargar_texto_diario(request):
         tasa=request.POST.get('tasa_impuesto','').strip()
         if menciona_impuesto and not tasa_escrita and not tasa:
             token=token or signing.dumps({'texto':texto,'revisar':revisar},salt='texto-impuesto',compress=True)
-            return render(request,plantilla,{'texto_caso':texto,'texto_token':token})
+            return render(request,plantilla,{'texto_caso':texto,'texto_token':token,'revisar':revisar})
         if tasa:
             tasa=str(decimal(tasa,'tasa de impuesto'))
             if Decimal(tasa)>100:raise ValueError('La tasa no puede superar el 100%.')
@@ -1113,7 +1113,7 @@ def cargar_texto_diario(request):
         messages.error(request,'La lectura caducó. Vuelva a procesar el texto conservado.')
     except ValueError as exc:messages.error(request,str(exc))
     except Exception:messages.error(request,'No se pudo procesar el caso. El texto se conservó; vuelva a intentarlo.')
-    return render(request,plantilla,{'texto_caso':texto})
+    return render(request,plantilla,{'texto_caso':texto,'revisar':revisar})
 
 
 def cargar_imagen_diario(request):

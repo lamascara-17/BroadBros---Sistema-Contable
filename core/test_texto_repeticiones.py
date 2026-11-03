@@ -80,3 +80,12 @@ class TextoSinBuclesTests(TestCase):
         self.assertContains(response,'Ver los demás datos pendientes')
         for nota in notas:self.assertEqual(response.content.decode().count(nota),1)
         self.assertEqual(AsientoContable.objects.count(),0)
+
+    def test_un_fallo_conserva_texto_y_eleccion_de_revision(self):
+        texto='El 01/10/2025 se aporta S/ 30,000 al contado.'
+        with patch('core.importacion_general.proponer_caso_general',side_effect=ValueError('Servicio temporalmente no disponible')):
+            response=self.client.post(reverse('cargar_texto_diario'),{'texto_caso':texto,'revisar':'on'})
+        self.assertEqual(response.context['texto_caso'],texto)
+        self.assertTrue(response.context['revisar'])
+        self.assertContains(response,'name="revisar" value="on" checked')
+        self.assertEqual(AsientoContable.objects.count(),0)
