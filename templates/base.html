@@ -94,7 +94,7 @@
             <div>
                 <span class="eyebrow">{% if ratio_lab_context %}Tutor financiero · {{ ticker }} FY{{ year }}{% else %}Asistente contable{% endif %}</span>
                 <h2 id="assistant-title">ÑoñoBot</h2>
-                <p>{% if ratio_lab_context %}Explicaciones con los datos y supuestos de este análisis.{% else %}Fundamentación de asientos y dinámica de cuentas.{% endif %}</p>
+                <p>{% if ratio_lab_context or ratio_caso_context %}Tus ratios, explicados en pocas palabras.{% else %}Asientos, estados financieros y ratios del caso.{% endif %}</p>
             </div>
             <button id="assistant-close" class="icon-button" type="button" aria-label="Cerrar ÑoñoBot">×</button>
         </div>
@@ -103,7 +103,7 @@
             <div class="chat-message bot">
                 <div class="chat-avatar nonobot-photo" aria-hidden="true"><img src="{% static 'img/nonobot.jpg' %}" alt=""></div>
                 <div class="chat-bubble">
-                    {% if ratio_lab_context %}Soy ÑoñoBot. Aquí puedo explicar los 17 ratios de {{ ticker }}, compararlos con {{ leader }} y el grupo, y comentar simulaciones. Uso cálculos del sistema, sin inventar datos ni causas empresariales. También puedes cambiar al caso contable.{% else %}Soy ÑoñoBot. Puedo ayudarte con contabilidad, finanzas, cálculos, estados financieros y el uso de BROADBROS.{% endif %}
+                    {% if ratio_lab_context %}Te explico los ratios de {{ ticker }}: qué significan y cómo se comparan. Pide el paso a paso si quieres ver el cálculo.{% elif ratio_caso_context %}Te ayudo a entender los ratios de tu caso con respuestas cortas. Si falta un dato, te digo cuál.{% else %}Soy ÑoñoBot. Puedo ayudarte con contabilidad, ratios y estados financieros. ¿Qué quieres entender?{% endif %}
                 </div>
             </div>
             <div class="assistant-suggestions">
@@ -111,6 +111,10 @@
                 <button type="button" data-prompt="¿Por qué mi ROE difiere del referente?">Explicar ROE</button>
                 <button type="button" data-prompt="Resume el diagnóstico financiero para sustentar.">Para sustentar</button>
                 <button type="button" data-prompt="¿Qué supuestos y fuentes usamos?">Datos y supuestos</button>
+                {% elif ratio_caso_context %}
+                <button type="button" data-prompt="Explícame la liquidez corriente de mi caso">Mi liquidez</button>
+                <button type="button" data-prompt="Explícame el margen neto de mi caso">Mi rentabilidad</button>
+                <button type="button" data-prompt="Resume los ratios de mi caso">Resumen breve</button>
                 {% else %}
                 <button type="button" data-prompt="¿Cómo justifico un cargo en la cuenta 10?">Cuenta 10</button>
                 <button type="button" data-prompt="Explícame la lógica del debe y haber de un asiento.">Debe y Haber</button>

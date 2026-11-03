@@ -143,7 +143,10 @@ def tutor(report, details, message, previous_metric='', scenario=None):
     prefix=f"{selected['company']['name']} ({selected['company']['ticker']}), FY{selected['period']['year']}; análisis externo, separado del caso contable. "
     if re.search(r'\b(simulacion|simulado|escenario)\b',q) and scenario:
         cards={r['key']:r for r in scenario['cards']}
-        return prefix+'SIMULACIÓN ACADÉMICA (variaciones: '+', '.join(k+' '+v+'%' for k,v in scenario['changes'].items())+'): margen neto '+cards['net_margin']['after']+', ROE '+cards['roe']['after']+' y deuda/EBITDA '+cards['debt_cover']['after']+'.\n\n'+scenario['assumptions'], ''
+        answer=prefix+'SIMULACIÓN ACADÉMICA (variaciones: '+', '.join(k+' '+v+'%' for k,v in scenario['changes'].items())+'): margen neto '+cards['net_margin']['after']+', ROE '+cards['roe']['after']+' y deuda/EBITDA '+cards['debt_cover']['after']+'.\nEs un escenario con otros factores constantes; no modifica tus registros ni predice resultados reales.'
+        if re.search(r'detalle|supuesto|paso a paso',q):answer+='\n'+scenario['assumptions']
+        return answer, ''
+    from .bot_ratios import indicador_consultado, quiere_detalle
     aliases={'roe':['roe','patrimonio del accionista'],'roa':['roa'],'current':['liquidez corriente','liquidez'],
        'quick':['prueba acida'],'working_capital':['capital de trabajo'],'leverage':['endeudamiento contable'],
        'debt_ratio':['porcentaje de endeudamiento'],'interest_cover':['cobertura de intereses'],
@@ -151,10 +154,19 @@ def tutor(report, details, message, previous_metric='', scenario=None):
        'receivable_days':['cobrar','cxc'],'payable_days':['pagar','cxp'],'cash_cycle':['ciclo de efectivo'],
        'gross_margin':['margen bruto'],'operating_margin':['margen operativo'],'net_margin':['margen neto'],
        'ebitda_margin':['margen ebitda','ebitda']}
-    metric=next((k for k,terms in aliases.items() if any(re.search(r'\b'+re.escape(t)+r'\b',q) for t in terms)), '')
+    metric=indicador_consultado(message) or next((k for k,terms in aliases.items() if any(re.search(r'\b'+re.escape(t)+r'\b',q) for t in terms)), '')
     if not metric and previous_metric in details and re.search(r'^(y\b|por que\b)|\b(ese|eso|anterior|referente|lider)\b',q):metric=previous_metric
     if metric:
         d=details[metric]; row=next(r for r in report['rows'] if r['key']==metric)
+        if not quiere_detalle(message):
+            short=f"{selected['company']['ticker']} · FY{selected['period']['year']} · análisis externo\n{d['label']}: {d['value']}. "
+            short+=(d['reason']+' N/D no significa cero.') if d['value']=='N/D' else d['meaning']
+            short+=f"\nReferente {ref['company']['ticker'] if ref else 'sin período'}: {row['leader']}; grupo: {row['sector']} (n={row['n']})."
+            if d['notes']:short+=' '+ ' '.join(d['notes'])
+            if metric=='roe' and ref and ('por que' in q or 'dupont' in q):
+                short+='\nDuPont ayuda a revisar margen, rotación y apalancamiento; sus diferencias no prueban una causa empresarial.'
+                short+=' Análisis separado del caso contable.'
+            return short,metric
         response=prefix+f"{d['label']}: {d['value']}. Fórmula: {d['formula']}. Sustitución: {d['expression']}. "
         response+=d['reason'] if d['value']=='N/D' else d['meaning']
         response+='\n\nReferente '+(ref['company']['ticker'] if ref else 'sin período disponible')+': '+row['leader']+'; promedio del grupo: '+row['sector']+f" (n={row['n']}). "+' '.join(d['notes'])
@@ -169,5 +181,6 @@ def tutor(report, details, message, previous_metric='', scenario=None):
     if any(k in q for k in ('fuente','dato','n/d','supuesto')):
         return prefix+'Pulsa cualquier indicador para ver su cálculo, partidas, fuente y aproximaciones. Los datos ausentes o denominadores no interpretables quedan como N/D; no se sustituyen por cero. Los cierres fiscales pueden diferir entre empresas; el promedio corresponde al grupo académico y no a un índice oficial del sector.', ''
     if any(k in q for k in ('resumen','rentable','solvente','diagnostico','sustentar','exponer')):
-        return prefix+' '.join(d['title']+': '+d['text'] for d in report['diagnoses'])+' Estas medidas no garantizan pagos futuros ni constituyen una recomendación de inversión.', ''
-    return prefix+'Puedo explicar cualquiera de los 17 indicadores, comparar sus valores con el referente y el grupo, descomponer DuPont o comentar tu escenario simulado. Prueba «¿Por qué mi ROE difiere del referente?» o «Explícame el margen neto». Para preguntas sobre tus asientos cambia el ámbito a Caso contable activo. No infiero causas empresariales que no figuren en estos datos.', ''
+        rows={r['key']:r for r in report['rows']}
+        return prefix+'\n'+ '\n'.join(f"• {rows[k]['label']}: {rows[k]['own']}." for k in ('current','debt_ratio','net_margin'))+'\nOrientan sobre liquidez, financiación y rentabilidad; no bastan para asegurar solvencia futura. Pregúntame por uno para interpretarlo.', ''
+    return prefix+'Puedo explicar los 17 ratios con sus datos reales. Prueba «Explícame el margen neto» o «¿Qué significa N/D?». Para ver las operaciones, pide «el cálculo paso a paso».', ''

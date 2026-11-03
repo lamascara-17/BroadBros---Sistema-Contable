@@ -214,7 +214,7 @@ def ratios_caso(request):
             writer.writerow([safe_csv(r[k]) for k in ('nombre', 'formula', 'valor', 'motivo')])
         return HttpResponse('\ufeff'+stream.getvalue(), content_type='text/csv; charset=utf-8',
                             headers={'Content-Disposition': 'attachment; filename=Ratios_caso_BROADBROS.csv'})
-    return render(request, 'ratios_caso.html', reporte)
+    return render(request, 'ratios_caso.html', {**reporte,'ratio_caso_context':True})
 
 
 def descargar_ratios(datos, formato, nombre):

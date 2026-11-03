@@ -5,6 +5,9 @@ from .reporte_utils import contexto_estados
 
 
 def respuesta_calculada(mensaje):
+    from .bot_ratios import respuesta_ratios_caso
+    ratios=respuesta_ratios_caso(mensaje)
+    if ratios:return ratios
     n = texto(mensaje)
     utilidad = bool(re.search(r'(?:cual|cuanto|dime|muestra).*\b(?:utilidad|resultado neto)\b', n))
     ventas = bool(re.search(r'(?:cual|cuanto|cuanta|dime|muestra).*\bventas(?: netas)?\b', n))
