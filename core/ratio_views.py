@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from .models import FinancialRatioPeriod
-from .ratios import FIELDS, comparison, companies_with_overrides, FX_SOURCE, fmt
+from .ratios import FIELDS, comparison, companies_with_overrides, FX_SOURCE, FX_SOURCES, FX, fmt
 
 
 class FinancialInputsForm(forms.Form):
@@ -87,12 +87,13 @@ def financial_ratios(request):
             messages.success(request,'Datos guardados y ratios recalculados. Los asientos contables se conservan.')
             return redirect(reverse('ratios_financieros')+'?'+urlencode({'empresa':cleaned['ticker'],'year':cleaned['year'],'lider':leader,'deuda':basis,'tasa':str(tax),'grupo':group})+'#comparativo')
         messages.error(request,'Revise los campos señalados. No se guardó ningún cambio.')
-    try:
-        report = comparison(companies,ticker,leader,year,tax/100,basis,group)
-    except ValueError:
-        ticker,year = 'AVGO',2025
-        report = comparison(companies,ticker,leader,year,tax/100,basis,group)
-        messages.error(request,'No hay datos para esa combinación. Se muestra Broadcom FY2025.')
+    company_periods = next(c['periods'] for c in companies if c['ticker'] == ticker)
+    company_years = sorted({p['year'] for p in company_periods})
+    if year not in company_years:
+        requested_year = year
+        year = max((y for y in company_years if y <= requested_year), default=max(company_years))
+        messages.info(request,f'No hay informe anual FY{requested_year} disponible para {ticker} al {data["as_of"]}. Se muestra FY{year}; no se sustituye por un trimestre ni una proyección.')
+    report = comparison(companies,ticker,leader,year,tax/100,basis,group)
     period, company = report['selected']['period'], report['selected']['company']
     if form is None:
         initial = {**period['values'],'ticker':ticker,'name':company['name'],'industry':company['industry'],
@@ -109,7 +110,11 @@ def financial_ratios(request):
     query = urlencode({'empresa':ticker,'lider':leader,'year':year,'tasa':str(tax),'deuda':basis,'grupo':group})
     context = {**report,'company':company,'period':period,'ticker':ticker,'leader':leader,'year':year,
         'companies':companies,'years':years,'group':group,'debt_basis':basis,'tax_rate':str(tax),
-        'as_of':data['as_of'],'form':form,'input_rows':input_rows,'fx_source':FX_SOURCE,'export_query':query,
+        'as_of':data['as_of'],'form':form,'input_rows':input_rows,'fx_source':FX_SOURCES.get(year,FX_SOURCE),'export_query':query,
+        'coverage_start':data.get('coverage_start',min(years)), 'coverage_end':data.get('coverage_end',max(years)),
+        'company_years':', '.join(f'FY{y}' for y in company_years),
+        'annual_pending':data.get('coverage_end',max(years)) not in company_years,
+        'fx_rates': [{'year':y,'rate':str(rate),'source':FX_SOURCES[y]} for y,rate in sorted(FX.items())],
         'metadata_fields':[form[k] for k in ('ticker','name','industry','year','currency','period_start','period_end','previous_end','source_url')],
         'categories':['Liquidez','Solvencia','Gestión','Rentabilidad'],
         'peer_periods':[{'company':c,'period':p} for c in companies for p in c['periods'] if p['year']==year],

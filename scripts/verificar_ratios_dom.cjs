@@ -25,7 +25,8 @@ const reply=(resolve,data,status=200)=>resolve({ok:status===200,json:async()=>da
  assert.ok(d.querySelector('#ratio-chart').textContent.includes('36.20%'));
  d.querySelector('[data-chart-view="all"]').click();assert.equal(d.querySelectorAll('#ratio-chart .ratio-chart-row').length,9);
  d.querySelector('[data-chart-view="history"]').click();assert.ok(d.querySelector('#ratio-chart svg'));
- assert.equal(d.querySelectorAll('.ratio-trend-line').length,3);assert.equal(d.querySelectorAll('.ratio-trend-table tbody tr').length,2);
+ assert.equal(d.querySelectorAll('.ratio-trend-line').length,9);assert.equal(d.querySelectorAll('.ratio-trend-table tbody tr').length,4);
+ assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2022'));assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2023'));
  assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2024'));assert.ok(d.querySelector('#ratio-chart').textContent.includes('FY2025'));
  const metric=d.querySelector('#ratio-chart-select');metric.value='roe';metric.dispatchEvent(new w.Event('change'));
  assert.ok(d.querySelector('#ratio-chart').textContent.includes('31.05%'));assert.ok(d.querySelector('#ratio-chart').textContent.includes('119.18%'));

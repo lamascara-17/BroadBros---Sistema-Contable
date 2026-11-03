@@ -12,22 +12,22 @@ class RatioVisualDataTests(SimpleTestCase):
             with self.subTest(indicador=row['key']):
                 chart=report['chart_data'][row['key']]
                 self.assertEqual([p['display'] for p in chart['benchmarks']], [row['own'],row['leader'],row['sector']])
-                self.assertEqual([p['year'] for p in chart['history']],[2024,2025])
-                self.assertEqual(chart['history'][0]['series'][0]['display'],row['previous'])
+                self.assertEqual([p['year'] for p in chart['history']],[2022,2023,2024,2025])
+                self.assertEqual(chart['history'][-2]['series'][0]['display'],row['previous'])
                 self.assertEqual([p['display'] for p in chart['history'][-1]['series']],[row['own'],row['leader'],row['sector']])
                 self.assertEqual(chart['history'][-1]['n'],row['n'])
 
     def test_ejercicio_sin_antecedente_no_inventa_anos_o_ttm(self):
-        report=comparison(dataset()['companies'],year=2024)
-        for chart in report['chart_data'].values():self.assertEqual([p['year'] for p in chart['history']],[2024])
+        report=comparison(dataset()['companies'],year=2022)
+        for chart in report['chart_data'].values():self.assertEqual([p['year'] for p in chart['history']],[2022])
 
     def test_conversion_asml_identica_en_las_tres_vistas(self):
         report=comparison(dataset()['companies'],'ASML')
         row=next(r for r in report['rows'] if r['key']=='working_capital');chart=report['chart_data']['working_capital']
         self.assertEqual(chart['unit'],'USD MM')
-        self.assertEqual(chart['history'][0]['series'][0]['display'],row['previous'])
+        self.assertEqual(chart['history'][-2]['series'][0]['display'],row['previous'])
         self.assertEqual(chart['benchmarks'][0]['display'],row['own'])
-        self.assertEqual(chart['history'][1]['series'][0]['display'],row['own'])
+        self.assertEqual(chart['history'][-1]['series'][0]['display'],row['own'])
 
     def test_no_disponible_permanece_null_en_el_grafico(self):
         companies=deepcopy(dataset()['companies'])
@@ -41,8 +41,8 @@ class RatioVisualDataTests(SimpleTestCase):
         previous=comparison(companies,year=2024,group='chips')
         for row in previous['rows']:
             chart=report['chart_data'][row['key']]
-            self.assertEqual(chart['history'][0]['series'][2]['display'],row['sector'])
-            self.assertEqual(chart['history'][0]['n'],row['n'])
+            self.assertEqual(chart['history'][-2]['series'][2]['display'],row['sector'])
+            self.assertEqual(chart['history'][-2]['n'],row['n'])
 
     def test_cero_y_perdidas_conservan_su_signo(self):
         companies=deepcopy(dataset()['companies'])

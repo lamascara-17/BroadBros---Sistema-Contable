@@ -37,8 +37,12 @@ DEFINITIONS = [
     ('roa', 'ROA operativo después de impuestos', 'Rentabilidad', '%', 'Utilidad operativa × (1 − t) / Activo promedio', 'high'),
     ('roe', 'ROE', 'Rentabilidad', '%', 'Utilidad neta / Patrimonio promedio del accionista', 'high'),
 ]
-FX = {2024: D('1.0389'), 2025: D('1.1750')}
+FX = {2022: D('1.0666'), 2023: D('1.1050'), 2024: D('1.0389'), 2025: D('1.1750')}
 FX_SOURCE = 'https://www.ecb.europa.eu/press/annual-reports-financial-statements/annual/annual-accounts/html/ecb.annualaccounts2025~ba3b593c99.en.html'
+FX_SOURCES = {2022: 'https://www.ecb.europa.eu/press/annual-reports-financial-statements/annual/annual-accounts/html/ecb.annualaccounts2023~f5a98cb02b.en.html',
+              2023: 'https://www.ecb.europa.eu/press/annual-reports-financial-statements/annual/annual-accounts/html/ecb.annualaccounts2023~f5a98cb02b.en.html',
+              2024: 'https://www.ecb.europa.eu/press/annual-reports-financial-statements/annual/annual-accounts/html/ecb.annualaccounts2024~718377b1c1.en.html',
+              2025: FX_SOURCE}
 
 
 def dataset():
@@ -176,7 +180,7 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
     previous = evaluated.get((ticker, year-1))
     group_tickers = {'chips': {'AVGO', 'NVDA', 'AMD', 'INTC'}, 'equipment': {'ASML', 'AMAT', 'LRCX', 'KLAC'}}
     peers = [v for (t,y),v in evaluated.items() if y == year and (group == 'all' or t in group_tickers.get(group,set()))]
-    prior_peers = [v for (t,y),v in evaluated.items() if y == year-1 and (group == 'all' or t in group_tickers.get(group,set()))]
+    historical_years = sorted({y for t,y in evaluated if 2022 <= y <= year})
 
     def historical_value(entry, key, unit):
         if entry is None: return None
@@ -240,14 +244,17 @@ def comparison(companies, ticker='AVGO', leader='NVDA', year=2025, tax_rate=D('.
                 {'ticker':leader, 'kind':'leader', 'role':'Referente', 'value':float(lead) if lead is not None else None, 'display':fmt(lead,unit)},
                 {'ticker':'Grupo', 'kind':'group', 'role':f'Promedio · n={len(points)}', 'value':float(sector) if sector is not None else None, 'display':fmt(sector,unit)},
             ]}
-        historical_reference = evaluated.get((leader,year-1))
-        prior_values = [historical_value(p,key,unit) for p in prior_peers]
-        prior_values = [v for v in prior_values if v is not None]
-        prior_sector = sum(prior_values,D('0'))/len(prior_values) if prior_values else None
         periods = []
-        if previous is not None or historical_reference is not None or prior_peers:
-            periods.append((year-1,historical_value(previous,key,unit),historical_value(historical_reference,key,unit),prior_sector,len(prior_values)))
-        periods.append((year,comparable,lead,sector,len(points)))
+        for historical_year in historical_years:
+            if historical_year == year:
+                periods.append((year,comparable,lead,sector,len(points)))
+                continue
+            peers_year = [p for (t,y),p in evaluated.items() if y == historical_year and (group == 'all' or t in group_tickers.get(group,set()))]
+            peer_values = [historical_value(p,key,unit) for p in peers_year]
+            peer_values = [v for v in peer_values if v is not None]
+            mean = sum(peer_values,D('0'))/len(peer_values) if peer_values else None
+            periods.append((historical_year,historical_value(evaluated.get((ticker,historical_year)),key,unit),
+                            historical_value(evaluated.get((leader,historical_year)),key,unit),mean,len(peer_values)))
         chart[key]['history'] = [{'year':y,'n':n,'series':[
             {'kind':kind,'value':float(value) if value is not None else None,'display':fmt(value,unit)}
             for kind,value in [('company',own_y),('leader',lead_y),('group',group_y)]]}

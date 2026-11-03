@@ -33,6 +33,14 @@ Si no hay costo de ventas o datos para calcularlo, déjalo pendiente, no lo calc
 como toda la compra ni fabriques inventario final. La ausencia de un inventario
 final no invalida los asientos de operaciones que sí se conocen.
 Identifica cada dato pendiente y pregunta concretamente cómo completarlo.
+Como máximo ocho pendientes esenciales y ocho convenciones, cada uno breve y
+distinto. No repitas frases dentro de una observación ni en varias observaciones.
+No hagas una lista de todo lo que el enunciado NO menciona. No preguntes si se
+debe registrar una compra, venta, apertura o cierre que el caso no solicita.
+La ausencia de otras cuentas o de operaciones hipotéticas no es un dato pendiente.
+Si hay una tasa de depreciación explícita, úsala; no exijas además una vida útil
+para volver a obtener la misma tasa. Si falta el inicio de uso o un dato necesario
+para depreciar, señala solo ese ajuste y conserva la compra que sí se conoce.
 En cada pendiente explica brevemente qué operación o reporte afecta y qué dato
 exacto debe aportar el usuario. Si el dato ya está escrito, úsalo, no lo pidas otra vez.
 Revisa cada operación del enunciado antes de responder. Incluye pagos iniciales
@@ -187,14 +195,17 @@ def normalizar_borrador(datos):
     for k in ('pendientes','supuestos'):
         valores = datos.get(k, [])
         if not isinstance(valores, list) or len(valores) > 100: raise ValueError('Las notas de revisión no son válidas.')
-        notas[k] = [str(n)[:2000] for n in valores if n]
+        from .notas_importacion import normalizar_notas
+        notas[k] = normalizar_notas(valores)
     if not borrador and not notas['pendientes']:
         notas['pendientes'] = ['No hay información suficiente para proponer asientos. Complete los datos del ejercicio.']
     return {'asientos':borrador, **notas}
 
 
 class PropuestaInvalida(ValueError):
-    pass
+    def __init__(self, mensaje, borrador=None):
+        super().__init__(mensaje)
+        self.borrador = borrador
 
 
 def _proponer_base(datos, tasa_impuesto, adicionales=''):
@@ -217,7 +228,15 @@ def _proponer_base(datos, tasa_impuesto, adicionales=''):
     if choice.finish_reason != 'stop': raise PropuestaInvalida('La propuesta quedó incompleta; no se guardó ningún asiento.')
     try: propuesta=leer_json(choice.message.content)
     except (ValueError,TypeError):raise PropuestaInvalida('La propuesta no contiene JSON válido.') from None
-    try:return normalizar_borrador(propuesta)
+    try:
+        borrador = normalizar_borrador(propuesta)
+        from .notas_importacion import notas_repetitivas
+        if notas_repetitivas(propuesta):
+            borrador['supuestos'].append('El análisis inicial produjo observaciones repetitivas. Revisa las operaciones propuestas antes de confirmar el guardado.')
+            raise PropuestaInvalida('El análisis produjo observaciones repetitivas y necesita revisión.', borrador)
+        return borrador
+    except PropuestaInvalida:
+        raise
     except ValueError as exc:raise PropuestaInvalida(str(exc)) from None
 
 
@@ -269,14 +288,14 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
         inicial = _proponer_base(datos, tasa_impuesto, adicionales)
     except PropuestaInvalida as exc:
         fallo = exc
-        inicial = None
+        inicial = exc.borrador if exc.borrador and exc.borrador.get('asientos') else None
     # Las fallas de conexión, cuota o configuración no se solucionan reorganizando.
     if inicial is not None:
         from .orientacion import orientar_revision
         pendientes, _ = orientar_revision(datos, inicial)
         omitidas = len(pendientes) > len(inicial['pendientes'])
         invalidos = any(a.get('error_validacion') for a in inicial['asientos'])
-        if inicial['asientos'] and not omitidas and (not invalidos or inicial['pendientes']):
+        if fallo is None and inicial['asientos'] and not omitidas and (not invalidos or inicial['pendientes']):
             return inicial
     try:
         organizados = organizar_lectura(datos)
@@ -284,7 +303,7 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
         from .orientacion import orientar_revision
         nuevo['pendientes'], _ = orientar_revision(datos, nuevo)
         # Si el rescate falla, conservar una propuesta anterior utilizable.
-        if inicial is not None and any(a.get('error_validacion') for a in nuevo['asientos']):
+        if inicial is not None and (not nuevo['asientos'] or any(a.get('error_validacion') for a in nuevo['asientos'])):
             return inicial
         nuevo['lectura_reorganizada'] = True
         return nuevo

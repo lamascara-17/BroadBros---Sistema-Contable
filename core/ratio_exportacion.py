@@ -27,7 +27,8 @@ def comparativo(context):
             sources.append([company['ticker'], str(p['year']), p['start'], p['end'], p['currency'],
                             p.get('manual_source', '') if p.get('edited') else source,
                             'Manual' if p.get('edited') else 'Publicado'])
-    sources.append(['BCE', '2024/25', '', '', 'EUR/USD', context['fx_source'], 'Conversión'])
+    for fx in context.get('fx_rates', []):
+        sources.append(['BCE', str(fx['year']), '', '', 'EUR/USD', fx['source'], 'Conversión'])
     inputs = []
     for key, label in FIELDS.items():
         provenance = period.get('provenance', {}).get(key, {})
@@ -45,7 +46,7 @@ def comparativo(context):
                       'N/D significa información insuficiente o denominador no válido; nunca se sustituye por cero.',
                       *context['selected']['assumptions'],
                       f"Grupo aplicado: {dict(all='Todas las empresas del trabajo', chips='Diseño, chips y fundición', equipment='Equipos de semiconductores')[context['group']]}. Referente: {context['leader']}.",
-                      'Conversión EUR/USD de cierre: 2024 = 1.0389; 2025 = 1.1750. Fuente: BCE (enlace en fuentes).'],
+                      'Conversión EUR/USD de cierre: 2022 = 1.0666; 2023 = 1.1050; 2024 = 1.0389; 2025 = 1.1750. Fuente: BCE (enlaces en fuentes).'],
             'warning': '', 'case': False, 'ticker': context['ticker'], 'source_year': context['year']}
 
 
@@ -310,11 +311,14 @@ def pdf(datos):
         story += [Spacer(1, 8), p('Ejercicios y documentos de respaldo', heading)]
         rows = [[p(h, white) for h in ['Empresa / FY', 'Inicio', 'Cierre', 'Moneda', 'Fuente']]]
         for ticker, year, start, end, currency, url, origin in datos['sources']:
+            if ticker == 'BCE' and int(year) not in (datos['source_year']-1, datos['source_year']): continue
             if year != str(datos['source_year']) and ticker not in (datos['ticker'], 'BCE'): continue
             link = enlace(url)
             source = Paragraph('<link href='+quoteattr(link)+' color="#2C666E">Consultar informe</link><br/>'+escape(origin), small) if link else p('Sin enlace / '+origin, small)
             rows.append([p(ticker+' / '+year, small), p(start, small), p(end, small), p(currency, small), source])
-        story.append(table(rows, [width*.22,width*.20,width*.20,width*.12,width*.26]))
+        sources_table = table(rows, [width*.22,width*.20,width*.20,width*.12,width*.26])
+        sources_table.setStyle(TableStyle([('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6)]))
+        story.append(sources_table)
     doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm,
                             topMargin=25*mm, bottomMargin=22*mm, title=datos['subtitle'], author='BROADBROS')
     doc.build(story, onFirstPage=footer, onLaterPages=footer)

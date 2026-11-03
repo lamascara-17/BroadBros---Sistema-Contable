@@ -42,7 +42,9 @@ TAGS = {
     'da': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization'],
 }
 FLOWS = {'revenue', 'cost_sales', 'operating_income', 'net_income', 'interest', 'da'}
-CUTOFF = '2026-11-01'
+CUTOFF = '2026-11-02'
+FIRST_YEAR = 2022
+LAST_YEAR = date.fromisoformat(CUTOFF).year
 
 
 def apply_verified_inputs(ticker, period):
@@ -86,14 +88,17 @@ def build(cache):
             return []
 
         periods = []
-        for year in (2024, 2025):
+        for year in range(FIRST_YEAR, LAST_YEAR + 1):
             anchors = candidates(TAGS['revenue'], flow=True, fy=year)
+            if not anchors:
+                print(ticker, year, 'sin informe anual publicado al corte')
+                continue
             end = max(v['end'] for _, v in anchors)
             anchors = [v for _, v in anchors if v['end'] == end]
             anchor = min(anchors, key=lambda v: v['filed'])
             accn = anchor['accn']
             starts = candidates(TAGS['assets'])
-            previous = max(v['end'] for _, v in starts if 300 < (date.fromisoformat(end)-date.fromisoformat(v['end'])).days < 400)
+            previous = max((v['end'] for _, v in starts if 300 < (date.fromisoformat(end)-date.fromisoformat(v['end'])).days < 400), default=None)
             values, provenance, notes = {}, {}, []
 
             def take(key, tags, day=end, flow=False):
@@ -112,7 +117,8 @@ def build(cache):
             for key, tags in TAGS.items():
                 take(key, tags, flow=key in FLOWS)
             for key in ('inventory', 'receivables', 'payables', 'assets', 'equity'):
-                take(key+'_previous', TAGS[key], day=previous)
+                if previous is not None: take(key+'_previous', TAGS[key], day=previous)
+                else: values[key+'_previous'] = None
             # Desgloses cuyo tag agregado no representa toda la D&A.
             if ticker in ('AVGO', 'INTC', 'AMD'):
                 take('_depreciation', ['Depreciation'], flow=True)
@@ -129,6 +135,8 @@ def build(cache):
                 values['da'] = None
                 provenance.pop('da', None)
                 notes.append('D&A total pendiente de desglose: no se usa la partida «depreciation, amortization, and other» como si fuera D&A pura.')
+            if ticker == 'AVGO' and values.get('da') is None:
+                notes.append('D&A pura pendiente de conciliación: el flujo combina intangibles y derechos de uso. Los indicadores que requieren EBITDA permanecen N/D hasta verificar el desglose, sin tomar EBITDA ajustado.')
             if ticker == 'KLAC':
                 take('debt_noncurrent', ['LongTermDebt'])
                 take('_rd', ['ResearchAndDevelopmentExpense'], flow=True)
@@ -156,8 +164,9 @@ def build(cache):
             print(ticker, year, end, 'missing:', [k for k,v in values.items() if v is None])
         companies.append({'ticker': ticker, 'name': name, 'cik': cik, 'industry': industry,
                           'source_url': f'https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010}.json', 'periods': periods})
-    return {'as_of': CUTOFF, 'unit': 'millones de moneda de presentación', 'companies': companies,
-            'methodology': '17 indicadores según S7 Alicorp y PPT S3/S4. FY2024 y FY2025, cierres distintos visibles; no TTM. Grupo académico de nueve empresas, no índice oficial de todo el sector.'}
+    return {'as_of': CUTOFF, 'coverage_start': FIRST_YEAR, 'coverage_end': LAST_YEAR,
+            'period_kind': 'annual', 'unit': 'millones de moneda de presentación', 'companies': companies,
+            'methodology': f'17 indicadores según S7 Alicorp y PPT S3/S4. Ejercicios anuales desde FY{FIRST_YEAR} hasta FY{LAST_YEAR}, solo si fueron publicados al corte; cierres distintos visibles, sin TTM ni trimestres tratados como años. Grupo académico de nueve empresas, no índice oficial de todo el sector.'}
 
 
 if __name__ == '__main__':

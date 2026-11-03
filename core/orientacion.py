@@ -4,7 +4,8 @@ from datetime import date
 
 
 def orientar_revision(datos,borrador,error=''):
-    pendientes=list(borrador.get('pendientes',[]))
+    from .notas_importacion import normalizar_notas
+    pendientes=normalizar_notas(borrador.get('pendientes',[]))
     sugerencias=[]
     if datos.get('lectura_incompleta'):
         sugerencias.append('La imagen quedó cortada por el límite de tokens. Compara la lectura con el original y completa las operaciones que faltan en el campo de texto.')
@@ -47,4 +48,4 @@ def orientar_revision(datos,borrador,error=''):
         for nota in auditar_asientos(borrador['asientos'], datos.get('texto_leido', '')):
             if nota not in pendientes: pendientes.append(nota)
             if nota not in sugerencias: sugerencias.append(nota)
-    return pendientes,list(dict.fromkeys(sugerencias))
+    return normalizar_notas(pendientes),normalizar_notas(sugerencias)

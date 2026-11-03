@@ -1040,7 +1040,7 @@ def mostrar_revision(request, payload, error=''):
         'error_propuesta':payload.get('error_propuesta',''),
         'lectura_incompleta':payload['datos'].get('lectura_incompleta',False),
         'clases_asiento':AsientoContable.CLASE_CHOICES,'clases_flujo':AsientoContable.FLUJO_CHOICES,
-        'sugerencias_bot':[texto_chat_simple(s) for s in sugerencias],
+        'sugerencias_bot':[texto_chat_simple(s) for s in sugerencias if s not in borrador['pendientes']],
     })
 
 
@@ -1077,11 +1077,14 @@ def cargar_texto_diario(request):
     from .importacion_general import proponer_caso_general
     plantilla='cargar_texto_diario.html'
     texto=request.POST.get('texto_caso','').strip()
+    revisar=request.POST.get('revisar')=='on'
     if request.method!='POST':return render(request,plantilla)
     try:
         token=request.POST.get('texto_token','')
         if token:
-            texto=signing.loads(token,salt='texto-impuesto',max_age=3600)['texto']
+            lectura=signing.loads(token,salt='texto-impuesto',max_age=3600)
+            texto=lectura['texto']
+            revisar=lectura.get('revisar',revisar)
         else:
             archivo=request.FILES.get('archivo_texto')
             if archivo:
@@ -1097,7 +1100,7 @@ def cargar_texto_diario(request):
         tasa_escrita=re.search(r'\b(?:IGV|IVA)\b[^.\n%]{0,40}?\d+(?:[.,]\d+)?\s*%|\d+(?:[.,]\d+)?\s*%\s*(?:de\s+)?(?:IGV|IVA)\b',texto,re.I)
         tasa=request.POST.get('tasa_impuesto','').strip()
         if menciona_impuesto and not tasa_escrita and not tasa:
-            token=token or signing.dumps({'texto':texto},salt='texto-impuesto',compress=True)
+            token=token or signing.dumps({'texto':texto,'revisar':revisar},salt='texto-impuesto',compress=True)
             return render(request,plantilla,{'texto_caso':texto,'texto_token':token})
         if tasa:
             tasa=str(decimal(tasa,'tasa de impuesto'))
@@ -1105,7 +1108,7 @@ def cargar_texto_diario(request):
         else:tasa=None
         datos={'texto_leido':texto}
         borrador=proponer_caso_general(datos,tasa)
-        return finalizar_propuesta(request,{'datos':datos,'tasa':tasa,'limpiar':False,'borrador':borrador})
+        return finalizar_propuesta(request,{'datos':datos,'tasa':tasa,'limpiar':False,'borrador':borrador},revisar)
     except signing.BadSignature:
         messages.error(request,'La lectura caducó. Vuelva a procesar el texto conservado.')
     except ValueError as exc:messages.error(request,str(exc))

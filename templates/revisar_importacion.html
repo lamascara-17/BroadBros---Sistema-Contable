@@ -4,15 +4,15 @@
 {% block page_subtitle %}Completa lo que falta y guarda únicamente los asientos que hayas revisado.{% endblock %}
 {% block content %}
 {% if error_revision %}<div class="message message-error" role="alert">{{ error_revision }}</div>{% endif %}
-{% if sugerencias_bot %}<section class="card" style="margin-bottom:20px;"><div class="card-header"><h3>ÑoñoBot te orienta</h3></div><div class="card-body"><ul>{% for sugerencia in sugerencias_bot %}<li>{{ sugerencia }}</li>{% endfor %}</ul><p class="helper-text">Puedes escribir los datos que faltan o pedir que se complete una operación en el formulario de aclaraciones.</p></div></section>{% endif %}
+{% if sugerencias_bot %}<section class="card" style="margin-bottom:20px;"><div class="card-header"><h3>ÑoñoBot te orienta</h3></div><div class="card-body"><ul>{% for sugerencia in sugerencias_bot|slice:':3' %}<li>{{ sugerencia }}</li>{% endfor %}</ul>{% if sugerencias_bot|length > 3 %}<details><summary>Ver otras comprobaciones</summary><ul>{% for sugerencia in sugerencias_bot|slice:'3:' %}<li>{{ sugerencia }}</li>{% endfor %}</ul></details>{% endif %}<p class="helper-text">Completa únicamente los datos necesarios para las operaciones de tu ejercicio.</p></div></section>{% endif %}
 {% if error_propuesta %}<div class="message message-error" role="alert">{{ error_propuesta }}</div>
 {% if not lectura_incompleta %}<form method="post" action="{% url 'revisar_importacion' %}" style="margin-bottom:20px;">{% csrf_token %}
 <input type="hidden" name="revision_token" value="{{ revision_token }}"><input type="hidden" name="accion" value="reintentar">
 <button class="btn btn-secondary" type="submit">Reintentar con la lectura conservada</button></form>{% endif %}{% endif %}
-<div class="card"><div class="card-header"><h3>Estado de la lectura</h3></div><div class="card-body">
+<div class="card"><div class="card-header"><h3>{% if pendientes and not sugerencias_bot %}ÑoñoBot te orienta{% else %}Estado de la lectura{% endif %}</h3></div><div class="card-body">
 {% if error_propuesta %}<p>El texto leído está conservado. No se guardó ningún asiento.</p>{% else %}<p>{{ asientos|length }} asientos propuestos. {{ pendientes|length }} datos o asuntos pendientes.</p>{% endif %}
-{% if pendientes %}<h4>Información pendiente</h4><ul>{% for nota in pendientes %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
-{% if supuestos %}<h4>Convenciones de la propuesta</h4><ul>{% for nota in supuestos %}<li>{{ nota }}</li>{% endfor %}</ul>{% endif %}
+{% if pendientes %}<h4>Información pendiente</h4><ul>{% for nota in pendientes|slice:':5' %}<li>{{ nota }}</li>{% endfor %}</ul>{% if pendientes|length > 5 %}<details><summary>Ver los demás datos pendientes ({{ pendientes|length }})</summary><ul>{% for nota in pendientes|slice:'5:' %}<li>{{ nota }}</li>{% endfor %}</ul></details>{% endif %}{% endif %}
+{% if supuestos %}<details><summary>Convenciones de la propuesta ({{ supuestos|length }})</summary><ul>{% for nota in supuestos %}<li>{{ nota }}</li>{% endfor %}</ul></details>{% endif %}
 <p class="helper-text">Una propuesta que cuadra todavía requiere revisar sus cuentas y el significado de la operación. Los datos anteriores se conservan hasta que confirmes el guardado.</p>
 <details><summary>Ver los datos leídos</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;">{{ texto_ejercicio }}</pre></details>
 </div></div>

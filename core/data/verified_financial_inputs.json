@@ -18,5 +18,45 @@
       "verified": true,
       "note": "Verificado en el 10-K FY2025: estado de resultados (p. 48), política de utilidad por acción (p. 57) y nota 8 (p. 69). La utilidad de 23.126 millones es el numerador usado para las acciones comunes; no se adopta ProfitLoss genéricamente para otras empresas."
     }
+  },
+  {
+    "ticker": "INTC",
+    "year": 2022,
+    "start": "2021-12-26",
+    "end": "2022-12-31",
+    "currency": "USD",
+    "field": "cash",
+    "value": "11144",
+    "provenance": {
+      "tag": "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "start": null,
+      "end": "2022-12-31",
+      "accession": "0000050863-24-000010",
+      "filed": "2024-01-26",
+      "unit": "USD",
+      "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000010/intc-20231230.htm",
+      "verified": true,
+      "note": "Caja y equivalentes FY2022 verificados en el balance consolidado del 10-K 2023 (p. 76), separadamente de inversiones de corto plazo. La equivalencia de esta etiqueta se verifica solo para este período y esta empresa."
+    }
+  },
+  {
+    "ticker": "INTC",
+    "year": 2023,
+    "start": "2023-01-01",
+    "end": "2023-12-30",
+    "currency": "USD",
+    "field": "cash",
+    "value": "7079",
+    "provenance": {
+      "tag": "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+      "start": null,
+      "end": "2023-12-30",
+      "accession": "0000050863-24-000010",
+      "filed": "2024-01-26",
+      "unit": "USD",
+      "url": "https://www.sec.gov/Archives/edgar/data/50863/000005086324000010/intc-20231230.htm",
+      "verified": true,
+      "note": "Caja y equivalentes FY2023 verificados en el balance consolidado del 10-K 2023 (p. 76), separadamente de inversiones de corto plazo. La equivalencia de esta etiqueta se verifica solo para este período y esta empresa."
+    }
   }
 ]
