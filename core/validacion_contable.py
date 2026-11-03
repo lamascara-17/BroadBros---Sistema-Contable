@@ -57,6 +57,8 @@ def preparar_pcge(asientos, fuente=''):
     from copy import deepcopy
     from .clasificacion import rubro_resultados
     from types import SimpleNamespace
+    from .models import CuentaContable
+    subcategorias_validas=dict(CuentaContable.SUBCATEGORIA_CHOICES)
     salida = deepcopy(asientos)
     from .contexto_importacion import inventario_generico,familia_del_inventario,INVENTARIOS
     inventarios_validos={}
@@ -96,6 +98,8 @@ def preparar_pcge(asientos, fuente=''):
             # Solo el borrador nuevo: no perpetuar una etiqueta de IA que
             # convierte ventas identificables en otros ingresos.
             sub = m.get('subcategoria', '')
+            sub_simple=str(sub or '').strip().strip('|').strip().lower()
+            sub_valida=sub_simple in subcategorias_validas or sub_simple in ('general','ninguna','no_aplica','sin_subcategoria')
             if tipo == 'ingreso' and texto(sub).strip().replace(' ', '_') == 'otro_ingreso':
                 cuenta = SimpleNamespace(codigo=codigo, nombre=nombre, tipo=tipo, subcategoria=sub)
                 if rubro_resultados(cuenta) == 'ventas':
@@ -109,19 +113,22 @@ def preparar_pcge(asientos, fuente=''):
                     if len(validos)==1:
                         cuenta=next(iter(validos.values()))
                         m.update({k:cuenta.get(k,'') for k in ('codigo','nombre','subcategoria')})
-                        m['subcategoria']='activo_corriente'
+                        m['subcategoria']='activo_corriente' if sub_valida else sub
                         continue
                     corregidos=inventarios_corregidos.get(grupo,{})
                     if len(corregidos)>1:continue
                     if len(corregidos)==1:
                         cuenta=next(iter(corregidos.values()))
                         m.update({k:cuenta.get(k,'') for k in ('codigo','nombre','subcategoria')})
-                        m['subcategoria']='activo_corriente'
+                        m['subcategoria']='activo_corriente' if sub_valida else sub
                         continue
-            if tipo=='activo' and grupo in INVENTARIOS:m['subcategoria']='activo_corriente'
-            if tipo=='activo' and grupo in ('33','39'):m['subcategoria']='activo_no_corriente'
-            if tipo=='gasto' and grupo in ('62','63','68'):m['subcategoria']='gasto_operativo'
-            if tipo=='gasto' and grupo=='69':m['subcategoria']='costo_ventas'
+            # Una categoría múltiple/desconocida sigue siendo un error de
+            # formato: la clasificación semántica no debe elegir por el usuario.
+            if sub_valida:
+                if tipo=='activo' and grupo in INVENTARIOS:m['subcategoria']='activo_corriente'
+                if tipo=='activo' and grupo in ('33','39'):m['subcategoria']='activo_no_corriente'
+                if tipo=='gasto' and grupo in ('62','63','68'):m['subcategoria']='gasto_operativo'
+                if tipo=='gasto' and grupo=='69':m['subcategoria']='costo_ventas'
             if not grupo and tipo == 'pasivo' and not codigo.startswith(('42','43','46','47')):
                 origen = origenes.get((codigo,texto(nombre),tipo),set())
                 if len(origen) == 1: grupo = next(iter(origen))
