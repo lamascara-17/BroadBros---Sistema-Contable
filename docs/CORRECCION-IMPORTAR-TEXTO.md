@@ -99,6 +99,31 @@ esa convención o confirmarse la cancelación antes de añadir un pago no escrit
 Las pruebas del caso no inventan ese pago. Tampoco se calcula IGV no indicado.
 
 No se incluyen migraciones, cambios de login, infraestructura ni modificaciones
-de datos de producción. La instrucción actual es dejar el commit en la rama de
-trabajo sin fusionar ni desplegar. Las pruebas de IA son simuladas; la nueva
-versión no se ha verificado con Groq en producción porque no se ha desplegado.
+de ejercicios de producción. La entrega inicial se dejó en la rama de trabajo
+sin desplegar. La publicación requiere autorización del usuario y comprobación
+del commit final. Las pruebas automatizadas de IA utilizan respuestas simuladas
+y no certifican por sí solas el funcionamiento del proveedor externo.
+
+La comprobación real posterior detectó otra variante del modelo: «|» en vez de
+una subcategoría vacía (General). El backend admite ese separador vacío y envoltorios
+como «|activo_corriente|», pero no elige entre varios valores distintos. El esquema
+del prompt ahora declara General como una cadena vacía, sin una alternativa vacía
+representada por una barra vertical. La advertencia de año ocupa un solo asunto
+pendiente, evitando contar por separado su explicación y la instrucción de aclaración.
+
+La prueba real de mercaderías también devolvió gastos de personal con código 74,
+uso de esa cuenta para servicios, costo de ventas fechado en una venta anterior y
+una depreciación anual de 10.000 abonada directamente al vehículo para un mes.
+Se reconoce el nombre «Gastos de Personal» (62), se señalan servicios mal asignados
+y abonos de depreciación al costo del activo en lugar del grupo 39. Si hay un único
+activo del grupo 33 incorporado el día 1 del mismo mes y una tasa anual explícita,
+sin residual ni método especial, se compara la propuesta con la cuota mensual;
+no se cambia su importe para cuadrarlo. Se solicita corregir o confirmar el criterio.
+Con datos ambiguos no se inventa una cuota. Los controles aritméticos no se ocultan
+por la presencia de un código inválido cuando los importes sí son legibles.
+
+El único reintento de análisis recibe las observaciones del backend, separadas de
+las aclaraciones del usuario. Así el modelo puede corregir problemas concretos,
+en lugar de repetir el mismo análisis; un diagnóstico no confirma por sí solo un
+año ni otro supuesto. Si persisten errores, la propuesta sigue en revisión y el
+caso anterior se conserva.

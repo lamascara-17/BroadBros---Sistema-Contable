@@ -52,7 +52,58 @@ def respuesta(datos):
     return SimpleNamespace(choices=[SimpleNamespace(finish_reason='stop',message=SimpleNamespace(content=json.dumps(datos)))])
 
 
+def propuesta_incorrecta_real():
+    p=propuesta('310')
+    for i in (3,4):p['asientos'][i]['movimientos'][0].update(codigo='74',nombre='Gastos de Personal')
+    p['asientos'][5]['fecha']='2026-10-11'
+    p['asientos'][6]['fecha']='2026-10-31'
+    p['asientos'][6]['movimientos'][0]['monto']='10000'
+    p['asientos'][6]['movimientos'][1].update(codigo='334',nombre='Vehículo',monto='10000')
+    return p
+
+
 class NormalizacionInventarioTests(TestCase):
+    def test_variante_real_detecta_servicios_cierre_y_depreciacion_anual(self):
+        b=normalizar_borrador(propuesta_incorrecta_real(),fuente=TEXTO)
+        self.assertTrue(all(not a['error_validacion'] for a in b['asientos']))
+        notas,_=orientar_revision({'texto_leido':TEXTO},b)
+        for control in ('grupo 63','grupo 39','833.33','2026-10-31'):
+            self.assertTrue(any(control in n for n in notas),control)
+
+    @override_settings(GROQ_API_KEY='solo-prueba')
+    def test_reintento_recibe_diagnostico_separado_de_aclaraciones(self):
+        with patch('core.importacion_general.Groq'),patch('core.importacion_general.solicitar_json',side_effect=[
+                respuesta(propuesta_incorrecta_real()),respuesta({'bloques':[TEXTO]}),respuesta(propuesta('201'))]) as ia:
+            b=proponer_caso_general({'texto_leido':TEXTO},None,'Aplicar criterio mensual.')
+        diagnostico=json.loads(ia.call_args.kwargs['messages'][1]['content'])
+        self.assertEqual(diagnostico['aclaraciones_usuario'],'Aplicar criterio mensual.')
+        self.assertTrue(any('833.33' in n for n in diagnostico['diagnostico_backend']))
+        self.assertEqual(b['pendientes'],[])
+        self.assertTrue(b['lectura_reorganizada'])
+
+    def test_un_error_pcge_no_oculta_los_errores_de_ajustes(self):
+        p=propuesta_incorrecta_real()
+        p['asientos'][3]['movimientos'][0]['nombre']='Cuenta sin identificar'
+        b=normalizar_borrador(p,fuente=TEXTO)
+        notas,_=orientar_revision({'texto_leido':TEXTO},b)
+        self.assertTrue(any('74' in n for n in notas))
+        self.assertTrue(any('833.33' in n for n in notas))
+
+    def test_ajustes_incorrectos_con_cuadre_no_reemplazan_el_caso(self):
+        guardar_importacion(novatech())
+        ids=list(AsientoContable.objects.values_list('pk',flat=True))
+        b=normalizar_borrador(propuesta_incorrecta_real(),fuente=TEXTO)
+        with self.assertRaises(ValueError):guardar_importacion(b['asientos'],fuente=TEXTO)
+        self.assertEqual(list(AsientoContable.objects.values_list('pk',flat=True)),ids)
+
+    def test_no_se_infiere_cuota_de_mes_completo_si_el_activo_no_inicia_el_dia_1(self):
+        from .validacion_contable import auditar_asientos
+        p=propuesta_incorrecta_real();p['asientos'][0]['fecha']='2026-10-15'
+        b=normalizar_borrador(p,fuente=TEXTO.replace('01/10/2026','15/10/2026'))
+        notas=auditar_asientos(b['asientos'],TEXTO.replace('01/10/2026','15/10/2026'))
+        self.assertFalse(any('833.33' in n for n in notas))
+        self.assertEqual(b['asientos'][6]['movimientos'][0]['monto'],'10000')
+
     @override_settings(GROQ_API_KEY='solo-prueba')
     def test_groq_411_y_310_se_normalizan_antes_de_la_decision_de_guardado(self):
         for codigo in ('411','310'):

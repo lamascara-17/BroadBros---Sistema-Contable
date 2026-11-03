@@ -41,7 +41,7 @@ def orientar_revision(datos,borrador,error='',aclaraciones=''):
             incoherentes=any(int(f[:4])!=esperado for f in fechas)
             propuestos=any(re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(a.get('fecha',''))) and int(str(a['fecha'])[:4])!=esperado for a in borrador['asientos'])
             if incoherentes or propuestos:
-                pendientes.append(f'El encabezado indica {mes.lower()} de {ano}, pero las fechas de las operaciones o de la propuesta no coinciden con el año {esperado}. Confirma el año con «El año correcto es {esperado}» o corrige el enunciado; no se cambia automáticamente.')
+                pendientes.append(f'El encabezado indica {mes.lower()} de {ano}, pero las fechas de las operaciones o de la propuesta no coinciden con el año {esperado}; confirma el año con «El año correcto es {esperado}» o corrige el enunciado; no se cambia automáticamente.')
         presentes={a.get('fecha') for a in borrador['asientos']}
         for faltante in sorted(fechas-presentes):
             nota=f'Revisa la operación del {faltante}: aparece en el enunciado pero no tiene un asiento propuesto. Pide completar el análisis; no inventes un dato que ya está escrito.'
@@ -66,8 +66,8 @@ def orientar_revision(datos,borrador,error='',aclaraciones=''):
         if pendientes:sugerencias.extend(pendientes)
         elif borrador['asientos']:
             sugerencias.append('Hay una propuesta con cuentas e importes revisables. Compara cada operación con el enunciado, incluidos los pagos y cobros parciales, antes de guardar.')
-    if borrador.get('asientos') and not any(a.get('error_validacion') for a in borrador['asientos']):
-        from .validacion_contable import auditar_asientos
+    from .validacion_contable import auditar_asientos,importes_auditables
+    if borrador.get('asientos') and importes_auditables(borrador['asientos']):
         for nota in auditar_asientos(borrador['asientos'], datos.get('texto_leido', '')):
             if nota not in pendientes: pendientes.append(nota)
             if nota not in sugerencias: sugerencias.append(nota)

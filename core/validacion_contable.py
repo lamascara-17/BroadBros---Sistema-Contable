@@ -1,7 +1,7 @@
 """Controles deterministas; nunca se altera un asiento histórico para cuadrarlo."""
 import re
 import unicodedata
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 FUENTE_PCGE = 'https://www.mef.gob.pe/contenidos/conta_publ/documentac/PCGE_2019.pdf'
 
@@ -28,7 +28,7 @@ def grupo_esperado(nombre, tipo):
     if tipo == 'ingreso' and venta_ordinaria(n): return '70'
     if tipo == 'gasto' and re.search(r'costo.*ventas', n): return '69'
     if tipo == 'gasto' and re.search(r'depreciacion|amortizacion', n): return '68'
-    if tipo == 'gasto' and re.search(r'\bplanilla\b|sueldos?|salarios?|remuneracion', n): return '62'
+    if tipo == 'gasto' and re.search(r'\bplanilla\b|sueldos?|salarios?|remuneracion|gastos? de personal', n): return '62'
     return None
 
 
@@ -197,6 +197,27 @@ def auditar_asientos(asientos, fuente=''):
         for i,a in enumerate(asientos,1):
             if es_ajuste_de_cierre(a) and a.get('fecha') and str(a['fecha'])!=cierre.isoformat():
                 alertas.append(f'Asiento {i}: el ajuste corresponde al cierre {cierre.isoformat()}, pero tiene fecha {a["fecha"]}. Corrija la fecha antes de guardar.')
+    for i,a in enumerate(asientos,1):
+        glosa=texto(a.get('descripcion',''))
+        if (re.search(r'servicios?',glosa) and not re.search(r'personal|planilla|sueld|remuneracion',glosa) and
+                any(m['tipo_cuenta']=='gasto' and grupo_esperado(m['nombre'],'gasto')=='62' for m in a['movimientos'])):
+            alertas.append(f'Asiento {i}: una operación descrita como servicios usa gastos de personal; revise el gasto de servicios del grupo 63 y no reutilice la cuenta de planilla.')
+        es_depreciacion=any(m['tipo_cuenta']=='gasto' and 'depreciacion' in texto(m['nombre']) for m in a['movimientos'])
+        if es_depreciacion and any(m['tipo_cuenta']=='activo' and str(m['codigo']).startswith('33') and m['tipo_movimiento']=='haber' for m in a['movimientos']):
+            alertas.append(f'Asiento {i}: la depreciación debe separar el costo del activo y su depreciación acumulada del grupo 39; revise el abono directo al grupo 33.')
+    tasas=re.findall(r'depreciacion[^.\n%]{0,80}?anual[^\d%]{0,80}(\d+(?:[.,]\d+)?)\s*%',n)
+    if cierre and len(tasas)==1 and not re.search(r'residual|salvamento|rescate|acelerad|unidades de produccion',n):
+        from datetime import date
+        activos=[(a,m) for a in asientos for m in a['movimientos'] if m['tipo_cuenta']=='activo' and str(m['codigo']).startswith('33') and m['tipo_movimiento']=='debe']
+        if len(activos)==1:
+            a,m=activos[0]
+            try:inicio=date.fromisoformat(str(a.get('fecha','')))
+            except ValueError:inicio=None
+            if inicio and inicio.day==1 and (inicio.year,inicio.month)==(cierre.year,cierre.month):
+                mensual=(Decimal(str(m['monto']))*importe_escrito(tasas[0])/100/12).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
+                registrada=sum((Decimal(str(m['monto'])) for a in asientos for m in a['movimientos'] if m['tipo_cuenta']=='gasto' and 'depreciacion' in texto(m['nombre']) and m['tipo_movimiento']=='debe'),Decimal('0'))
+                if registrada and registrada!=mensual:
+                    alertas.append(f'La tasa de depreciación es anual y el período identificado es un mes; con prorrateo mensual sobre el activo registrado la cuota sería S/ {mensual:,.2f}, pero se propuso S/ {registrada:,.2f}; confirme el criterio temporal y corrija el ajuste antes de guardar.')
     tiene_inventario = any(m['tipo_cuenta'] == 'activo' and
                            (str(m['codigo']).startswith(('20','21','22','23','24','25','26','28')) or
                             re.search(r'inventario|mercader|existencia', texto(m['nombre'])))
@@ -212,3 +233,12 @@ def auditar_asientos(asientos, fuente=''):
         if saldo != fisico:
             alertas.append(f'El inventario físico del enunciado es S/ {fisico:,.2f}; los asientos dejan S/ {saldo:,.2f}. Conciliar antes de guardar.')
     return list(dict.fromkeys(alertas))
+
+
+def importes_auditables(asientos):
+    """Un código inválido no debe ocultar los otros controles del borrador."""
+    from decimal import InvalidOperation
+    try:
+        return all(Decimal(str(m['monto'])).is_finite() and Decimal(str(m['monto']))>=0
+                   for a in asientos for m in a['movimientos'])
+    except (InvalidOperation,ValueError,TypeError,KeyError):return False

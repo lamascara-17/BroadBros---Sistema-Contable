@@ -124,7 +124,26 @@ class PCGEImportacionTests(TestCase):
         with patch('core.importacion_general.proponer_caso_general',return_value=b):
             r=self.client.post(reverse('cargar_texto_diario'),{'texto_caso':TEXTO})
         self.assertContains(r,'El encabezado indica octubre de 2026')
+        self.assertEqual(len(r.context['pendientes']),1)
         self.assertTrue(all(a['fecha'].startswith('2025') for a in r.context['asientos']))
+        self.assertEqual(AsientoContable.objects.count(),0)
+
+    def test_separador_del_esquema_no_es_una_subcategoria_contable(self):
+        p=proveedor_221()
+        for a in p:
+            for m in a['movimientos']:
+                if not m['subcategoria']:m['subcategoria']='|'
+                if m['codigo']=='101':m['subcategoria']=' |activo_corriente| '
+        b=normalizar_borrador({'asientos':p})
+        self.assertTrue(all(not a['error_validacion'] for a in b['asientos']))
+        guardar_importacion(b['asientos'])
+        self.assertEqual(contexto_estados()['resultado_neto'],11000)
+
+    def test_varias_subcategorias_no_se_eligen_al_azar(self):
+        p=novatech()
+        p[3]['movimientos'][0]['subcategoria']='gasto_operativo|gasto_financiero'
+        b=normalizar_borrador({'asientos':p})
+        self.assertTrue(b['asientos'][3]['error_validacion'])
         self.assertEqual(AsientoContable.objects.count(),0)
 
     def test_aclarar_el_ano_conserva_la_revision_voluntaria_sin_autoguardado(self):

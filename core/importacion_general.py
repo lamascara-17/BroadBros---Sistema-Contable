@@ -91,12 +91,24 @@ inventarios. No inventes existencias ni costo de mercaderías en una consultora
 que únicamente presta servicios y no registra operaciones con mercaderías.
 Si el encabezado y las fechas detalladas se contradicen, conserva las fechas
 escritas y pide confirmar el año. Una aclaración explícita del usuario prevalece.
+Cada campo enum contiene un SOLO valor, nunca una lista con barras verticales.
+Para subcategoria General devuelve la cadena vacía ""; no devuelvas "|".
+Las subcategorías restantes son costo_ventas, gasto_operativo, gasto_financiero,
+otro_ingreso, otro_gasto, impuesto_ganancias, activo_corriente,
+activo_no_corriente, pasivo_corriente y pasivo_no_corriente.
+Los gastos de personal/planilla corresponden al grupo 62; los servicios de
+terceros al 63; la depreciación al 68 contra depreciación acumulada 39, manteniendo
+el costo del vehículo en 33. No reutilices una cuenta de personal para servicios.
+Una tasa de depreciación ANUAL no es el gasto de un solo mes. Si el caso permite
+un mes completo, declara el prorrateo mensual (tasa anual / 12); si no, pide el
+criterio o inicio de uso. El costo de ventas pedido al cierre lleva la fecha de
+cierre, no la de una venta anterior. Un plazo de crédito no demuestra un pago.
 Devuelve SOLO JSON con esta estructura:
 {"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa", "clase":"operacion|apertura|cierre", "flujo_efectivo":"operacion|inversion|financiacion|pendiente",
 "fuente":"operación del ejercicio que sustenta el asiento",
 "movimientos":[{"codigo":"código PCGE", "nombre":"nombre de cuenta",
 "tipo_cuenta":"activo|pasivo|patrimonio|ingreso|gasto",
-"subcategoria":"|costo_ventas|gasto_operativo|gasto_financiero|otro_ingreso|otro_gasto|impuesto_ganancias|activo_corriente|activo_no_corriente|pasivo_corriente|pasivo_no_corriente",
+"subcategoria":"",
 "tipo_movimiento":"debe|haber","monto":"importe decimal o null"}]}],
 "pendientes":["operación y dato concreto que falta"],"supuestos":["convenciones usadas"]}.
 No inventes números de documento ni terceros. Los importes deben tener como
@@ -109,7 +121,7 @@ def clasificacion_normalizada(tipo, sub):
         texto = ''.join(c for c in unicodedata.normalize('NFKD', str(valor or '').strip().lower())
                         if not unicodedata.combining(c))
         return re.sub(r'[\s-]+', '_', texto)
-    tipo, sub = etiqueta(tipo), etiqueta(sub)
+    tipo, sub = etiqueta(tipo), etiqueta(str(sub or '').strip().strip('|').strip())
     tipo = {'activos': 'activo', 'pasivos': 'pasivo', 'ingresos': 'ingreso',
             'gastos': 'gasto', 'patrimonio_neto': 'patrimonio', 'capital': 'patrimonio'}.get(tipo, tipo)
     if tipo in ('activo_corriente', 'activo_no_corriente', 'pasivo_corriente', 'pasivo_no_corriente'):
@@ -236,7 +248,7 @@ class PropuestaInvalida(ValueError):
         self.borrador = borrador
 
 
-def _proponer_base(datos, tasa_impuesto, adicionales=''):
+def _proponer_base(datos, tasa_impuesto, adicionales='', observaciones_revision=None):
     key = getattr(settings,'GROQ_API_KEY','')
     if not key: raise ValueError('Configure GROQ_API_KEY para preparar la revisión general.')
     ejercicio={'texto_leido':datos['texto_leido']} if datos.get('texto_leido') else datos
@@ -244,6 +256,9 @@ def _proponer_base(datos, tasa_impuesto, adicionales=''):
         ejercicio = {**ejercicio, 'operaciones_organizadas': datos['bloques_lectura']}
     contenido = json.dumps({'ejercicio':ejercicio,'tasa_configurada':str(tasa_impuesto) if tasa_impuesto is not None else None,
                             'aclaraciones_usuario':adicionales},ensure_ascii=False,default=str)
+    if observaciones_revision:
+        contenido=json.dumps({**json.loads(contenido),'diagnostico_backend':observaciones_revision,
+                              'instruccion_revision':'Corrige los problemas detectados usando el enunciado original; conserva los datos y deja pendientes las ambigüedades, sin inventar información.'},ensure_ascii=False)
     if len(contenido) > 100000: raise ValueError('El ejercicio es demasiado extenso; divídalo en partes.')
     client = Groq(api_key=key,timeout=90,max_retries=1)
     modelo=getattr(settings,'GROQ_TEXT_MODEL','openai/gpt-oss-20b')
@@ -312,6 +327,7 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     if datos.get('lectura_incompleta'):
         raise ValueError('Complete la lectura original antes de generar asientos.')
     fallo = None
+    diagnostico=[]
     try:
         inicial = _proponer_base(datos, tasa_impuesto, adicionales)
     except PropuestaInvalida as exc:
@@ -321,13 +337,14 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     if inicial is not None:
         from .orientacion import orientar_revision
         pendientes, _ = orientar_revision(datos, inicial, aclaraciones=adicionales)
+        diagnostico=pendientes
         omitidas = len(pendientes) > len(inicial['pendientes'])
         invalidos = any(a.get('error_validacion') for a in inicial['asientos'])
         if fallo is None and inicial['asientos'] and not omitidas and (not invalidos or inicial['pendientes']):
             return inicial
     try:
         organizados = organizar_lectura(datos)
-        nuevo = _proponer_base(organizados, tasa_impuesto, adicionales)
+        nuevo = _proponer_base(organizados, tasa_impuesto, adicionales, **({'observaciones_revision':diagnostico} if diagnostico else {}))
         from .orientacion import orientar_revision
         nuevo['pendientes'], _ = orientar_revision(datos, nuevo, aclaraciones=adicionales)
         # Si el rescate falla, conservar una propuesta anterior utilizable.
