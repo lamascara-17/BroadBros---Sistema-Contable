@@ -84,7 +84,13 @@ operaciones, como convención declarada. Si no hay ninguna fecha, déjala pendie
 No crees asientos para contenidos ajenos a contabilidad.
 Cada ejercicio tiene su propio plan de cuentas. Usa códigos PCGE coherentes
 dentro de este caso, sin consultar cuentas de ejercicios anteriores. Distingue
-caja de banco y proveedores comerciales de proveedores de activos.
+caja (101), banco (104), clientes (12), proveedores comerciales (42) y pasivos
+por compra de equipos de uso propio (465). La compra y sus pagos posteriores
+usan la MISMA cuenta del proveedor. No uses 221 para proveedores ni 411 para
+inventarios. No inventes existencias ni costo de mercaderías en una consultora
+que únicamente presta servicios y no registra operaciones con mercaderías.
+Si el encabezado y las fechas detalladas se contradicen, conserva las fechas
+escritas y pide confirmar el año. Una aclaración explícita del usuario prevalece.
 Devuelve SOLO JSON con esta estructura:
 {"asientos":[{"fecha":"YYYY-MM-DD o null si falta", "descripcion":"glosa", "clase":"operacion|apertura|cierre", "flujo_efectivo":"operacion|inversion|financiacion|pendiente",
 "fuente":"operación del ejercicio que sustenta el asiento",
@@ -117,11 +123,11 @@ def clasificacion_normalizada(tipo, sub):
     return tipo, sub
 
 
-def validar_asientos(asientos):
+def validar_asientos(asientos, numero_inicial=1):
     if not isinstance(asientos, list) or not 1 <= len(asientos) <= 100:
         raise ValueError('Seleccione entre 1 y 100 asientos para guardar.')
     resultado, catalogo = [], {}
-    for numero, item in enumerate(asientos, 1):
+    for numero, item in enumerate(asientos, numero_inicial):
         if not isinstance(item, dict): raise ValueError('Asiento inválido.')
         try: dia = date.fromisoformat(str(item.get('fecha')))
         except ValueError: raise ValueError(f'Falta una fecha válida en el asiento {numero}.') from None
@@ -149,6 +155,8 @@ def validar_asientos(asientos):
             if sub in ('pasivo_corriente', 'pasivo_no_corriente') and tipo != 'pasivo':
                 raise ValueError('La clasificación corriente/no corriente corresponde a cuentas de pasivo.')
             if lado not in ('debe','haber'): raise ValueError('Indique Debe o Haber en cada línea.')
+            from .validacion_contable import validar_cuenta
+            validar_cuenta(codigo,nombre,tipo)
             firma = (nombre, tipo, sub)
             if codigo in catalogo and catalogo[codigo] != firma:
                 raise ValueError(f'La cuenta {codigo} tiene clasificaciones o nombres distintos dentro del borrador.')
@@ -171,16 +179,22 @@ def serializar_asientos(asientos):
     return json.loads(json.dumps(asientos, default=str))
 
 
-def normalizar_borrador(datos):
+def normalizar_borrador(datos, fuente='', aclaraciones=''):
     if not isinstance(datos, dict) or not isinstance(datos.get('asientos'), list) or len(datos['asientos']) > 100:
         raise ValueError('La propuesta no contiene una lista válida de asientos.')
     from .validacion_contable import preparar_pcge
-    borrador = []
-    for item in preparar_pcge(datos['asientos']):
+    from .clasificacion import fecha_cierre_del_caso
+    from .contexto_importacion import es_ajuste_de_cierre, inventario_generico, familia_del_inventario
+    cierre=fecha_cierre_del_caso({'texto_leido':fuente})
+    borrador,notas_backend = [],[]
+    for numero,item in enumerate(preparar_pcge(datos['asientos'],fuente),1):
         if not isinstance(item, dict) or not isinstance(item.get('movimientos'), list) or len(item['movimientos']) > 40:
             raise ValueError('La propuesta contiene movimientos inválidos.')
         a = {k:str(item.get(k) or '')[:2000] for k in ('fecha','descripcion','fuente')}
         a.update(clase=item.get('clase','operacion'),flujo_efectivo=item.get('flujo_efectivo','pendiente'))
+        if not a['fecha'] and cierre and es_ajuste_de_cierre(item):
+            a['fecha']=cierre.isoformat()
+            notas_backend.append(f'Fecha del ajuste {numero}: {cierre.isoformat()}, último día del único mes identificado en el enunciado.')
         a['movimientos'] = []
         for m in item['movimientos']:
             if not isinstance(m, dict): raise ValueError('Movimiento inválido en el borrador.')
@@ -188,15 +202,29 @@ def normalizar_borrador(datos):
                                     ('codigo','nombre','tipo_cuenta','subcategoria','tipo_movimiento','monto')})
             linea = a['movimientos'][-1]
             linea['tipo_cuenta'], linea['subcategoria'] = clasificacion_normalizada(linea['tipo_cuenta'], linea['subcategoria'])
-        try: validar_asientos([a]);a['error_validacion']=''
+        try: validar_asientos([a],numero_inicial=numero);a['error_validacion']=''
         except ValueError as exc:a['error_validacion']=str(exc)
         borrador.append(a)
+        if fuente and any(m.get('tipo_cuenta')=='activo' and inventario_generico(m.get('nombre','')) for m in a['movimientos']) and not familia_del_inventario(item,fuente):
+            notas_backend.append(f'Asiento {numero}: el tipo de inventario no está determinado. Aclare si son mercaderías, materias primas, productos terminados u otras existencias.')
+    usos={}
+    for numero,a in enumerate(borrador,1):
+        for m in a['movimientos']:
+            usos.setdefault(m['codigo'],[]).append((numero,(m['nombre'],m['tipo_cuenta'],m['subcategoria'])))
+    for codigo,cuentas in usos.items():
+        if len({firma for _,firma in cuentas})>1:
+            indices=sorted({n for n,_ in cuentas})
+            aviso=f'Cuenta {codigo}: nombres o clasificaciones distintos en los asientos '+', '.join(map(str,indices))+'. Separe o unifique correctamente las cuentas antes de guardar.'
+            for i in indices:borrador[i-1]['error_validacion']=(borrador[i-1]['error_validacion']+' '+aviso).strip()
     notas = {}
     for k in ('pendientes','supuestos'):
         valores = datos.get(k, [])
         if not isinstance(valores, list) or len(valores) > 100: raise ValueError('Las notas de revisión no son válidas.')
         from .notas_importacion import normalizar_notas
         notas[k] = normalizar_notas(valores)
+    notas['supuestos'].extend(n for n in notas_backend if n.startswith('Fecha del ajuste'))
+    notas['pendientes'].extend(n for n in notas_backend if not n.startswith('Fecha del ajuste'))
+    notas={k:normalizar_notas(v) for k,v in notas.items()}
     if not borrador and not notas['pendientes']:
         notas['pendientes'] = ['No hay información suficiente para proponer asientos. Complete los datos del ejercicio.']
     return {'asientos':borrador, **notas}
@@ -229,7 +257,7 @@ def _proponer_base(datos, tasa_impuesto, adicionales=''):
     try: propuesta=leer_json(choice.message.content)
     except (ValueError,TypeError):raise PropuestaInvalida('La propuesta no contiene JSON válido.') from None
     try:
-        borrador = normalizar_borrador(propuesta)
+        borrador = normalizar_borrador(propuesta,fuente=datos.get('texto_leido',''),aclaraciones=adicionales)
         from .notas_importacion import notas_repetitivas
         if notas_repetitivas(propuesta):
             borrador['supuestos'].append('El análisis inicial produjo observaciones repetitivas. Revisa las operaciones propuestas antes de confirmar el guardado.')
@@ -292,7 +320,7 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
     # Las fallas de conexión, cuota o configuración no se solucionan reorganizando.
     if inicial is not None:
         from .orientacion import orientar_revision
-        pendientes, _ = orientar_revision(datos, inicial)
+        pendientes, _ = orientar_revision(datos, inicial, aclaraciones=adicionales)
         omitidas = len(pendientes) > len(inicial['pendientes'])
         invalidos = any(a.get('error_validacion') for a in inicial['asientos'])
         if fallo is None and inicial['asientos'] and not omitidas and (not invalidos or inicial['pendientes']):
@@ -301,7 +329,7 @@ def proponer_caso_general(datos, tasa_impuesto, adicionales=''):
         organizados = organizar_lectura(datos)
         nuevo = _proponer_base(organizados, tasa_impuesto, adicionales)
         from .orientacion import orientar_revision
-        nuevo['pendientes'], _ = orientar_revision(datos, nuevo)
+        nuevo['pendientes'], _ = orientar_revision(datos, nuevo, aclaraciones=adicionales)
         # Si el rescate falla, conservar una propuesta anterior utilizable.
         if inicial is not None and (not nuevo['asientos'] or any(a.get('error_validacion') for a in nuevo['asientos'])):
             return inicial

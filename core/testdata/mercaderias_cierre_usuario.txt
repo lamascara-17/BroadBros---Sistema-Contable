@@ -1,0 +1,5 @@
+01/10/2026: Se crea una empresa con S/ 200,000 en efectivo y un vehículo de S/ 100,000.
+06/10/2026: Se compra mercadería por S/ 100,000, 50% al contado y 50% a crédito a 15 días.
+11/10/2026: Se vende por S/ 200,000, 60% a crédito y 40% al contado.
+16/10/2026: Se paga planilla de S/ 50,000 al contado y se registran servicios por S/ 10,000 pagaderos el siguiente mes.
+Al cierre del mes queda inventario por S/ 50,000. La depreciación anual del vehículo es de 10% y debe reconocerse al cierre del mes.

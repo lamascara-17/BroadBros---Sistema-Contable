@@ -983,7 +983,7 @@ def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente='', s
     """Validación completa antes de limpiar; cabeceras y detalles son atómicos."""
     from .importacion_general import validar_asientos, serializar_asientos
     from .validacion_contable import preparar_pcge, validar_cuenta
-    asientos = validar_asientos(preparar_pcge(serializar_asientos(asientos)))
+    asientos = validar_asientos(preparar_pcge(serializar_asientos(asientos),fuente))
     for a in asientos:
         for m in a['movimientos']: validar_cuenta(m['codigo'], m['nombre'], m['tipo_cuenta'])
     from .respaldos import MAX_CUENTAS_RESPALDO
@@ -1026,11 +1026,11 @@ def guardar_importacion(asientos, pendientes='', fecha_cierre=None, fuente='', s
 def mostrar_revision(request, payload, error=''):
     from django.core import signing
     from .importacion_general import normalizar_borrador
-    borrador=normalizar_borrador(payload['borrador'])
+    borrador=normalizar_borrador(payload['borrador'],fuente=payload['datos'].get('texto_leido',''),aclaraciones=payload.get('aclaraciones',''))
     if payload.get('error_propuesta') and not payload['borrador'].get('pendientes'):
         borrador['pendientes']=[]
     from .orientacion import orientar_revision
-    borrador['pendientes'],sugerencias=orientar_revision(payload['datos'],borrador,payload.get('error_propuesta',''))
+    borrador['pendientes'],sugerencias=orientar_revision(payload['datos'],borrador,payload.get('error_propuesta',''),payload.get('aclaraciones',''))
     payload['borrador']=borrador
     return render(request,'revisar_importacion.html',{
         **borrador,'revision_token':signing.dumps(payload,salt='revision-contable',compress=True),
@@ -1047,12 +1047,13 @@ def mostrar_revision(request, payload, error=''):
 def finalizar_propuesta(request, payload, revisar=False):
     from .importacion_general import normalizar_borrador, validar_asientos
     from .orientacion import orientar_revision
-    borrador = normalizar_borrador(payload['borrador'])
+    if revisar: payload['revision_solicitada'] = True
+    borrador = normalizar_borrador(payload['borrador'],fuente=payload['datos'].get('texto_leido',''),aclaraciones=payload.get('aclaraciones',''))
     if payload.get('error_propuesta') and not payload['borrador'].get('pendientes'):
         borrador['pendientes'] = []
-    borrador['pendientes'], _ = orientar_revision(payload['datos'], borrador, payload.get('error_propuesta', ''))
+    borrador['pendientes'], _ = orientar_revision(payload['datos'], borrador, payload.get('error_propuesta', ''), payload.get('aclaraciones',''))
     payload['borrador'] = borrador
-    requiere_revision = (revisar or payload.get('error_propuesta') or
+    requiere_revision = (payload.get('revision_solicitada') or payload.get('error_propuesta') or
                          payload['datos'].get('lectura_incompleta') or
                          payload['datos'].get('errores_lectura') or
                          borrador['pendientes'] or borrador['supuestos'] or
@@ -1226,12 +1227,12 @@ def revisar_importacion(request):
                 raise ValueError('Confirme el guardado parcial porque excluyó asientos de la propuesta.')
         # Conservar las correcciones del usuario si una validación impide guardar.
         borrador=normalizar_borrador({'asientos':asientos,'pendientes':pendientes,
-                                     'supuestos':payload['borrador'].get('supuestos',[])})
+                                     'supuestos':payload['borrador'].get('supuestos',[])},fuente=payload['datos'].get('texto_leido',''),aclaraciones=payload.get('aclaraciones',''))
         payload['borrador']=borrador
         limpiar=request.POST.get('limpiar')=='on' if request.POST.get('elegir_limpieza')=='1' else payload['limpiar']
         payload['limpiar']=limpiar
         from .orientacion import orientar_revision
-        pendientes, _ = orientar_revision(payload['datos'], borrador)
+        pendientes, _ = orientar_revision(payload['datos'], borrador, aclaraciones=payload.get('aclaraciones',''))
         borrador['pendientes'] = pendientes
         if pendientes and request.POST.get('aceptar_parcial') != 'on':
             raise ValueError('La propuesta omite operaciones o ajustes. Complete el análisis o confirme expresamente el guardado parcial.')

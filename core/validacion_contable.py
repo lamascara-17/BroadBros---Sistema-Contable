@@ -15,12 +15,20 @@ def grupo_esperado(nombre, tipo):
     if tipo == 'activo':
         if re.search(r'\bcaja\b|\bbancos?\b|efectivo|cuenta.*corriente', n): return '10'
         if re.search(r'mercader|inventario de mercader', n): return '20'
+        from .contexto_importacion import familias_inventario
+        inventarios=familias_inventario(n)
+        if len(inventarios)==1:return next(iter(inventarios))
         if re.search(r'depreciacion acumulada|amortizacion acumulada', n): return '39'
-        if re.search(r'equipo|maquinaria|mobiliario', n) and not re.search(r'para.*venta|por cobrar|anticipo', n): return '33'
+        if re.search(r'equipo|maquinaria|mobiliario|vehiculo', n) and not re.search(r'para.*venta|por cobrar|anticipo', n): return '33'
+    if tipo == 'pasivo':
+        if re.search(r'proveedor|pasivos? por compra', n) and re.search(r'equipos?|activo (?:fijo|inmovilizado)|maquinaria', n):
+            return '47' if 'relacionad' in n else '46'
     if tipo == 'patrimonio' and re.fullmatch(r'capital(?: social)?', n.strip()): return '50'
     from .clasificacion import venta_ordinaria
     if tipo == 'ingreso' and venta_ordinaria(n): return '70'
     if tipo == 'gasto' and re.search(r'costo.*ventas', n): return '69'
+    if tipo == 'gasto' and re.search(r'depreciacion|amortizacion', n): return '68'
+    if tipo == 'gasto' and re.search(r'\bplanilla\b|sueldos?|salarios?|remuneracion', n): return '62'
     return None
 
 
@@ -34,16 +42,49 @@ def validar_cuenta(codigo, nombre, tipo):
                   tipo == 'gasto' and (60 <= grupo <= 69 or grupo == 88 or 90 <= grupo <= 99) or
                   tipo == 'ingreso' and 70 <= grupo <= 79)
     esperado = grupo_esperado(nombre, tipo)
+    from .contexto_importacion import inventario_generico,INVENTARIOS
+    if tipo == 'activo' and inventario_generico(nombre) and str(codigo)[:2] not in {*INVENTARIOS,'28'}:
+        raise ValueError(f'Cuenta {codigo} — {nombre}: no identifica una familia de inventarios. Aclare si son mercaderías, materias primas u otro tipo de existencias.')
+    if tipo == 'pasivo' and re.search(r'\bproveedores?\b', texto(nombre)) and grupo not in (42,43,46,47):
+        compatible = False
     if not compatible or esperado and not str(codigo).startswith(esperado):
         raise ValueError(f'Cuenta {codigo} — {nombre}: código incompatible con {tipo} según las familias PCGE' + (f'; corresponde revisar el grupo {esperado}.' if esperado else '.'))
 
 
-def preparar_pcge(asientos):
+def preparar_pcge(asientos, fuente=''):
     """Solo borradores nuevos: corrige familias reconocibles, no libros históricos."""
     from copy import deepcopy
     from .clasificacion import rubro_resultados
     from types import SimpleNamespace
     salida = deepcopy(asientos)
+    from .contexto_importacion import inventario_generico,familia_del_inventario,INVENTARIOS
+    inventarios_validos={}
+    for a in salida:
+        for m in a.get('movimientos',[]):
+            if m.get('tipo_cuenta')=='activo' and (inventario_generico(m.get('nombre','')) or
+                                                  grupo_esperado(m.get('nombre',''),'activo') in INVENTARIOS):
+                g=str(m.get('codigo',''))[:2]
+                if g in INVENTARIOS:inventarios_validos.setdefault(g,{})[str(m['codigo'])]=m
+    inventarios_corregidos={}
+    # Inferir el proveedor solo desde compras inequívocas del mismo borrador.
+    # Una cuenta que mezcla equipos y mercaderías necesita revisión manual.
+    origenes = {}
+    for a in salida:
+        movs = a.get('movimientos', [])
+        compra_activo = any(m.get('tipo_cuenta') == 'activo' and
+                            (grupo_esperado(m.get('nombre',''),'activo') == '33' or
+                             str(m.get('codigo','')).startswith('33')) and
+                            m.get('tipo_movimiento') == 'debe' for m in movs)
+        compra_comercial = any((m.get('tipo_cuenta') == 'activo' and
+                                (grupo_esperado(m.get('nombre',''),'activo') in INVENTARIOS or
+                                 inventario_generico(m.get('nombre','')) and familia_del_inventario(a,fuente) in INVENTARIOS) or
+                                m.get('tipo_cuenta') == 'gasto' and str(m.get('codigo','')).startswith(('60','62','63'))) and
+                               m.get('tipo_movimiento') == 'debe' for m in movs)
+        for m in movs:
+            if m.get('tipo_cuenta') == 'pasivo' and re.search(r'\bproveedores?\b', texto(m.get('nombre',''))):
+                key = (str(m.get('codigo','')), texto(m.get('nombre','')), 'pasivo')
+                if compra_activo: origenes.setdefault(key,set()).add('46')
+                if compra_comercial: origenes.setdefault(key,set()).add('42')
     elegidos = {}
     ocupados = {str(m.get('codigo')): (texto(m.get('nombre', '')), m.get('tipo_cuenta'))
                 for a in salida for m in a.get('movimientos', [])}
@@ -59,18 +100,49 @@ def preparar_pcge(asientos):
                 if rubro_resultados(cuenta) == 'ventas':
                     m['subcategoria'] = ''
             grupo = grupo_esperado(nombre, tipo)
+            if tipo=='activo' and inventario_generico(nombre):
+                grupo=familia_del_inventario(a,fuente)
+                if grupo and not codigo.startswith(grupo):
+                    validos=inventarios_validos.get(grupo,{})
+                    if len(validos)>1:continue
+                    if len(validos)==1:
+                        cuenta=next(iter(validos.values()))
+                        m.update({k:cuenta.get(k,'') for k in ('codigo','nombre','subcategoria')})
+                        m['subcategoria']='activo_corriente'
+                        continue
+                    corregidos=inventarios_corregidos.get(grupo,{})
+                    if len(corregidos)>1:continue
+                    if len(corregidos)==1:
+                        cuenta=next(iter(corregidos.values()))
+                        m.update({k:cuenta.get(k,'') for k in ('codigo','nombre','subcategoria')})
+                        m['subcategoria']='activo_corriente'
+                        continue
+            if tipo=='activo' and grupo in INVENTARIOS:m['subcategoria']='activo_corriente'
+            if tipo=='activo' and grupo in ('33','39'):m['subcategoria']='activo_no_corriente'
+            if tipo=='gasto' and grupo in ('62','68'):m['subcategoria']='gasto_operativo'
+            if tipo=='gasto' and grupo=='69':m['subcategoria']='costo_ventas'
+            if not grupo and tipo == 'pasivo' and not codigo.startswith(('42','43','46','47')):
+                origen = origenes.get((codigo,texto(nombre),tipo),set())
+                if len(origen) == 1: grupo = next(iter(origen))
             if grupo and not codigo.startswith(grupo):
-                clave = (texto(nombre), tipo)
+                clave = (codigo, texto(nombre), tipo)
                 if clave not in elegidos:
-                    base = {'10': '101', '20': '201', '33': '336', '39': '39', '50': '501', '70': '70', '69': '69'}[grupo]
+                    base = {'10': '101', '20': '201', '21':'211','22':'221','23':'231','24':'241','25':'251','26':'261','33': '336', '39': '39',
+                            '42': '421', '46': '4654', '47': '477', '50': '501', '62':'62','68':'68','70': '70', '69': '69'}[grupo]
+                    # Sin documento no se puede decidir 4211/4212. No mezclar
+                    # proveedores ni inventar una subdivision para evitar el choque.
+                    if grupo in ('42','47') and base in ocupados:
+                        continue
                     candidato = base
                     sufijo = 1
-                    while candidato in ocupados and ocupados[candidato] != clave:
+                    while candidato in ocupados:
                         candidato = base + str(sufijo)
                         sufijo += 1
                     elegidos[clave] = candidato
-                    ocupados[candidato] = clave
+                    ocupados[candidato] = (texto(nombre),tipo)
                 m['codigo'] = elegidos[clave]
+                if tipo=='activo' and grupo in INVENTARIOS:
+                    inventarios_corregidos.setdefault(grupo,{})[m['codigo']]=m
     return salida
 
 
@@ -98,7 +170,7 @@ def auditar_asientos(asientos, fuente=''):
             alertas.append(f'Asiento {i}: posible operación duplicada (misma fecha, glosa y movimientos). Aclare el documento antes de guardar.')
         vistos.add(firma)
         inventario = [m for m in movs if m['tipo_cuenta'] == 'activo' and
-                      (str(m['codigo']).startswith('20') or re.search(r'mercader|inventario|existencia', texto(m['nombre'])))]
+                      (str(m['codigo']).startswith(('20','21','22','23','24','25','26','28')) or re.search(r'mercader|inventario|existencia', texto(m['nombre'])))]
         cambio = sum((Decimal(str(m['monto'])) * (1 if m['tipo_movimiento'] == 'debe' else -1) for m in inventario), Decimal('0'))
         previo = saldo
         saldo += cambio
@@ -112,6 +184,26 @@ def auditar_asientos(asientos, fuente=''):
             if fisico != saldo:
                 alertas.append(f'Asiento {i}: inventario físico S/ {fisico:,.2f}, saldo contable S/ {saldo:,.2f}; diferencia S/ {saldo-fisico:,.2f}. Saldo previo S/ {previo:,.2f}; reducción neta requerida S/ {previo-fisico:,.2f}, sujeta a revisar la contrapartida.')
     n = texto(fuente)
+    depreciaciones=any(m['tipo_cuenta']=='gasto' and
+                      re.search(r'depreciacion|amortizacion',texto(m['nombre']))
+                      for a in asientos for m in a['movimientos'])
+    if (n.strip() and depreciaciones and
+            not re.search(r'depreciacion|amortizacion|vida util|valor residual',n)):
+        alertas.append('La propuesta añade depreciación o amortización sin datos que sustenten ese ajuste en el enunciado. Retire el ajuste o complete su base antes de guardar; no se inventan tasas ni importes.')
+    from .clasificacion import fecha_cierre_del_caso
+    from .contexto_importacion import es_ajuste_de_cierre
+    cierre=fecha_cierre_del_caso({'texto_leido':fuente})
+    if cierre:
+        for i,a in enumerate(asientos,1):
+            if es_ajuste_de_cierre(a) and a.get('fecha') and str(a['fecha'])!=cierre.isoformat():
+                alertas.append(f'Asiento {i}: el ajuste corresponde al cierre {cierre.isoformat()}, pero tiene fecha {a["fecha"]}. Corrija la fecha antes de guardar.')
+    tiene_inventario = any(m['tipo_cuenta'] == 'activo' and
+                           (str(m['codigo']).startswith(('20','21','22','23','24','25','26','28')) or
+                            re.search(r'inventario|mercader|existencia', texto(m['nombre'])))
+                           for a in asientos for m in a['movimientos'])
+    if (tiene_inventario and re.search(r'consultor|servicios? de soporte',n) and
+            not re.search(r'mercader|inventari|existenci|productos?|stock|insumos?|materiales|repuestos|bienes para.*venta',n)):
+        alertas.append('La propuesta incluye inventarios, pero el enunciado de servicios no describe existencias ni compras de mercaderías. Revise y retire la operación sin sustento; no se puede inventar inventario ni costo de ventas.')
     patrones = [r'inventario\s+(?:fisico\s+)?final[^\d\n]{0,65}([\d][\d.,]*)',
                 r'inventario[^\n]{0,35}saldo\s+final[^\d\n]{0,30}([\d][\d.,]*)']
     finales = [x for patron in patrones for x in re.findall(patron, n)]

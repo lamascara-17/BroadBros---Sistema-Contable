@@ -78,6 +78,7 @@ def activo_no_corriente(codigo, nombre, subcategoria=''):
 
 def fecha_cierre_del_caso(datos):
     from datetime import date
+    from calendar import monthrange
     texto = datos.get('texto_leido', '')
     literal = re.search(r'fecha\s+de\s+cierre\s*[:：]?\s*(\d{1,2})/(\d{1,2})/(\d{4})\b', texto, re.I)
     if literal:
@@ -88,4 +89,21 @@ def fecha_cierre_del_caso(datos):
     if valor:
         try:return date.fromisoformat(str(valor))
         except ValueError:raise ValueError('La fecha de cierre del ejercicio no es válida.') from None
+    n=nombre_normalizado(texto)
+    if re.search(r'(?:al cierre|al final|al termino) del mes',n):
+        periodos=set()
+        for d,m,y in re.findall(r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b',n):
+            try:
+                f=date(int(y),int(m),int(d));periodos.add((f.year,f.month))
+            except ValueError:return None
+        meses={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,'julio':7,'agosto':8,'septiembre':9,'setiembre':9,'octubre':10,'noviembre':11,'diciembre':12}
+        for mes,y in re.findall(r'\b('+'|'.join(meses)+r')\s+(?:de(?:l)?\s+)?(\d{4})\b',n):
+            periodos.add((int(y),meses[mes]))
+        for op in datos.get('operaciones',[]):
+            if isinstance(op,dict) and op.get('fecha'):
+                try:
+                    f=date.fromisoformat(str(op['fecha']));periodos.add((f.year,f.month))
+                except ValueError:return None
+        if len(periodos)==1:
+            y,m=next(iter(periodos));return date(y,m,monthrange(y,m)[1])
     return None

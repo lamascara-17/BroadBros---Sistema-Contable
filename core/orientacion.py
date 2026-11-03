@@ -3,7 +3,16 @@ import re
 from datetime import date
 
 
-def orientar_revision(datos,borrador,error=''):
+def anio_confirmado(aclaraciones):
+    from .validacion_contable import texto
+    for frase in re.split(r'[.;\n]',texto(aclaraciones)):
+        if re.search(r'[?¿]|\b(?:no|nunca|tampoco)\b',frase): continue
+        match = re.search(r'\bel ano correcto(?: del ejercicio)?\s*(?:es|:)\s*(\d{4})\b',frase)
+        if match and 1900 <= int(match[1]) <= 2100: return int(match[1])
+    return None
+
+
+def orientar_revision(datos,borrador,error='',aclaraciones=''):
     from .notas_importacion import normalizar_notas
     pendientes=normalizar_notas(borrador.get('pendientes',[]))
     sugerencias=[]
@@ -22,6 +31,17 @@ def orientar_revision(datos,borrador,error=''):
             try:fechas.add(date(int(y),meses[m.lower()],int(d)).isoformat())
             except (ValueError,KeyError):pass
         fechas.update(str(op['fecha']) for op in datos.get('operaciones',[]) if isinstance(op,dict) and op.get('fecha') and op.get('tipo')!='inventario_final')
+        confirmado=anio_confirmado(aclaraciones)
+        encabezados=re.findall(r'\bdurante\s+(?:el\s+mes\s+de\s+)?('+'|'.join(meses)+r')\s+(?:de(?:l)?\s+)?(\d{4})\b',texto,re.I)
+        if confirmado:
+            fechas={f'{confirmado}{f[4:]}' for f in fechas}
+        if encabezados and fechas:
+            mes,ano=encabezados[0]
+            esperado=confirmado or int(ano)
+            incoherentes=any(int(f[:4])!=esperado for f in fechas)
+            propuestos=any(re.fullmatch(r'\d{4}-\d{2}-\d{2}',str(a.get('fecha',''))) and int(str(a['fecha'])[:4])!=esperado for a in borrador['asientos'])
+            if incoherentes or propuestos:
+                pendientes.append(f'El encabezado indica {mes.lower()} de {ano}, pero las fechas de las operaciones o de la propuesta no coinciden con el año {esperado}. Confirma el año con «El año correcto es {esperado}» o corrige el enunciado; no se cambia automáticamente.')
         presentes={a.get('fecha') for a in borrador['asientos']}
         for faltante in sorted(fechas-presentes):
             nota=f'Revisa la operación del {faltante}: aparece en el enunciado pero no tiene un asiento propuesto. Pide completar el análisis; no inventes un dato que ya está escrito.'
@@ -39,7 +59,10 @@ def orientar_revision(datos,borrador,error=''):
             nota = 'El caso incluye ventas e inventario final, pero falta el ajuste del costo de ventas. Complete el análisis usando la apertura, las compras y el inventario final indicados.'
             if nota not in pendientes: pendientes.append(nota)
         for i,a in enumerate(borrador['asientos'],1):
-            if a.get('error_validacion'):sugerencias.append(f'Asiento {i}: {a["error_validacion"]}')
+            if a.get('error_validacion'):
+                nota=f'Asiento {i}: {a["error_validacion"]}'
+                sugerencias.append(nota)
+                pendientes.append(nota)
         if pendientes:sugerencias.extend(pendientes)
         elif borrador['asientos']:
             sugerencias.append('Hay una propuesta con cuentas e importes revisables. Compara cada operación con el enunciado, incluidos los pagos y cobros parciales, antes de guardar.')
